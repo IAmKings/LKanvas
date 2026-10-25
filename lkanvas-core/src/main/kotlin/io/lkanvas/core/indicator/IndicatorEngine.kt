@@ -29,6 +29,9 @@ data class PlotDef(
 
 enum class PlotType { LINE, BAR }
 
+/** 指标序列归属（上游 series 语义）：主图/成交量图/独立副图。 */
+enum class IndicatorSeries { PRICE, VOLUME, NORMAL }
+
 /** 数据变更类型（增量推进的输入）。 */
 sealed interface ChangeKind {
     data object Reset : ChangeKind
@@ -66,8 +69,14 @@ interface IndicatorDefinition {
     /** 显示精度（位数）。 */
     val precision: Int
 
-    /** 输出列定义。 */
+    /** 输出列定义（默认参数下的；实际以 [plotsFor] 为准）。 */
     val plots: List<PlotDef>
+
+    /** 按实例参数生成输出列（如 MA 的 ma1..maN 随参数个数变化）。 */
+    fun plotsFor(params: List<Double>): List<PlotDef> = plots
+
+    /** 序列归属（pane 放置策略，PRD R-08）。 */
+    val series: IndicatorSeries get() = IndicatorSeries.NORMAL
 
     /** 增量能力声明（能力清单记录，PRD R-08）。 */
     val incremental: IncrementalCapability get() = IncrementalCapability.FULL_ONLY

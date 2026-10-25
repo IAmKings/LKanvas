@@ -10,6 +10,7 @@ lifecycle = "2.10.0"
 activityCompose = "1.13.0"
 composeBom = "2026.06.01"
 kotlinx-coroutines = "1.10.2"
+kotlinxSerialization = "1.8.1"
 junit = "4.13.2"
 
 [libraries]
@@ -25,6 +26,8 @@ androidx-foundation = { group = "androidx.compose.foundation", name = "foundatio
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+# 仅使用 Json DOM API（fixture 解析），不引入 @Serializable 编译插件
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
