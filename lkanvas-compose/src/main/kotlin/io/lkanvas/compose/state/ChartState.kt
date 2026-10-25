@@ -333,6 +333,10 @@ class ChartState(
     suspend fun prependHistory(candles: List<Candle>): ChangeResult =
         engine.apply(ChangeRequest.PrependHistory(candles))
 
+    /** 显式纠正已存在历史值（R-02 PatchHistory；指标后缀重算）。 */
+    suspend fun patchHistory(patches: List<Candle>): ChangeResult =
+        engine.apply(ChangeRequest.PatchHistory(patches))
+
     /** pane 高度（px）：主图自适应，VOL/MACD 固定，时间轴固定。 */
     data class PaneHeights(
         val main: Float,

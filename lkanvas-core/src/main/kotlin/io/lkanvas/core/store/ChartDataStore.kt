@@ -15,7 +15,7 @@ data class MarketKey(
 )
 
 /** 数据操作类型（PRD R-02 基础操作）。 */
-enum class DataOp { RESET, REPLACE_LATEST, UPSERT_LATEST, APPEND_BATCH, PREPEND_HISTORY }
+enum class DataOp { RESET, REPLACE_LATEST, UPSERT_LATEST, APPEND_BATCH, PREPEND_HISTORY, PATCH_HISTORY }
 
 /** 拒绝原因（明确错误，不静默修正）。 */
 enum class RejectReason {
@@ -121,6 +121,54 @@ class ChartDataStore(
 
     /** 只读视图（不拷贝；仅保证在串行上下文内消费）。 */
     fun candlesView(): List<Candle> = candles
+
+    /**
+     * 显式纠正已存在历史值（PRD R-02 PatchHistory）：
+     * - 每个 patch 的时间戳必须已存在（二分定位），否则明确拒绝；
+     * - patch 自身须通过 candle 校验；整批原子（任一失败数据不变）；
+     * - 不改变数量与时间戳序列，仅替换内容；revision 递增。
+     */
+    fun patchHistory(patches: List<Candle>): ChangeResult {
+        if (patches.isEmpty()) {
+            return ChangeResult.Rejected(DataOp.PATCH_HISTORY, RejectReason.EMPTY_BATCH)
+        }
+        if (candles.isEmpty()) {
+            return ChangeResult.Rejected(DataOp.PATCH_HISTORY, RejectReason.NO_DATA)
+        }
+        // 先全部定位与校验，再统一替换（原子性）
+        data class Located(val index: Int, val patch: Candle)
+        val located = ArrayList<Located>(patches.size)
+        for (p in patches) {
+            val issue = CandleValidator.validateBatch(listOf(p))
+            if (issue.isNotEmpty()) {
+                return ChangeResult.Rejected(DataOp.PATCH_HISTORY, RejectReason.VALIDATION_FAILED, issue)
+            }
+            val index = indexOfTimestampExact(p.timestamp)
+                ?: return ChangeResult.Rejected(
+                    DataOp.PATCH_HISTORY,
+                    RejectReason.TIMESTAMP_MISMATCH,
+                    detail = "时间戳 ${p.timestamp} 不存在于当前数据",
+                )
+            located += Located(index, p)
+        }
+        for (l in located) candles[l.index] = l.patch
+        return ChangeResult.Accepted(sessionId, ++revisionSerial, DataOp.PATCH_HISTORY)
+    }
+
+    private fun indexOfTimestampExact(timestamp: Long): Int? {
+        var lo = 0
+        var hi = candles.size - 1
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val ts = candles[mid].timestamp
+            when {
+                ts == timestamp -> return mid
+                ts < timestamp -> lo = mid + 1
+                else -> hi = mid - 1
+            }
+        }
+        return null
+    }
 
     fun reset(key: MarketKey? = marketKey, newCandles: List<Candle>): ChangeResult {
         val issues = CandleValidator.validateBatch(newCandles)

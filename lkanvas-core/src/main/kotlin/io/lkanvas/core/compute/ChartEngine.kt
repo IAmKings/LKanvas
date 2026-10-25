@@ -22,6 +22,9 @@ sealed interface ChangeRequest {
     data class UpsertLatest(val candle: Candle) : ChangeRequest
     data class AppendBatch(val candles: List<Candle>) : ChangeRequest
     data class PrependHistory(val candles: List<Candle>) : ChangeRequest
+
+    /** 显式纠正已存在历史值（R-02 PatchHistory）。 */
+    data class PatchHistory(val patches: List<Candle>) : ChangeRequest
 }
 
 /** 已接受变更摘要（快照事件附带，视口锚点维护用）。 */
@@ -236,5 +239,6 @@ class ChartEngine(
         is ChangeRequest.UpsertLatest -> store.upsertLatest(request.candle)
         is ChangeRequest.AppendBatch -> store.appendBatch(request.candles)
         is ChangeRequest.PrependHistory -> store.prependHistory(request.candles)
+        is ChangeRequest.PatchHistory -> store.patchHistory(request.patches)
     }
 }
