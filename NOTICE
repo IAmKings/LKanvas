@@ -1,0 +1,11 @@
+LKanvas
+Copyright 2026 The LKanvas Authors
+
+本产品包含由 KLineChart（https://github.com/klinecharts/KLineChart，
+Apache License 2.0，Copyright klinecharts）派生的指标公式、几何与领域行为实现，
+以独立 Kotlin/Compose 实现的方式移植，非逐文件翻译。
+
+上游基线：KLineChart v10.1.0（快照位于 third_party/klinechart-v10.1.0/，仅用于
+开发期 TypeScript 对照测试，不进入发布制品）。
+
+逐项来源映射与有意差异（D-01/D-02/D-03）见 docs/compatibility.md。

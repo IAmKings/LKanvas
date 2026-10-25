@@ -1,0 +1,29 @@
+# 构建产物
+build/
+out/
+*.class
+
+# Gradle
+.gradle/
+local.properties
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Android /Compose
+*.apk
+*.aab
+.apk.idsig
+captures/
+.kotlin/
+
+# Node（tools/oracle 本地依赖）
+node_modules/
+
+# 日志与临时文件
+*.log
+.DS_Store
