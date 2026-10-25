@@ -10,9 +10,18 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 
 | 模块 | 说明 |
 |---|---|
-| `lkanvas-core` | 纯 Kotlin/JVM 库：数据模型与校验、串行数据变更、会话/版本门禁、指标引擎、视口与坐标、覆盖物领域状态、存档 DTO |
-| `lkanvas-compose` | Android Compose 库：`KLineChart` 组件、Canvas 绘制、手势、无障碍语义 |
-| `app-sample` | 示例应用：本地确定性数据源、实时更新、指标与画线演示 |
+| `lkanvas-core` | 纯 Kotlin/JVM 库：数据模型与校验、串行数据变更、会话/版本门禁、27 种内置指标（全量与增量）、三种纵轴+自定义轴、视口坐标、覆盖物领域状态、DataSource 契约 |
+| `lkanvas-compose` | Android Compose 库：`KLineChart` 组件（六种主图类型、三 pane、明暗主题）、Canvas 绘制、手势状态机、segment 画线 |
+| `app-sample` | 示例应用：本地确定性行情、实时末根更新、分页、画线、图型/轴切换 |
+
+## 当前进度（M0–M3 完成）
+
+- **27/27 内置指标**：全部与上游 v10.1.0 TS oracle 逐位对照通过（值与 Missing 位置），附手算样例与增量/全量一致性测试
+- **六种主图类型**：candle_solid / candle_stroke / candle_up_stroke / candle_down_stroke / ohlc / area
+- **三种纵轴 + 自定义**：normal / logarithm（带符号 log）/ percentage（零基准按 D-01）
+- **数据链路**：Reset/Replace/Upsert/Append/Prepend/PatchHistory、会话门禁、分页加载状态机
+- **交互**：平移/双指缩放/长按十字线/点击/基础惯性；segment 画线（创建/拖点/整体拖/锁定/删除）
+- 待 M4–M6：其余 15 种覆盖物、存档恢复、无障碍、性能冻结、Maven 发布（见兼容台账）
 
 ## 上游基线
 

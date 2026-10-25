@@ -17,35 +17,37 @@
 
 ## 2. 内置指标（27，PRD 6.1）
 
-| 编号 | 名称 | 上游文件（src/extension/indicator/） | 状态 | Kotlin 位置 | 测试 |
-|---|---|---|---|---|---|
-| I-01 | MA | movingAverage.ts | **已实现已验收（Alpha）** | core `indicator/builtin/BuiltInIndicators.kt` | oracle 逐位对照 + 手算 + 增量一致性 + 工作量探针 |
-| I-02 | VOL | volume.ts | **已实现已验收（Alpha）**（缺失字段按 D-03） | 同上 | 同上 |
-| I-03 | MACD | movingAverageConvergenceDivergence.ts | **已实现已验收（Alpha）** | 同上 | 同上 |
-| I-04 | EMA | exponentialMovingAverage.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-05 | SMA | simpleMovingAverage.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-06 | BOLL | bollingerBands.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-07 | BBI | bullAndBearIndex.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-08 | BIAS | bias.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-09 | AO | awesomeOscillator.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-10 | MTM | momentum.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-11 | ROC | rateOfChange.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-12 | PSY | psychologicalLine.ts | 已映射待实现（M3） | 待 T-12 | 待 T-12 |
-| I-13 | KDJ | stoch.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-14 | RSI | relativeStrengthIndex.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-15 | WR | williamsR.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-16 | CCI | commodityChannelIndex.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-17 | DMI | directionalMovementIndex.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-18 | BRAR | brar.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-19 | CR | currentRatio.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-20 | VR | volumeRatio.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-21 | EMV | easeOfMovementValue.ts | 已映射待实现（M3） | 待 T-13 | 待 T-13 |
-| I-22 | SAR | stopAndReverse.ts | 已映射待实现（M3） | 待 T-14 | 待 T-14 |
-| I-23 | TRIX | tripleExponentiallySmoothedAverage.ts | 已映射待实现（M3） | 待 T-14 | 待 T-14 |
-| I-24 | OBV | onBalanceVolume.ts | 已映射待实现（M3） | 待 T-14 | 待 T-14 |
-| I-25 | PVT | priceAndVolumeTrend.ts | 已映射待实现（M3） | 待 T-14 | 待 T-14 |
-| I-26 | AVP | averagePrice.ts | 已映射待实现（M3） | 待 T-14 | 待 T-14 |
-| I-27 | DMA | differentOfMovingAverage.ts | 已映射待实现（M3） | 待 T-14 | 待 T-14 |
+**M3 全部完成**：27/27 指标均与上游 v10.1.0 TS oracle 逐位对照通过（值与 Missing 位置一致，误差 1e-9+1e-10·max），并附手算独立样例与增量/全量一致性测试。Kotlin 位置：`lkanvas-core/src/main/kotlin/io/lkanvas/core/indicator/builtin/`。
+
+| 编号 | 名称 | 增量能力 | 备注 |
+|---|---|---|---|
+| I-01 | MA | 增量 | 滚动窗口和 |
+| I-02 | VOL | 增量 | 缺失 volume → Missing（D-03） |
+| I-03 | MACD | 增量 | EMA 种子=前 p 根 SMA |
+| I-04 | EMA | 增量 | 种子=前 p 根 SMA |
+| I-05 | SMA | 增量 | 上游递推口径 (Cw+prev(N-w+1))/(N+1) |
+| I-06 | BOLL | 增量 | MID 滚动和 + 窗口偏差 O(p) |
+| I-07 | BBI | 增量 | 多窗口 MA 均值 |
+| I-08 | BIAS | 增量 | 均值为零 → Missing（R-08 禁止 Infinity） |
+| I-09 | AO | 增量 | HL/2 双窗口 |
+| I-10 | MTM | 增量 | 回看派生 |
+| I-11 | ROC | 增量 | 回看为零 → 0（上游显式约定） |
+| I-12 | PSY | 增量 | 涨跌标志派生 |
+| I-13 | KDJ | 增量 | 窗口高低 O(p) + K/D 递推（种子 50） |
+| I-14 | RSI | 增量 | RMA 递推（i>=p 有效） |
+| I-15 | WR | 增量 | 窗口极值，同价取 0 |
+| I-16 | CCI | 增量 | TP 滚动和 + 平均偏差 |
+| I-17 | DMI | **全量** | ADXR 需历史 ADX 回看 |
+| I-18 | BRAR | 增量 | 四项滚动和 |
+| I-19 | CR | **全量** | 带前移 MA 需序列回看；复现上游 list[-1]→undefined |
+| I-20 | VR | 增量 | 缺失 volume 窗口 → Missing（D-03） |
+| I-21 | EMV | 增量 | 缺失 volume → Missing；有效零量 → 0 |
+| I-22 | SAR | 增量 | 趋势状态机 |
+| I-23 | TRIX | 增量 | 三级 EMA + 固定大小环形历史 |
+| I-24 | OBV | 增量 | 历史由 candle O(N) 派生 |
+| I-25 | PVT | 增量 | volume 缺失按上游显式取 1 |
+| I-26 | AVP | 增量 | 累计零量 → Missing |
+| I-27 | DMA | 增量 | 双 MA 差由窗口派生 |
 
 ## 3. 覆盖物（16，PRD 6.2）
 
@@ -60,12 +62,13 @@
 
 | 能力 | 上游位置 | 状态 |
 |---|---|---|
-| 主图类型 6 种（candle_solid/stroke/up_stroke/down_stroke/ohlc/area） | common/Styles.ts、view/ | **candle_solid 已实现已验收（Alpha）**；其余 5 种已映射待实现（M3/T-18） |
-| 轴 3 种 + 自定义（normal/percentage/logarithm） | src/extension/y-axis/ | **normal 已实现已验收（Alpha）**（core `axis/LinearYAxis.kt`）；percentage/logarithm/自定义已映射待实现（M3/T-16、T-17） |
+| 主图类型 6 种（candle_solid/stroke/up_stroke/down_stroke/ohlc/area） | common/Styles.ts、view/ | **已实现（M3/T-18）**：六形态 + 可见高低标记 + area 渐变；真机验证空心蜡烛/轴切换 |
+| 轴 3 种 + 自定义（normal/percentage/logarithm） | src/extension/y-axis/ | **已实现（M3/T-16、T-17）**：core `axis/YAxisSpec.kt` 统一规格；signed-log 负/零/小正值支持；percentage 零基准按 D-01；自定义轴 A-18 保护（非单调/超量/非有限降级） |
 | 基础图形 7 种（circle/line/polygon/rect/text/arc/path） | src/extension/figure/ | line/point 等价物已实现（segment 用）；text 以 Compose 文本实现；其余已映射待实现（Beta） |
 | 数据接入（loadMoreData/DataSource 语义） | Store.ts、docs/guide/ | **已实现已验收（Alpha）**（core `datasource/`：HistorySource/ChartLoader/确定性示例；原生等价而非逐字兼容） |
-| 图例/tooltip/价格线/主题/格式化 | view/、common/ | **基础摘要已实现（Alpha）**（OHLC/MA 图例、末价线标签、明暗主题、时间/价格格式化）；完整 tooltip/资源扩展待 M3 |
-| 数据模型/串行变更/会话门禁/视口 | Store.ts 等 | **已实现已验收（Alpha）**（core `data/`、`store/`、`compute/`、`viewport/`；A-01~A-14 相关 JVM 测试通过） |
+| PatchHistory 显式历史纠正 | — | **已实现（M3/T-15）**：A-06 测试（最早/中间/末根纠正后与全量一致） |
+| 图例/tooltip/价格线/主题/格式化 | view/、common/ | **基础摘要已实现（Alpha）**（OHLC/MA 图例、末价线标签、明暗主题、时间/价格格式化）；完整 tooltip/资源扩展待 M4 |
+| 数据模型/串行变更/会话门禁/视口 | Store.ts 等 | **已实现已验收（Alpha）**（core `data/`、`store/`、`compute/`、`viewport/`；A-01~A-15 相关 JVM 测试通过） |
 | 手势（拖动/缩放/十字线/点击） | Event.ts | **基础已实现（Alpha）**（compose `gesture/ChartGestures.kt`；真机验证）；轴拖动缩放/pane 分隔条待 Beta |
 | setStyles/createIndicator 等 JS API | Chart.ts | **平台不适用**：JS 方法名/回调签名不逐字兼容（PRD 3.2），以 Kotlin 公开控制接口等价提供 |
 | DOM/CSS/CanvasRenderingContext2D/鼠标右键 | — | **平台不适用**：以 Compose 手势/无障碍等价 |
@@ -81,11 +84,17 @@
 |---|---|
 | 2026-10-25 | 初版：基线固定 v10.1.0；27 指标/16 覆盖物/其他能力登记；D-01/D-02/D-03 差异预登记 |
 | 2026-10-26 | **Alpha（M0–M2）完成**：数据模型/串行变更/会话门禁/视口坐标（A-01~A-14 JVM 测试）；指标引擎+MA/VOL/MACD（oracle 逐位对照）；candle_solid 三 pane 绘制；手势/十字线/图例；覆盖物框架+segment；DataSource 契约+加载协调器；真机（小米 23078PND5G）视觉验收通过 |
+| 2026-10-26 | **M3 完成**：27/27 指标（oracle 逐位对照 + 手算 + 增量一致性）；PatchHistory（A-06）；normal/logarithm/percentage/自定义轴（A-17/A-18）；六种主图类型 + 可见高低标记；真机验证图型/轴切换 |
 
-## 6. Alpha 已知问题与后续计划
+## 6. 已知问题与后续计划
 
-- 无障碍语义节点未提供（M4/T-27 范围，Alpha 不阻断）。
+- 无障碍语义节点未提供（M4/T-27 范围）。
 - 手势中轴拖动缩放、pane 分隔条调整未实现（Beta/T-23）。
-- 图例/tooltip 完整定制（slot/事件）待 M3/T-24；中英文资源扩展待做。
-- 性能门槛（第 7 节 B-01~B-06）尚未在冻结设备上测量（M5/T-30、T-34）；增量工作量已有 JVM 探针证明（末根替换 O(参数)）。
+- 覆盖物仅 segment（O-01）；其余 15 种待 M4/T-20~T-22。
+- 基础图形仅 line/point/text 等价物；circle/polygon/rect/arc/path 待 Beta。
+- 图例/tooltip 完整定制（slot/事件）与中英文资源扩展待 M4/T-24。
+- 存档/恢复、PNG 导出、诊断未实现（M4/M5）。
+- 性能门槛（第 7 节 B-01~B-06）尚未在冻结设备上测量（M5/T-30、T-34）；增量工作量已有 JVM 探针证明（末根替换 O(参数)，万根数据访问 <30 次）。
 - 惯性滚动为基础指数衰减实现，未接入 Android fling 动画曲线（后续优化）。
+- pane 增删/排序/调高为固定三 pane 布局，动态 pane 管理待 M4/T-16 完整版。
+- PVT volume 缺失按上游显式取 1、ROC 零回看取 0、AVP 缺失按 0：上游明确代码行为，逐位对齐优先（登记备查）。
