@@ -24,6 +24,15 @@ import ao from '../../third_party/klinechart-v10.1.0/src/extension/indicator/awe
 import mtm from '../../third_party/klinechart-v10.1.0/src/extension/indicator/momentum.ts'
 import roc from '../../third_party/klinechart-v10.1.0/src/extension/indicator/rateOfChange.ts'
 import psy from '../../third_party/klinechart-v10.1.0/src/extension/indicator/psychologicalLine.ts'
+import kdj from '../../third_party/klinechart-v10.1.0/src/extension/indicator/stoch.ts'
+import rsi from '../../third_party/klinechart-v10.1.0/src/extension/indicator/relativeStrengthIndex.ts'
+import wr from '../../third_party/klinechart-v10.1.0/src/extension/indicator/williamsR.ts'
+import cci from '../../third_party/klinechart-v10.1.0/src/extension/indicator/commodityChannelIndex.ts'
+import dmi from '../../third_party/klinechart-v10.1.0/src/extension/indicator/directionalMovementIndex.ts'
+import brar from '../../third_party/klinechart-v10.1.0/src/extension/indicator/brar.ts'
+import cr from '../../third_party/klinechart-v10.1.0/src/extension/indicator/currentRatio.ts'
+import vr from '../../third_party/klinechart-v10.1.0/src/extension/indicator/volumeRatio.ts'
+import emv from '../../third_party/klinechart-v10.1.0/src/extension/indicator/easeOfMovementValue.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = resolve(here, '../../lkanvas-core/src/test/resources/fixtures/indicator')
@@ -124,6 +133,16 @@ const fixtures: Fixture[] = [
   run('MTM', mtm, [12, 6], genCandles(120)),
   run('ROC', roc, [12, 6], genCandles(120)),
   run('PSY', psy, [12, 6], genCandles(120)),
+  // T-13 振荡/方向/量指标组（I-13~I-21）；CR 需要更长序列预热四条均线
+  run('KDJ', kdj, [9, 3, 3], genCandles(200)),
+  run('RSI', rsi, [6, 12, 24], genCandles(200)),
+  run('WR', wr, [6, 10, 14], genCandles(200)),
+  run('CCI', cci, [20], genCandles(200)),
+  run('DMI', dmi, [14, 6], genCandles(200)),
+  run('BRAR', brar, [26], genCandles(200)),
+  run('CR', cr, [26, 10, 20, 40, 60], genCandles(260)),
+  run('VR', vr, [26, 6], genCandles(200)),
+  run('EMV', emv, [14, 9], genCandles(200)),
 ]
 
 for (const f of fixtures) {
