@@ -80,6 +80,27 @@ class ChartState(
     /** candle 槽位中间隙占比（0..1）。 */
     var gapRatio: Double = 0.25
 
+    /** 主 pane 纵轴规格（R-06/T-16：normal/logarithm/percentage/custom）。 */
+    var mainAxisSpec: io.lkanvas.core.axis.YAxisSpec = io.lkanvas.core.axis.YAxisSpec.Normal
+
+    /** 生效规格：percentage 未指定基准时取首可见 candle close（上游口径）。 */
+    fun effectiveMainAxisSpec(): io.lkanvas.core.axis.YAxisSpec {
+        val spec = mainAxisSpec
+        return if (spec is io.lkanvas.core.axis.YAxisSpec.Percentage && spec.base == null) {
+            io.lkanvas.core.axis.YAxisSpec.Percentage(firstVisibleClose())
+        } else {
+            spec
+        }
+    }
+
+    private fun firstVisibleClose(): Double? {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val vp = viewport
+        val from = kotlin.math.floor(vp.scrollIndex).toInt().coerceIn(candles.indices)
+        return candles[from].close
+    }
+
     /** 十字线位置（内容区像素；null=未显示）。手势层更新。 */
     var crosshairPosition by mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
 
@@ -294,6 +315,7 @@ class ChartState(
             null, io.lkanvas.core.store.DataOp.RESET -> ChangeKind.Reset
             io.lkanvas.core.store.DataOp.REPLACE_LATEST -> ChangeKind.ReplaceLatest
             io.lkanvas.core.store.DataOp.PREPEND_HISTORY -> ChangeKind.Prepend(change.prependedCount)
+            io.lkanvas.core.store.DataOp.PATCH_HISTORY -> ChangeKind.Patch
             io.lkanvas.core.store.DataOp.UPSERT_LATEST ->
                 if (change.appendedCount > 0) ChangeKind.Append(change.appendedCount) else ChangeKind.ReplaceLatest
             io.lkanvas.core.store.DataOp.APPEND_BATCH -> ChangeKind.Append(change.appendedCount)

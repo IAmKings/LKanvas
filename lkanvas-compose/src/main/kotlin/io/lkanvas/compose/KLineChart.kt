@@ -197,14 +197,15 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCrosshairLabels
     contentRight: Float,
     legendHeight: Float,
 ) {
-    // 右侧标签由各 pane 的轴体系决定；Alpha 在主 pane 区域显示十字线 y 对应值
+    // 右侧标签由各 pane 的轴体系决定；在主 pane 区域显示十字线 y 对应值（按轴规格）
     val candles = state.dataSnapshot.candles
     val range = state.viewport.visibleRange(candles.size)
     if (range.count <= 0) return
     val visible = candles.subList(range.first, range.last + 1)
     val (lo, hi) = io.lkanvas.core.axis.LinearYAxis.rangeOfCandles(visible) ?: return
-    val value = io.lkanvas.core.axis.LinearYAxis.yToValue(
-        crosshair.y.toDouble(), lo, hi, 0.0, state.paneHeightsPx.main.toDouble(),
+    val spec = state.effectiveMainAxisSpec()
+    val value = io.lkanvas.core.axis.YAxisMath.yToValue(
+        spec, crosshair.y.toDouble(), lo, hi, 0.0, state.paneHeightsPx.main.toDouble(),
     )
     val clampedY = crosshair.y.coerceIn(legendHeight + text.tagHeight / 2f, Float.MAX_VALUE)
     drawTag(text, value, clampedY, contentRight, theme.crosshairLine)

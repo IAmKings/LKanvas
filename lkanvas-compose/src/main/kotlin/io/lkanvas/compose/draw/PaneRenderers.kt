@@ -9,7 +9,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
+import io.lkanvas.core.axis.AxisTicks
 import io.lkanvas.core.axis.LinearYAxis
+import io.lkanvas.core.axis.YAxisMath
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.indicator.IndicatorResultState
 import io.lkanvas.core.indicator.PlotType
@@ -37,7 +39,7 @@ fun Viewport.visibleRange(dataCount: Int): VisibleRange {
  */
 object PaneRenderers {
 
-    /** 主 pane：网格 + candle + MA 线 + 末价线。[legendHeight] 为顶部图例避让区。 */
+    /** 主 pane：网格 + candle + MA 线 + 末价线（按 [YAxisSpec] 轴规格映射）。 */
     fun DrawScope.drawMainPane(
         state: ChartState,
         theme: ChartTheme,
@@ -55,16 +57,43 @@ object PaneRenderers {
         val visible = candles.subList(range.first, range.last + 1)
 
         val (lo, hi) = LinearYAxis.rangeOfCandles(visible) ?: return
-        val y: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
+        val spec = state.effectiveMainAxisSpec()
+        val (rf, rt) = YAxisMath.realRange(spec, lo, hi)
+        val yReal: (Double) -> Double = { r -> LinearYAxis.valueToY(r, rf, rt, top.toDouble(), bottom.toDouble()) }
+        val y: (Double) -> Double = { v -> yReal(YAxisMath.valueToReal(spec, v)) }
 
-        drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom)
+        // 网格与刻度按轴规格生成
+        val axisTicks = YAxisMath.ticks(spec, lo, hi, 5)
+        for (t in axisTicks.ticks) {
+            val yy = yReal(t.real).toFloat()
+            drawLine(theme.gridLine, Offset(contentLeft, yy), Offset(contentRight, yy), 1f)
+        }
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             drawCandles(state, theme, visible, range.first, y)
             state.maResult?.let { drawLinePlots(it, state.viewport, range, y, theme.linePalette) }
             drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
         }
-        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi), y, contentRight, clipTop = legendHeight)
+        drawAxisTicks(text, theme, axisTicks, yReal, contentRight, clipTop = legendHeight)
         if (crosshair != null) drawCrosshair(theme, crosshair, contentLeft, contentRight, top, bottom)
+    }
+
+    /** 轴规格刻度标签（文本已按规格格式化；垂直去重叠 + 顶部避让）。 */
+    private fun DrawScope.drawAxisTicks(
+        text: ChartText,
+        theme: ChartTheme,
+        ticks: AxisTicks,
+        yReal: (Double) -> Double,
+        axisRight: Float,
+        clipTop: Float,
+    ) {
+        var lastTop = Float.NEGATIVE_INFINITY
+        for (t in ticks.ticks) {
+            val top = yReal(t.real).toFloat() - text.textHeight / 2f
+            if (top < lastTop + 2f) continue
+            if (top < clipTop) continue
+            drawText(text, t.text, Offset(axisRight + 6f, top), theme.axisText)
+            lastTop = top
+        }
     }
 
     /** VOL pane：成交量柱 + 均量线。 */
