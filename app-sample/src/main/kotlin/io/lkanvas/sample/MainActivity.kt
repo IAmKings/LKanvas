@@ -63,7 +63,29 @@ class MainActivity : ComponentActivity() {
                                 state.notifyOverlayChanged()
                             },
                             modifier = Modifier.padding(start = 8.dp),
-                        ) { Text("删除选中") }
+                        ) { Text("删除") }
+                        // 主图类型循环切换（六形态，T-18）
+                        val types = io.lkanvas.compose.theme.MainChartType.entries
+                        Button(
+                            onClick = {
+                                val next = types[(types.indexOf(state.mainChartType) + 1) % types.size]
+                                state.mainChartType = next
+                                state.notifyViewportChanged()
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text("图型") }
+                        // 纵轴规格循环：normal → logarithm → percentage（T-16）
+                        Button(
+                            onClick = {
+                                state.mainAxisSpec = when (state.mainAxisSpec) {
+                                    is io.lkanvas.core.axis.YAxisSpec.Normal -> io.lkanvas.core.axis.YAxisSpec.Logarithm
+                                    is io.lkanvas.core.axis.YAxisSpec.Logarithm -> io.lkanvas.core.axis.YAxisSpec.Percentage(null)
+                                    else -> io.lkanvas.core.axis.YAxisSpec.Normal
+                                }
+                                state.notifyViewportChanged()
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text("轴") }
                     }
                 }
             }

@@ -56,6 +56,22 @@ data class ChartTheme(
     }
 }
 
+/** 主图类型（上游 Styles 主图六形态，PRD 6.3/T-18）。 */
+enum class MainChartType {
+    /** 实心蜡烛 */
+    CANDLE_SOLID,
+    /** 空心蜡烛（描边） */
+    CANDLE_STROKE,
+    /** 上涨空心、下跌实心 */
+    CANDLE_UP_STROKE,
+    /** 上涨实心、下跌空心 */
+    CANDLE_DOWN_STROKE,
+    /** 美国线（OHLC bar） */
+    OHLC,
+    /** 面积图（收盘线 + 渐变填充） */
+    AREA,
+}
+
 /** 尺寸与布局配置（dp，绘制前转换为 px）。 */
 data class ChartLayoutConfig(
     val subPaneHeight: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp(92f),

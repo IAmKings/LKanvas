@@ -83,6 +83,10 @@ class ChartState(
     /** 主 pane 纵轴规格（R-06/T-16：normal/logarithm/percentage/custom）。 */
     var mainAxisSpec: io.lkanvas.core.axis.YAxisSpec = io.lkanvas.core.axis.YAxisSpec.Normal
 
+    /** 主图类型（T-18：六形态，默认实心蜡烛）。 */
+    var mainChartType: io.lkanvas.compose.theme.MainChartType =
+        io.lkanvas.compose.theme.MainChartType.CANDLE_SOLID
+
     /** 生效规格：percentage 未指定基准时取首可见 candle close（上游口径）。 */
     fun effectiveMainAxisSpec(): io.lkanvas.core.axis.YAxisSpec {
         val spec = mainAxisSpec

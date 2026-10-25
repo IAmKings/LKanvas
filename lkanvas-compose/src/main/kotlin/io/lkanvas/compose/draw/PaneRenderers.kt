@@ -6,9 +6,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
+import io.lkanvas.compose.theme.MainChartType
 import io.lkanvas.core.axis.AxisTicks
 import io.lkanvas.core.axis.LinearYAxis
 import io.lkanvas.core.axis.YAxisMath
@@ -72,6 +74,10 @@ object PaneRenderers {
             drawCandles(state, theme, visible, range.first, y)
             state.maResult?.let { drawLinePlots(it, state.viewport, range, y, theme.linePalette) }
             drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
+            drawHighLowMarkers(state, theme, text, visible, range.first, y, contentRight)
+            if (state.mainChartType == MainChartType.AREA) {
+                drawAreaFill(state, theme, visible, range.first, y, bottom)
+            }
         }
         drawAxisTicks(text, theme, axisTicks, yReal, contentRight, clipTop = legendHeight)
         if (crosshair != null) drawCrosshair(theme, crosshair, contentLeft, contentRight, top, bottom)
@@ -190,33 +196,138 @@ object PaneRenderers {
         val vp = state.viewport
         val gap = (vp.barSpacing * state.gapRatio).coerceAtMost(vp.barSpacing - 1.0).coerceAtLeast(0.0)
         val bodyWidth = (vp.barSpacing - gap).coerceAtLeast(1.0)
+        val type = state.mainChartType
         for (i in visible.indices) {
             val c = visible[i]
             val x = vp.candleCenterX((firstIndex + i).toDouble())
+            val up = c.close > c.open
             val color = when {
                 c.close > c.open -> theme.upColor
                 c.close < c.open -> theme.downColor
                 else -> theme.noChangeColor
             }
-            // 影线
-            drawLine(
-                color,
-                Offset(x.toFloat(), y(c.high).toFloat()),
-                Offset(x.toFloat(), y(c.low).toFloat()),
-                1f,
-            )
+            // OHLC bar：竖线 + 左开右收两横
+            if (type == MainChartType.OHLC) {
+                drawLine(color, Offset(x.toFloat(), y(c.high).toFloat()), Offset(x.toFloat(), y(c.low).toFloat()), 1f)
+                drawLine(
+                    color,
+                    Offset((x - bodyWidth / 2).toFloat(), y(c.open).toFloat()),
+                    Offset(x.toFloat(), y(c.open).toFloat()),
+                    1f,
+                )
+                drawLine(
+                    color,
+                    Offset(x.toFloat(), y(c.close).toFloat()),
+                    Offset((x + bodyWidth / 2).toFloat(), y(c.close).toFloat()),
+                    1f,
+                )
+                continue
+            }
+            // 影线（area 不画影线）
+            if (type != MainChartType.AREA) {
+                drawLine(
+                    color,
+                    Offset(x.toFloat(), y(c.high).toFloat()),
+                    Offset(x.toFloat(), y(c.low).toFloat()),
+                    1f,
+                )
+            }
+            if (type == MainChartType.AREA) continue
+
             // 实体（最小 1px，开收同价画横线）
             val yOpen = y(c.open)
             val yClose = y(c.close)
             val top = min(yOpen, yClose).toFloat()
             val bottom = max(yOpen, yClose).toFloat()
             val height = max(bottom - top, 1f)
-            drawRect(
-                color,
-                topLeft = Offset((x - bodyWidth / 2).toFloat(), top),
-                size = Size(bodyWidth.toFloat(), height),
+            val topLeft = Offset((x - bodyWidth / 2).toFloat(), top)
+            val size = Size(bodyWidth.toFloat(), height)
+            when (type) {
+                MainChartType.CANDLE_SOLID ->
+                    drawRect(color, topLeft = topLeft, size = size)
+                MainChartType.CANDLE_STROKE ->
+                    drawRect(color, topLeft = topLeft, size = size, style = Stroke(width = 1f))
+                // 上涨空心、下跌实心
+                MainChartType.CANDLE_UP_STROKE ->
+                    if (up) {
+                        drawRect(color, topLeft = topLeft, size = size, style = Stroke(width = 1f))
+                    } else {
+                        drawRect(color, topLeft = topLeft, size = size)
+                    }
+                // 上涨实心、下跌空心
+                MainChartType.CANDLE_DOWN_STROKE ->
+                    if (up) {
+                        drawRect(color, topLeft = topLeft, size = size)
+                    } else {
+                        drawRect(color, topLeft = topLeft, size = size, style = Stroke(width = 1f))
+                    }
+                else -> drawRect(color, topLeft = topLeft, size = size)
+            }
+        }
+    }
+
+    /** area 类型：收盘价折线 + 向下渐变填充（画在 candle 之后、MA 之前由调用序保证）。 */
+    private fun DrawScope.drawAreaFill(
+        state: ChartState,
+        theme: ChartTheme,
+        visible: List<Candle>,
+        firstIndex: Int,
+        y: (Double) -> Double,
+        paneBottom: Float,
+    ) {
+        if (visible.isEmpty()) return
+        val vp = state.viewport
+        val path = Path()
+        val firstX = vp.candleCenterX(firstIndex.toDouble()).toFloat()
+        path.moveTo(firstX, y(visible.first().close).toFloat())
+        for (i in 1 until visible.size) {
+            path.lineTo(
+                vp.candleCenterX((firstIndex + i).toDouble()).toFloat(),
+                y(visible[i].close).toFloat(),
             )
         }
+        val lastX = vp.candleCenterX((firstIndex + visible.size - 1).toDouble()).toFloat()
+        val closeLine = Path().apply { addPath(path) }
+        path.lineTo(lastX, paneBottom)
+        path.lineTo(firstX, paneBottom)
+        path.close()
+        val lineColor = theme.linePalette.first()
+        drawPath(
+            path,
+            androidx.compose.ui.graphics.Brush.verticalGradient(
+                colors = listOf(lineColor.copy(alpha = 0.25f), lineColor.copy(alpha = 0.02f)),
+                startY = 0f,
+                endY = paneBottom,
+            ),
+        )
+        drawPath(closeLine, lineColor, style = Stroke(width = 1.5f))
+    }
+
+    /** 可见最高/最低标记（PRD R-07：可见最高最低标记）。 */
+    private fun DrawScope.drawHighLowMarkers(
+        state: ChartState,
+        theme: ChartTheme,
+        text: ChartText,
+        visible: List<Candle>,
+        firstIndex: Int,
+        y: (Double) -> Double,
+        contentRight: Float,
+    ) {
+        if (visible.size < 2) return
+        var highIdx = 0
+        var lowIdx = 0
+        for (i in visible.indices) {
+            if (visible[i].high > visible[highIdx].high) highIdx = i
+            if (visible[i].low < visible[lowIdx].low) lowIdx = i
+        }
+        val vp = state.viewport
+        val hx = vp.candleCenterX((firstIndex + highIdx).toDouble()).toFloat()
+        val hy = y(visible[highIdx].high).toFloat()
+        drawText(text, " ${text.price(visible[highIdx].high)}", Offset(hx + 6f, (hy - text.textHeight).coerceAtLeast(0f)), theme.upColor)
+
+        val lx = vp.candleCenterX((firstIndex + lowIdx).toDouble()).toFloat()
+        val ly = y(visible[lowIdx].low).toFloat()
+        drawText(text, "${text.price(visible[lowIdx].low)} ", Offset((lx - 6f - text.tagWidth).coerceAtLeast(0f), ly + 2f), theme.downColor)
     }
 
     private fun DrawScope.drawVolumeBars(
