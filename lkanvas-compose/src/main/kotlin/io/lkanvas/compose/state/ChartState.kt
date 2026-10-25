@@ -24,6 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * 图表状态门面：把核心引擎（数据/会话/指标）与 Compose 可观察状态桥接。
@@ -79,8 +80,85 @@ class ChartState(
     /** candle 槽位中间隙占比（0..1）。 */
     var gapRatio: Double = 0.25
 
-    /** 十字线位置（内容区像素；null=未显示）。手势层更新（T-08）。 */
+    /** 十字线位置（内容区像素；null=未显示）。手势层更新。 */
     var crosshairPosition by mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
+
+    /** candle 点击事件（PRD R-10）。 */
+    var onCandleClick: ((io.lkanvas.core.data.Candle) -> Unit)? = null
+
+    /** 手势所有权：任一时刻至多一个交互所有者（PRD A-33 前置）。 */
+    var gestureOwner: GestureOwner = GestureOwner.NONE
+        private set
+
+    /** 惯性动画任务（新手势开始时取消）。 */
+    private var flingJob: kotlinx.coroutines.Job? = null
+
+    fun setGestureOwner(owner: GestureOwner) {
+        gestureOwner = owner
+    }
+
+    /** 手势入口统一封装：取消惯性、设置所有者。 */
+    fun beginGesture(owner: GestureOwner) {
+        flingJob?.cancel()
+        flingJob = null
+        gestureOwner = owner
+    }
+
+    fun endGesture() {
+        gestureOwner = GestureOwner.NONE
+    }
+
+    /** 平移（px；手势层调用）。 */
+    fun panBy(deltaX: Float) {
+        viewport.scrollBy(deltaX.toDouble(), dataSnapshot.candles.size)
+        viewRevision++
+    }
+
+    /** 以触点为锚缩放。 */
+    fun zoomAt(scale: Float, anchorX: Float) {
+        viewport.zoomBy(scale.toDouble(), anchorX.toDouble(), dataSnapshot.candles.size)
+        viewRevision++
+    }
+
+    /** 长按进入十字线模式：x 吸附最近 candle 中心。 */
+    fun showCrosshairAt(x: Float, y: Float) {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return
+        val vp = viewport
+        val idx = vp.logicalIndexAt(x.toDouble()).toInt().coerceIn(candles.indices)
+        crosshairPosition = androidx.compose.ui.geometry.Offset(
+            vp.candleCenterX(idx.toDouble()).toFloat(),
+            y.coerceIn(0f, paneHeightsPx.main + paneHeightsPx.vol + paneHeightsPx.macd),
+        )
+    }
+
+    fun moveCrosshair(x: Float, y: Float) = showCrosshairAt(x, y)
+
+    fun hideCrosshair() {
+        crosshairPosition = null
+    }
+
+    /** 点击：解析命中 candle 并回调。 */
+    fun tapCandle(x: Float) {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return
+        val idx = viewport.logicalIndexAt(x.toDouble()).roundToInt().coerceIn(candles.indices)
+        onCandleClick?.invoke(candles[idx])
+    }
+
+    /** 基础惯性：指数衰减平移直到速度接近零（取消即中断）。 */
+    fun fling(velocityX: Float) {
+        if (kotlin.math.abs(velocityX) < 200f) return
+        flingJob?.cancel()
+        flingJob = scope.launch {
+            var velocity = velocityX
+            while (kotlin.math.abs(velocity) > 60f) {
+                panBy(velocity * 16f / 1000f)
+                velocity *= 0.94f
+                kotlinx.coroutines.delay(16L)
+            }
+        }
+    }
 
     /** 布局宽度（px），由 composable 的 onSizeChanged 回填。 */
     var contentWidthPx: Float = 0f
@@ -167,3 +245,6 @@ class ChartState(
         val timeAxis: Float,
     )
 }
+
+/** 手势所有者（PRD R-10：任一时刻只有一个明确操作所有者）。 */
+enum class GestureOwner { NONE, PAN, PINCH, CROSSHAIR, OVERLAY_EDIT }

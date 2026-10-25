@@ -13,6 +13,7 @@ import io.lkanvas.compose.draw.PaneRenderers
 import io.lkanvas.compose.draw.drawTag
 import io.lkanvas.compose.draw.drawText
 import io.lkanvas.compose.draw.visibleRange
+import io.lkanvas.compose.gesture.chartGestures
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartLayoutConfig
 import io.lkanvas.compose.theme.ChartTheme
@@ -46,7 +47,12 @@ fun KLineChart(
         state.onLayout(contentW, ChartState.PaneHeights(mainH, subPaneH, subPaneH, timeAxisH))
     }
 
-    Canvas(modifier = modifier.fillMaxSize().then(layoutModifier)) {
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .then(layoutModifier)
+            .chartGestures(state),
+    ) {
         // 读取 viewRevision 触发重绘
         val rev = state.viewRevision
         val panes = state.paneHeightsPx
