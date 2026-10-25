@@ -60,7 +60,8 @@ data class ChartTheme(
 data class ChartLayoutConfig(
     val subPaneHeight: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp(92f),
     val timeAxisHeight: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp(22f),
-    val rightAxisGutter: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp(48f),
+    /** 右侧轴标签留白：需容纳最长价格文本（如 -1234.56） */
+    val rightAxisGutter: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp(64f),
     val legendTextSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
     val axisTextSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp),
     val candleGapRatio: Float = 0.25f,

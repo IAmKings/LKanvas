@@ -39,6 +39,16 @@ class ChartText(
         else -> volumeFormat.format(v)
     }
 
+    private val widthCache = HashMap<String, Float>()
+
+    /** 文本宽度测量（带缓存；仅用于图例/轴标签排布，键空间有界）。 */
+    fun measureWidth(s: String): Float = widthCache.getOrPut(s) {
+        measurer.measure(
+            s,
+            style = TextStyle(fontSize = textSizePx.sp),
+        ).size.width.toFloat()
+    }
+
     private fun createFormat(precision: Int): DecimalFormat =
         DecimalFormat().apply {
             maximumFractionDigits = precision

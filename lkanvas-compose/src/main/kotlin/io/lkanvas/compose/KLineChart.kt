@@ -76,8 +76,10 @@ fun KLineChart(
         drawLine(theme.axisLine, Offset(0f, volBottom), Offset(size.width, volBottom), 1f)
 
         val crosshair = state.crosshairPosition
+        // 主 pane 顶部两行图例（OHLC + MA）的避让高度
+        val legendHeight = legendTextSizePx * 3.2f
         with(PaneRenderers) {
-            drawMainPane(state, theme, contentLeft, contentRight, mainTop, mainBottom, text, crosshair)
+            drawMainPane(state, theme, contentLeft, contentRight, mainTop, mainBottom, text, crosshair, legendHeight)
             drawVolumePane(state, theme, contentLeft, contentRight, volTop, volBottom, text)
             drawMacdPane(state, theme, contentLeft, contentRight, macdTop, macdBottom, text)
         }
@@ -88,13 +90,13 @@ fun KLineChart(
         drawTimeAxis(state, theme, text, contentLeft, contentRight, macdBottom, panes.timeAxis)
         drawLegend(state, theme, text, legendTextSizePx, crosshair, gutterW, size.width)
         if (crosshair != null) {
-            // 十字线当前值标签
-            drawCrosshairLabels(state, theme, text, crosshair, contentRight)
+            // 十字线当前值标签（避让图例区）
+            drawCrosshairLabels(state, theme, text, crosshair, contentRight, legendHeight)
         }
     }
 }
 
-/** 时间轴：按可见范围与间隔取标签（跨日显示日期）。 */
+/** 时间轴：按可见范围与间隔取标签（跨日显示日期）；实测宽度防重叠。 */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTimeAxis(
     state: ChartState,
     theme: ChartTheme,
@@ -108,23 +110,28 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTimeAxis(
     val range = state.viewport.visibleRange(candles.size)
     if (range.count <= 0) return
     val interval = if (candles.size > 1) candles[1].timestamp - candles[0].timestamp else 60_000L
-    // 标签间隔：约每 90px 一个
-    val step = maxOf(1, (90.0 / state.viewport.barSpacing).toInt())
     var prevTs: Long? = null
+    var lastLabelRight = Float.NEGATIVE_INFINITY
     var i = range.first
+    // 逐根尝试：跨日标签优先绘制，普通时间标签与已绘制区域重叠则跳过
     while (i <= range.last) {
         val c = candles[i]
         val label = ChartText.timeAxisLabel(c.timestamp, prevTs, interval)
         if (label.isNotEmpty()) {
             val x = state.viewport.candleCenterX(i.toDouble()).toFloat()
-            drawText(text, label, Offset((x - 18f).coerceIn(left, right - 40f), top + 3f), theme.axisText)
+            val width = measureLabelWidth(text, label)
+            val drawX = (x - width / 2f).coerceIn(left, (right - width).coerceAtLeast(left))
+            if (drawX > lastLabelRight + 6f) {
+                drawText(text, label, Offset(drawX, top + 3f), theme.axisText)
+                lastLabelRight = drawX + width
+            }
         }
         prevTs = c.timestamp
-        i += step
+        i++
     }
 }
 
-/** 图例：主 pane 顶部 OHLC 摘要 + MA/VOL/MACD 值（跟随十字线或末根）。 */
+/** 图例：主 pane 顶部 OHLC 摘要 + MA 值（跟随十字线或末根）；实测宽度排布防重叠。 */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLegend(
     state: ChartState,
     theme: ChartTheme,
@@ -140,6 +147,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLegend(
     val idx = crosshair?.let { vp.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) }
         ?: (candles.size - 1)
     val c = candles[idx]
+    val contentWidth = totalWidth - gutterW
     var x = 8f
     val y = 4f
     val prev = candles.getOrNull(idx - 1)
@@ -149,24 +157,36 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLegend(
         c.close < prev.close -> theme.legendValueDown
         else -> theme.legendValueNeutral
     }
-    drawText(text, "O ${text.price(c.open)}", Offset(x, y), theme.legendText); x += 84f
-    drawText(text, "H ${text.price(c.high)}", Offset(x, y), theme.legendText); x += 84f
-    drawText(text, "L ${text.price(c.low)}", Offset(x, y), theme.legendText); x += 84f
-    drawText(text, "C ${text.price(c.close)}", Offset(x, y), priceColor)
+    val items = listOf(
+        "O ${text.price(c.open)}" to theme.legendText,
+        "H ${text.price(c.high)}" to theme.legendText,
+        "L ${text.price(c.low)}" to theme.legendText,
+        "C ${text.price(c.close)}" to priceColor,
+    )
+    for ((s, color) in items) {
+        if (x > contentWidth - 40f) break
+        drawText(text, s, Offset(x, y), color)
+        x += measureLabelWidth(text, s) + 10f
+    }
 
-    // MA 图例（列序 = 参数序，titles 由参数推导）
+    // MA 图例（列序 = 参数序）
     state.maResult?.let { ma ->
         var lx = 8f
-        val ly = y + textSizePx * 1.3f
+        val ly = y + textSizePx * 1.4f
         for ((k, key) in ma.result.keys.withIndex()) {
             val v = ma.result[key].getOrNull(idx) ?: Double.NaN
             val color = theme.linePalette[k % theme.linePalette.size]
             val period = ma.params.getOrNull(k)?.toInt() ?: (k + 1)
-            drawText(text, "MA$period ${text.price(v)}", Offset(lx, ly), color)
-            lx += textSizePx * 9f
+            val s = "MA$period ${text.price(v)}"
+            if (lx > contentWidth - 40f) break
+            drawText(text, s, Offset(lx, ly), color)
+            lx += measureLabelWidth(text, s) + 10f
         }
     }
 }
+
+/** 测量文本宽度（图例/时间轴排布用；TextMeasurer 结果缓存于 ChartText）。 */
+private fun measureLabelWidth(text: ChartText, s: String): Float = text.measureWidth(s)
 
 /** 十字线当前值标签（右侧价格 + 底部时间）。 */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCrosshairLabels(
@@ -175,6 +195,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCrosshairLabels
     text: ChartText,
     crosshair: Offset,
     contentRight: Float,
+    legendHeight: Float,
 ) {
     // 右侧标签由各 pane 的轴体系决定；Alpha 在主 pane 区域显示十字线 y 对应值
     val candles = state.dataSnapshot.candles
@@ -185,5 +206,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCrosshairLabels
     val value = io.lkanvas.core.axis.LinearYAxis.yToValue(
         crosshair.y.toDouble(), lo, hi, 0.0, state.paneHeightsPx.main.toDouble(),
     )
-    drawTag(text, value, crosshair.y, contentRight, theme.crosshairLine)
+    val clampedY = crosshair.y.coerceIn(legendHeight + text.tagHeight / 2f, Float.MAX_VALUE)
+    drawTag(text, value, clampedY, contentRight, theme.crosshairLine)
 }

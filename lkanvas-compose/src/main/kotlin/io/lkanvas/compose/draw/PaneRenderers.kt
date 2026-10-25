@@ -37,7 +37,7 @@ fun Viewport.visibleRange(dataCount: Int): VisibleRange {
  */
 object PaneRenderers {
 
-    /** 主 pane：网格 + candle + MA 线 + 末价线。 */
+    /** 主 pane：网格 + candle + MA 线 + 末价线。[legendHeight] 为顶部图例避让区。 */
     fun DrawScope.drawMainPane(
         state: ChartState,
         theme: ChartTheme,
@@ -47,6 +47,7 @@ object PaneRenderers {
         bottom: Float,
         text: ChartText,
         crosshair: Offset?,
+        legendHeight: Float = 0f,
     ) {
         val candles = state.dataSnapshot.candles
         val range = state.viewport.visibleRange(candles.size)
@@ -60,9 +61,9 @@ object PaneRenderers {
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             drawCandles(state, theme, visible, range.first, y)
             state.maResult?.let { drawLinePlots(it, state.viewport, range, y, theme.linePalette) }
-            drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text)
+            drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
         }
-        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi), y, contentRight)
+        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi), y, contentRight, clipTop = legendHeight)
         if (crosshair != null) drawCrosshair(theme, crosshair, contentLeft, contentRight, top, bottom)
     }
 
@@ -287,11 +288,13 @@ object PaneRenderers {
         left: Float,
         right: Float,
         text: ChartText,
+        legendHeight: Float = 0f,
     ) {
         val last = candles.lastOrNull() ?: return
-        val yy = y(last.close).toFloat()
+        // 末价标签避让图例区
+        val yy = y(last.close).toFloat().coerceIn(legendHeight + text.tagHeight, Float.MAX_VALUE)
         drawLine(theme.lastPriceLine, Offset(left, yy), Offset(right, yy), 1f)
-        drawTag(text, 
+        drawTag(text,
             last.close,
             yy,
             right,
@@ -317,13 +320,19 @@ object PaneRenderers {
         ticks: List<Double>,
         y: (Double) -> Double,
         axisRight: Float,
+        clipTop: Float = 0f,
     ) {
+        var lastTop = Float.NEGATIVE_INFINITY
         for (t in ticks) {
-            drawText(text, 
+            val top = y(t).toFloat() - text.textHeight / 2f
+            if (top < lastTop + 2f) continue // 相邻刻度垂直重叠时跳过
+            if (top < clipTop) continue // 避让顶部图例区
+            drawText(text,
                 t,
-                Offset(axisRight + 6f, y(t).toFloat() - text.textHeight / 2f),
+                Offset(axisRight + 6f, top),
                 theme.axisText,
             )
+            lastTop = top
         }
     }
 }
