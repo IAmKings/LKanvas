@@ -33,6 +33,12 @@ import brar from '../../third_party/klinechart-v10.1.0/src/extension/indicator/b
 import cr from '../../third_party/klinechart-v10.1.0/src/extension/indicator/currentRatio.ts'
 import vr from '../../third_party/klinechart-v10.1.0/src/extension/indicator/volumeRatio.ts'
 import emv from '../../third_party/klinechart-v10.1.0/src/extension/indicator/easeOfMovementValue.ts'
+import sar from '../../third_party/klinechart-v10.1.0/src/extension/indicator/stopAndReverse.ts'
+import trix from '../../third_party/klinechart-v10.1.0/src/extension/indicator/tripleExponentiallySmoothedAverage.ts'
+import obv from '../../third_party/klinechart-v10.1.0/src/extension/indicator/onBalanceVolume.ts'
+import pvt from '../../third_party/klinechart-v10.1.0/src/extension/indicator/priceAndVolumeTrend.ts'
+import avp from '../../third_party/klinechart-v10.1.0/src/extension/indicator/averagePrice.ts'
+import dma from '../../third_party/klinechart-v10.1.0/src/extension/indicator/differentOfMovingAverage.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = resolve(here, '../../lkanvas-core/src/test/resources/fixtures/indicator')
@@ -143,6 +149,13 @@ const fixtures: Fixture[] = [
   run('CR', cr, [26, 10, 20, 40, 60], genCandles(260)),
   run('VR', vr, [26, 6], genCandles(200)),
   run('EMV', emv, [14, 9], genCandles(200)),
+  // T-14 递推/累计指标组（I-22~I-27）；DMA/TRIX 长预热
+  run('SAR', sar, [2, 2, 20], genCandles(200)),
+  run('TRIX', trix, [12, 9], genCandles(200)),
+  run('OBV', obv, [30], genCandles(200)),
+  run('PVT', pvt, [], genCandles(200)),
+  run('AVP', avp, [], genCandles(200)),
+  run('DMA', dma, [10, 50, 10], genCandles(200)),
 ]
 
 for (const f of fixtures) {
