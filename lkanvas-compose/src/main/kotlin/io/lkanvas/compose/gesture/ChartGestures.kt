@@ -8,22 +8,26 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import io.lkanvas.compose.draw.OverlayRenderer
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.state.GestureOwner
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.hypot
 
-private enum class GMode { IDLE, PAN, CROSSHAIR, PINCH }
+private enum class GMode { IDLE, PAN, CROSSHAIR, PINCH, CREATE, POINT_DRAG, WHOLE_DRAG }
 
 /**
- * 图表手势状态机（PRD R-10 Alpha 部分）：
+ * 图表手势状态机（PRD R-10 Alpha 部分 + R-09 覆盖物）：
  * - 单指拖动（超过触距且横向为主）→ 平移（PAN），释放带基础惯性；
  *   纵向为主的位移不消费，外层 LazyColumn/Pager 可正常接管（A-32 基础）
  * - 双指 → 缩放（PINCH，中点为锚）；第二指加入时结束平移/十字线；
  *   双指抬一指降级等待，不再误触发平移
  * - 长按（未移动）→ 十字线（CROSSHAIR），移动吸附 candle 中心，抬起隐藏
  * - 短按无位移 → 点击 candle 事件
+ * - 创建模式（CREATE）：点击按磁吸加控制点，补齐自动完成（O-01 segment）
+ * - 命中覆盖物：控制点拖动（POINT_DRAG）优先于整体拖动（WHOLE_DRAG），
+ *   再优先于图表平移（命中优先级 PRD R-09）
  * - 位移被父容器消费（接管/取消）→ 结束当前交互，无残留状态（A-31 基础）
  */
 fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(state) {
@@ -38,6 +42,33 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         var moved = false
         var pinchDist: Float? = null
         val velocity = VelocityTracker()
+        // 覆盖物拖动上下文
+        var dragInstanceId: String? = null
+        var dragPointIndex: Int? = null
+        var lastAnchor: io.lkanvas.core.overlay.OverlayPoint? = null
+
+        // 创建模式优先接管本次手势
+        if (state.overlays.creatingId != null) {
+            mode = GMode.CREATE
+            state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
+        } else {
+            val hit = OverlayRenderer.hitTest(state, down.position.x, down.position.y)
+            if (hit != null) {
+                state.overlays.select(hit.instanceId)
+                state.notifyOverlayChanged()
+                if (hit.pointIndex != null && state.overlays.beginDrag(hit.instanceId, hit.pointIndex)) {
+                    mode = GMode.POINT_DRAG
+                    dragInstanceId = hit.instanceId
+                    dragPointIndex = hit.pointIndex
+                    state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
+                } else if (hit.wholeDrag && state.overlays.beginDrag(hit.instanceId, null)) {
+                    mode = GMode.WHOLE_DRAG
+                    dragInstanceId = hit.instanceId
+                    lastAnchor = state.overlayPointFromPx(down.position.x, down.position.y)
+                    state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
+                }
+            }
+        }
 
         while (true) {
             val awaitingLongPress = mode == GMode.IDLE && !moved
@@ -60,7 +91,9 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
 
             when (event.type) {
                 PointerEventType.Press -> {
-                    if (event.changes.count { it.pressed } >= 2) {
+                    if (event.changes.count { it.pressed } >= 2 && mode != GMode.CREATE &&
+                        mode != GMode.POINT_DRAG && mode != GMode.WHOLE_DRAG
+                    ) {
                         mode = GMode.PINCH
                         state.setGestureOwner(GestureOwner.PINCH)
                         state.hideCrosshair()
@@ -115,6 +148,38 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                 // 纵向为主：不消费不进入平移，父容器接管
                             }
                         }
+
+                        GMode.POINT_DRAG -> {
+                            val c = event.changes.firstOrNull() ?: continue
+                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                            if (anchor != null) {
+                                state.overlays.drag(dragInstanceId, dragPointIndex, to = anchor)
+                                state.notifyOverlayChanged()
+                            }
+                            event.changes.forEach { it.consume() }
+                        }
+
+                        GMode.WHOLE_DRAG -> {
+                            val c = event.changes.firstOrNull() ?: continue
+                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                            val last = lastAnchor
+                            if (anchor != null && last != null) {
+                                state.overlays.drag(
+                                    dragInstanceId,
+                                    pointIndex = null,
+                                    deltaTimestamp = anchor.timestamp - last.timestamp,
+                                    deltaValue = anchor.value - last.value,
+                                )
+                                lastAnchor = anchor
+                                state.notifyOverlayChanged()
+                            }
+                            event.changes.forEach { it.consume() }
+                        }
+
+                        GMode.CREATE -> {
+                            // 创建中：无需移动处理（点击在 Release 分支加点）
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        }
                     }
                 }
 
@@ -133,6 +198,21 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                         GMode.PAN -> state.fling(velocity.calculateVelocity().x)
                         GMode.IDLE -> if (!moved) state.tapCandle(down.position.x)
                         GMode.PINCH -> Unit
+                        GMode.CREATE -> {
+                            val c = event.changes.firstOrNull() ?: break
+                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                            if (anchor != null) {
+                                val id = state.overlays.creatingId
+                                if (id != null) {
+                                    state.overlays.addCreatePoint(id, anchor)
+                                    state.notifyOverlayChanged()
+                                }
+                            }
+                        }
+                        GMode.POINT_DRAG, GMode.WHOLE_DRAG -> {
+                            state.overlays.endDrag(dragInstanceId, dragPointIndex)
+                            state.notifyOverlayChanged()
+                        }
                     }
                     break
                 }

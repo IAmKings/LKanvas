@@ -81,6 +81,10 @@ fun KLineChart(
             drawVolumePane(state, theme, contentLeft, contentRight, volTop, volBottom, text)
             drawMacdPane(state, theme, contentLeft, contentRight, macdTop, macdBottom, text)
         }
+        // 覆盖物（主 pane 区域；读取 overlayRevision 触发重绘）
+        with(io.lkanvas.compose.draw.OverlayRenderer) {
+            drawOverlays(state, theme, contentRight)
+        }
         drawTimeAxis(state, theme, text, contentLeft, contentRight, macdBottom, panes.timeAxis)
         drawLegend(state, theme, text, legendTextSizePx, crosshair, gutterW, size.width)
         if (crosshair != null) {

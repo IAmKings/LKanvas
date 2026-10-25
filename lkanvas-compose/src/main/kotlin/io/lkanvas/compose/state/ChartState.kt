@@ -83,6 +83,102 @@ class ChartState(
     /** 十字线位置（内容区像素；null=未显示）。手势层更新。 */
     var crosshairPosition by mutableStateOf<androidx.compose.ui.geometry.Offset?>(null)
 
+    /** 覆盖物管理器（领域状态；串行上下文操作）。 */
+    val overlays = io.lkanvas.core.overlay.OverlayManager()
+
+    /** 覆盖物版本：增删/拖动后递增驱动重绘。 */
+    var overlayRevision by mutableIntStateOf(0)
+        private set
+
+    fun notifyOverlayChanged() {
+        overlayRevision++
+    }
+
+    /** 进入 segment 创建模式（Alpha 工具入口）。 */
+    fun beginCreateSegment(): Boolean =
+        overlays.beginCreate(io.lkanvas.core.overlay.SegmentDefinition) != null
+
+    fun cancelCreateOverlay() {
+        overlays.cancelCreate()
+        overlayRevision++
+    }
+
+    /** 主 pane 当前可见范围（与绘制共用同一来源，A-12 一致性）。 */
+    fun mainPaneRange(): Pair<Double, Double>? {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val vp = viewport
+        val from = kotlin.math.floor(vp.scrollIndex).toInt().coerceIn(candles.indices)
+        val to = kotlin.math.ceil(vp.scrollIndex + vp.visibleCount).toInt().coerceIn(candles.indices)
+        if (to < from) return null
+        return io.lkanvas.core.axis.LinearYAxis.rangeOfCandles(candles.subList(from, to + 1))
+    }
+
+    /** y 像素 → 主 pane 数值（与绘制同一映射）。 */
+    fun mainPaneValueAt(y: Float): Double? {
+        val (lo, hi) = mainPaneRange() ?: return null
+        return io.lkanvas.core.axis.LinearYAxis.yToValue(
+            y.toDouble(), lo, hi, 0.0, paneHeightsPx.main.toDouble(),
+        )
+    }
+
+    /** 数值 → y 像素（主 pane）。 */
+    fun mainPaneYOf(value: Double): Double? {
+        val (lo, hi) = mainPaneRange() ?: return null
+        return io.lkanvas.core.axis.LinearYAxis.valueToY(
+            value, lo, hi, 0.0, paneHeightsPx.main.toDouble(),
+        )
+    }
+
+    /** 时间戳 → 数据索引（不存在取不大于它的最近一根；早于首根取首根）。 */
+    fun indexOfTimestampNearest(ts: Long): Int? {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val exact = io.lkanvas.core.viewport.Viewport.indexOfTimestamp(ts, candles)
+        return exact ?: run {
+            var lo = 0
+            var hi = candles.size - 1
+            var ans = 0
+            while (lo <= hi) {
+                val mid = (lo + hi) ushr 1
+                if (candles[mid].timestamp <= ts) {
+                    ans = mid; lo = mid + 1
+                } else hi = mid - 1
+            }
+            ans
+        }
+    }
+
+    /** 锚点 → 像素（主 pane）。 */
+    fun overlayPointToPx(p: io.lkanvas.core.overlay.OverlayPoint): androidx.compose.ui.geometry.Offset? {
+        val idx = indexOfTimestampNearest(p.timestamp) ?: return null
+        val x = viewport.candleCenterX(idx.toDouble())
+        val y = mainPaneYOf(p.value) ?: return null
+        return androidx.compose.ui.geometry.Offset(x.toFloat(), y.toFloat())
+    }
+
+    /** 像素 → 锚点（按磁吸模式吸附；PRD R-09）。 */
+    fun overlayPointFromPx(x: Float, y: Float): io.lkanvas.core.overlay.OverlayPoint? {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val idx = viewport.logicalIndexAt(x.toDouble()).roundToInt().coerceIn(candles.indices)
+        val candle = candles[idx]
+        val value = when (overlays.magnetMode) {
+            io.lkanvas.core.overlay.MagnetMode.NORMAL ->
+                mainPaneValueAt(y) ?: candle.close
+            io.lkanvas.core.overlay.MagnetMode.WEAK ->
+                mainPaneValueAt(y) ?: candle.close
+            io.lkanvas.core.overlay.MagnetMode.STRONG -> {
+                val raw = mainPaneValueAt(y) ?: candle.close
+                // 吸附到最近 OHLC
+                listOf(candle.open, candle.high, candle.low, candle.close).minByOrNull {
+                    kotlin.math.abs(it - raw)
+                } ?: raw
+            }
+        }
+        return io.lkanvas.core.overlay.OverlayPoint(candle.timestamp, value)
+    }
+
     /** candle 点击事件（PRD R-10）。 */
     var onCandleClick: ((io.lkanvas.core.data.Candle) -> Unit)? = null
 
