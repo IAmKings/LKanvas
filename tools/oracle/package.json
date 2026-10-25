@@ -1,0 +1,13 @@
+{
+  "name": "lkanvas-oracle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "开发期 TS 对照 oracle：直接运行 third_party/klinechart-v10.1.0 上游指标源码，产出 Kotlin 测试用 golden fixtures。不进入任何发布制品。",
+  "scripts": {
+    "gen": "tsx gen-fixtures.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.19.2"
+  }
+}
