@@ -161,7 +161,7 @@ class ChartEngineTest {
     @Test
     fun `快照始终来自单一串行写入无跨会话混合`() = runEngine { engine ->
         val snapshots = mutableListOf<DataSnapshot>()
-        engine.onSnapshot = { snapshots += it }
+        engine.onSnapshot = { snap, _ -> snapshots += snap }
 
         engine.apply(ChangeRequest.Reset(keyA, listOf(c(100), c(101))))
         engine.apply(ChangeRequest.Reset(keyB, listOf(c(200))))

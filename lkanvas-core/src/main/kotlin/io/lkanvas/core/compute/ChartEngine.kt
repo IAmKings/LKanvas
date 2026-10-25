@@ -2,6 +2,7 @@ package io.lkanvas.core.compute
 
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.store.ChangeResult
+import io.lkanvas.core.store.DataOp
 import io.lkanvas.core.store.ChartDataStore
 import io.lkanvas.core.store.DataSnapshot
 import io.lkanvas.core.store.MarketKey
@@ -22,6 +23,14 @@ sealed interface ChangeRequest {
     data class AppendBatch(val candles: List<Candle>) : ChangeRequest
     data class PrependHistory(val candles: List<Candle>) : ChangeRequest
 }
+
+/** 已接受变更摘要（快照事件附带，视口锚点维护用）。 */
+data class AppliedChange(
+    val op: DataOp,
+    val appendedCount: Int,
+    val prependedCount: Int,
+    val replacedLatest: Boolean,
+)
 
 /**
  * 计算任务票据（PRD R-03）：任务发出时在串行上下文捕获，提交结果时校验。
@@ -92,14 +101,18 @@ class ChartEngine(
     var lastDropReason: DropReason? = null
         private set
 
-    /** 快照监听（在串行上下文回调；不得阻塞）。 */
-    var onSnapshot: ((DataSnapshot) -> Unit)? = null
+    /** 快照监听（在串行上下文回调；不得阻塞）；附带本次接受的变更摘要。 */
+    var onSnapshot: ((snapshot: DataSnapshot, change: AppliedChange?) -> Unit)? = null
 
     /** 结果被应用时回调（串行上下文；payload 已通过门禁）。 */
     var onResultApplied: ((ticket: ComputeTicket, payload: Any?) -> Unit)? = null
 
     /** 结果被丢弃时回调（串行上下文；诊断用）。 */
     var onResultDropped: ((ticket: ComputeTicket, reason: DropReason) -> Unit)? = null
+
+    /** 最近一次接受的变更（诊断）。 */
+    var lastApplied: AppliedChange? = null
+        private set
 
     /** 挂起式提交数据变更：队列满载时背压挂起。 */
     suspend fun apply(request: ChangeRequest): ChangeResult {
@@ -157,7 +170,13 @@ class ChartEngine(
                     event.reply.complete(result)
                     if (result is ChangeResult.Accepted) {
                         currentSnapshot = store.snapshot()
-                        onSnapshot?.invoke(currentSnapshot)
+                        lastApplied = AppliedChange(
+                            op = result.op,
+                            appendedCount = result.appendedCount,
+                            prependedCount = result.prependedCount,
+                            replacedLatest = result.replacedLatest,
+                        )
+                        onSnapshot?.invoke(currentSnapshot, lastApplied)
                     }
                 }
                 is EngineEvent.ConfigChanged -> {
