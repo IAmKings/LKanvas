@@ -15,6 +15,15 @@ import { fileURLToPath } from 'node:url'
 import movingAverage from '../../third_party/klinechart-v10.1.0/src/extension/indicator/movingAverage.ts'
 import volume from '../../third_party/klinechart-v10.1.0/src/extension/indicator/volume.ts'
 import macd from '../../third_party/klinechart-v10.1.0/src/extension/indicator/movingAverageConvergenceDivergence.ts'
+import ema from '../../third_party/klinechart-v10.1.0/src/extension/indicator/exponentialMovingAverage.ts'
+import sma from '../../third_party/klinechart-v10.1.0/src/extension/indicator/simpleMovingAverage.ts'
+import boll from '../../third_party/klinechart-v10.1.0/src/extension/indicator/bollingerBands.ts'
+import bbi from '../../third_party/klinechart-v10.1.0/src/extension/indicator/bullAndBearIndex.ts'
+import bias from '../../third_party/klinechart-v10.1.0/src/extension/indicator/bias.ts'
+import ao from '../../third_party/klinechart-v10.1.0/src/extension/indicator/awesomeOscillator.ts'
+import mtm from '../../third_party/klinechart-v10.1.0/src/extension/indicator/momentum.ts'
+import roc from '../../third_party/klinechart-v10.1.0/src/extension/indicator/rateOfChange.ts'
+import psy from '../../third_party/klinechart-v10.1.0/src/extension/indicator/psychologicalLine.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = resolve(here, '../../lkanvas-core/src/test/resources/fixtures/indicator')
@@ -105,6 +114,16 @@ const fixtures: Fixture[] = [
   run('MA', movingAverage, [5, 10, 30, 60], genCandles(120)),
   run('VOL', volume, [5, 10, 20], genCandles(120)),
   run('MACD', macd, [12, 26, 9], genCandles(120)),
+  // T-12 均值/窗口指标组（I-04~I-12）
+  run('EMA', ema, [6, 12, 20], genCandles(120)),
+  run('SMA', sma, [12, 2], genCandles(120)),
+  run('BOLL', boll, [20, 2], genCandles(120)),
+  run('BBI', bbi, [3, 6, 12, 24], genCandles(120)),
+  run('BIAS', bias, [6, 12, 24], genCandles(120)),
+  run('AO', ao, [5, 34], genCandles(120)),
+  run('MTM', mtm, [12, 6], genCandles(120)),
+  run('ROC', roc, [12, 6], genCandles(120)),
+  run('PSY', psy, [12, 6], genCandles(120)),
 ]
 
 for (const f of fixtures) {
