@@ -111,6 +111,48 @@ class ChartState(
     /** 覆盖物管理器（领域状态；串行上下文操作）。 */
     val overlays = io.lkanvas.core.overlay.OverlayManager()
 
+    /** 存档恢复门禁（A-37：恢复期抑制保存事件）。 */
+    val restoreGate = io.lkanvas.core.archive.RestoreGate()
+
+    /** 存档变脏回调（恢复完成后由数据/覆盖物编辑触发；宿主用它触发持久化）。 */
+    var onArchiveDirty: (() -> Unit)? = null
+
+    private fun notifyArchiveDirty(hasContent: Boolean) {
+        if (restoreGate.shouldEmitSave(hasContent)) {
+            onArchiveDirty?.invoke()
+        }
+    }
+
+    /**
+     * 恢复存档（PRD R-12：宿主控制时机）。流程：
+     * 1. beginRestore（期间 onSnapshot 引起的保存事件被抑制）；
+     * 2. 写回覆盖物（未知模板条目不写入，保留在结果中）；
+     * 3. 指标参数写回；
+     * 4. 视口锚点写回（若数据已就绪）。
+     * 数据本身由宿主按 archive.marketKey 喂入（Reset 不经本方法门禁语义不变）。
+     */
+    fun applyRestoredArchive(archive: io.lkanvas.core.archive.ChartArchive.Archive) {
+        restoreGate.beginRestore()
+        try {
+            overlays.restoreFrom(archive.overlays)
+            archive.indicatorParams.forEach { (name, params) ->
+                when (name) {
+                    "MA" -> maInstance.updateParams(params)
+                    "VOL" -> volInstance.updateParams(params)
+                    "MACD" -> macdInstance.updateParams(params)
+                }
+            }
+            val anchor = archive.viewportAnchor
+            if (anchor != null && dataSnapshot.candles.isNotEmpty()) {
+                viewport.restoreAnchor(anchor.scrollIndex, anchor.barSpacing, dataSnapshot.candles.size)
+            }
+            overlayRevision++
+            viewRevision++
+        } finally {
+            restoreGate.endRestore(success = true)
+        }
+    }
+
     /** 覆盖物版本：增删/拖动后递增驱动重绘。 */
     var overlayRevision by mutableIntStateOf(0)
         private set
@@ -309,6 +351,7 @@ class ChartState(
             }
             advanceIndicators(snap, change)
             viewRevision++
+            notifyArchiveDirty(hasContent = snap.candles.isNotEmpty() || overlays.all().isNotEmpty())
         }
         scope.launch { engine.run() }
     }
