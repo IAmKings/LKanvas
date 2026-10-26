@@ -1,80 +1,87 @@
-# LKanvas：KLineChart 的 Kotlin/Compose 原生移植 — 实施计划（M0→M2 Alpha 优先，进度允许继续 M3）
+# 对齐排查与对齐实施计划（Kotlin ↔ KLineChart TS v10.1.0）
 
-## 0. 已定决策（未获用户答复，按推荐项执行）
+## 0. 背景与目标重述
 
-- **库名**：LKanvas（PRD 暂定名转正）。模块 `lkanvas-core` / `lkanvas-compose`，包名 `io.lkanvas.*`，示例应用 `app-sample`。不自称官方 KLineChart Android 版。
-- **执行范围**：M0→M2 Alpha 完整纵向链路优先，每步带测试；完成后视进度推进 M3（全部指标/轴/主图类型）。M4–M6（全部覆盖物、存档、无障碍、性能冻结、Maven 发布）本轮不承诺。
-- **全程中文 commit**，每完成一个 PRD 任务提交一次，提交信息格式：`feat(core): 数据模型与输入校验（R-01/T-03）`。
+第一轮按 PRD「领域等价、不逐字翻译」执行：27 指标数值已 oracle 逐位对齐，但**结构与接口**未对齐上游——内核是自研 `ChartDataStore/ChartEngine`，公开面是 `KLineChart/ChartState`。本轮把对齐升级为三层：
 
-## 1. 环境事实（已勘察）
+| 层 | 内容 | 现状 |
+|---|---|---|
+| L1 数值/公式语义 | 指标/几何计算结果 | ✅ 已达标（oracle 逐位对照），保持防回归 |
+| L2 公开接口对齐 | WebView 用户按 KLineChart 文档 1:1 迁移（`init`/`Chart` 约 70 方法/`Options`/模板注册/事件/utils 22 项） | ❌ 主要缺口，当前 Kotlin 无同名对应 |
+| L3 示例对齐 | app-sample 覆盖上游 demo 功能清单，支撑人工验收 | ⚠️ 功能覆盖但信息架构不同 |
 
-- 工程目录 `KKLineChart/` 目前仅有 `docs/PRD-*.md`，从零搭建，非 git 仓库。
-- 上游基线源码快照：`/Users/pauldeman/Documents/ai_workspace/LKanvas/upstream-klinechart`（v10.1.0，含 27 指标/16 覆盖物源文件与 LICENSE/NOTICE，无 .git）。
-- 本机已验证工具链：Gradle 9.7.0（已缓存）、AGP 9.3.1、Kotlin 2.4.10、JDK 21 工具链（已缓存）、Android SDK platforms 34–37、Node 25（TS 对照可运行）、模拟器镜像可用（android-emulator 插件可建 AVD 并构建/安装/截图）。
+**关键架构决策（本计划前提，请重点确认）**：采用**门面对齐**而非内核重构——保留现有内核（已通过 A-01~A-14 验收，上游版本漂移不集中于此），新增与 TS 同名同语义的门面 `LKanvasChart` + 模板/样式/事件层。理由：上游迭代集中在 Chart API/模板/样式树，门面镜像即可快速跟进；满足「内部实现逻辑不大改」；不推翻已验收行为。若期望内核也按 Store.ts/pane/view 重排到类文件级，请拒绝并说明——那会扩大约 3 倍量级且与第一轮冲突。
 
-## 2. 工程结构与版本
+## 阶段 A：对齐基线（纯分析，产出 3 文档 + 1 矩阵）
 
-```
-KKLineChart/
-├── settings.gradle.kts / gradle.properties / gradle/libs.versions.toml / wrapper(9.7.0)
-├── lkanvas-core/        # 纯 Kotlin JVM 库（kotlin("jvm")）：数据模型、串行 Store、会话/revision、
-│                        #   指标引擎与全部指标、视口/坐标、覆盖物领域状态、存档 DTO、格式化纯逻辑
-├── lkanvas-compose/     # Android 库（com.android.library + compose）：KLineChart composable、
-│                        #   Canvas 绘制、手势、无障碍语义、公开接入控制（依赖 core，禁止反向依赖）
-├── app-sample/          # 示例应用：本地确定性 DataSource、实时模拟、指标/主图切换演示
-├── third_party/klinechart-v10.1.0/   # 上游 src + LICENSE + NOTICE 快照（oracle 对照用，来源合规）
-├── tools/oracle/        # npm(tsx) 工程：直接 import 上游 TS 指标函数，对固定输入产出 golden fixtures JSON
-├── docs/                # 现有 PRD + compatibility.md 兼容台账（T-01）
-└── .gitignore / README.md / NOTICE
-```
+- **A1 TS 清单** `docs/alignment/ts-inventory.md`：逐符号登记（签名/语义/默认值/上游文件:行号）：
+  - `index.ts` 33 个导出：`init/dispose/version/utils(22 项)/register{Indicator,Overlay,Figure,Styles,Locale,XAxis,YAxis,Hotkey}/getSupported*/getFigureClass/getOverlayClass/getHotkey` + 类型别名（CandleType/LineType/PolygonType/TooltipShowRule/TooltipShowType/ActionType/IndicatorSeries/OverlayMode/OverlayDrawingMode/YAxisOverride/ZoomAnchor/FormatDateType…）
+  - `Chart.ts` 约 70 方法分 6 组：数据（setData/applyNewData/applyMoreData/updateData/getDataList/resetData/setDataLoader）、指标（createIndicator/overrideIndicator/getIndicators/removeIndicator/getIndicatorByInstanceId）、覆盖物（createOverlay 支持数组/getOverlays/overrideOverlay/removeOverlay）、视口（setBarSpace/getBarSpace/getVisibleRange/scrollTo*4/scrollByDistance/zoomAt*3/offsetRight/maxOffsetLeftRight/leftMinVisibleBarCount/rightMin…/setZoomEnabled/setScrollEnabled/setZoomAnchor）、配置（setStyles/getStyles/setLocale/setTimezone/setThousandsSeparator/setDecimalFold/setFormatter/setHotkey/setLayoutOptions/setPaneOptions/createYAxis/removeYAxis/getYAxes/overrideYAxis/overrideXAxis）、生命周期（resize/destroy/convertToPictureUrl/executeAction/subscribeAction/unsubscribeAction）、DOM 组（getDom/getSize/getContainer/getDrawPaneById/getDrawPanes/layout/updatePane）
+  - `Options.ts`：locale/timezone/styles/formatter(formatDate/formatBigNumber/formatExtendText)/thousandsSeparator/decimalFold/zoomAnchor(cursor|last_bar)/hotkey/layout(barSpaceLimit/pane/yAxis)
+  - `Styles.ts` 全样式树：Grid/Candle(type,bar 回调,area,priceMark,tooltip)/Indicator(ohlc,bars[],lines[],circles[],texts[],lastValueMark,tooltip)/Tooltip(showRule=always|follow_cross|none,showType=standard|rect,legend,title,features)/Crosshair/Overlay(point 六态,line,rect,polygon,circle,arc,text)/Separator/XAxis/YAxis
+  - `component/Indicator.ts`：Indicator 接口 22 字段（id/paneId/yAxisId/name/shortName/precision/calcParams/shouldOhlc/shouldFormatBigNumber/visible/zLevel/extendData/series/figures/minValue/maxValue/styles/shouldUpdate/calc/regenerateFigures/createTooltipDataSource/draw）
+  - `component/Overlay.ts`：Overlay 接口 + OverlayTemplate（totalStep/needDefaultPointFigure/needDefaultXAxisFigure/needDefaultYAxisFigure/createPointFigures/createXAxisFigures/createYAxisFigures/checkEventOn/drawingMode=step|continuous/performEvent*）+ OverlayMode(normal|weak_magnet|strong_magnet)
+  - `common/Action.ts`：9 种 ActionType
+- **A2 Kotlin 清单** `docs/alignment/kt-inventory.md`：core/compose 当前 public 符号
+- **A3 差距矩阵** `docs/alignment/gap-matrix.md`：每行 = TS 符号 | Kotlin 现状 | 分类（**A 直接对齐 / B 适配 / C 平台不适用 / D 有意差异 D-01~03 / E 缺失**）| 工作量 S/M/L | 批次
+- **A4 出口**：矩阵覆盖 100% 符号、0 unknown（延续 PRD 3.2 口径）
 
-版本组合：Gradle 9.7.0、AGP 9.3.1、Kotlin 2.4.10、JDK 工具链 21、minSdk 23（PRD 提案值）、compileSdk 36、Compose（AndroidX BOM，取本机缓存可用稳定版）、kotlinx-coroutines、kotlinx-serialization-json（存档 DTO）、JUnit4 + kotlin-test。CI 不在本轮（本地构建+模拟器验证代替）。
+## 阶段 B：Chart 门面对齐（P0，WebView 用户最小迁移面）
 
-## 3. 阶段化任务与提交序列
+新建 `io.lkanvas.chart.LKanvasChart` + `init()/dispose()` 工厂，方法映射现有 `ChartState/ChartEngine`：
 
-### 阶段 M0：基线与工程（T-01/T-02）
-1. `git init`（main 分支）、.gitignore、README、NOTICE → **commit：chore: 初始化仓库**
-2. Gradle 多模块骨架 + version catalog + wrapper，三模块空实现可编译（core JVM 测试可跑）→ **commit：搭建 Gradle 多模块工程骨架**
-3. 复制上游快照到 `third_party/`（含 LICENSE/NOTICE），建 `tools/oracle`，跑通最小 TS 对照（MA 一组数据→fixtures JSON→core 测试可读取）→ **commit：引入上游 v10.1.0 基线与 TS 对照 oracle**
-4. `docs/compatibility.md`：上游公开能力→Kotlin 任务/测试映射、D-01/D-02/D-03 差异登记初版 → **commit：建立兼容台账（T-01）**
+- **B1 数据组**：`setData/applyNewData/applyMoreData/updateData/getDataList/resetData/setDataLoader`——先读上游 Store 源码确认 `updateData` 的 upsert 语义与 `applyMoreData` 分页契约，再映射 `ChangeRequest`（与 R-02 语义 diff 记入矩阵）
+- **B2 指标组**：`createIndicator(String|IndicatorCreate, isStack)/overrideIndicator/getIndicators(filter)/removeIndicator(filter)/getIndicatorByInstanceId`（filter= id/name/paneId 组合）
+- **B3 覆盖物组**：`createOverlay(String|OverlayCreate|数组, paneId?)/getOverlays/overrideOverlay/removeOverlay`
+- **B4 视口组**：`setBarSpace/getBarSpace/getVisibleRange/scrollToDataIndex/scrollToTimestamp/scrollToRealTime/scrollByDistance(animation)/zoomAtCoordinate/zoomAtDataIndex/zoomAtTimestamp/setOffsetRightDistance/setMaxOffsetLeft/RightDistance/setLeftMinVisibleBarCount/setRightMinVisibleBarCount/setZoomEnabled/isZoomEnabled/setScrollEnabled/isScrollEnabled/setZoomAnchor`——Viewport 缺的语义补齐（动画滚动、双向最小可见数、zoomAnchor）
+- **B5 配置组**：`setStyles/getStyles/setLocale/getLocale/setTimezone/getTimezone/setThousandsSeparator/setDecimalFold/setFormatter/setHotkey/setLayoutOptions/setPaneOptions/getPaneOptions/createYAxis/removeYAxis/getYAxes/overrideYAxis/overrideXAxis`（多轴已有 YAxisSpec 基础，补 pane 级 API）
+- **B6 事件组**：`subscribeAction/unsubscribeAction/executeAction` + 9 种 ActionType 枚举（onZoom/onScroll/onVisibleRangeChange/onCrosshairChange/onCandleBarClick/onPaneDrag/三个 FeatureClick），从现有手势/引擎事件接线
+- **B7 生命周期**：`resize/destroy/convertToPictureUrl(includeOverlay,type,backgroundColor→PNG 导出映射)/executeAction`；DOM 方法 → C 类：提供 `getBounding(paneId?)` 等价
+- **B8 验收**：每方法编译/单测；sample 冒烟改走门面
 
-### 阶段 M1：数据与坐标基础（T-03~T-06，全部 JVM 测试）
-5. **T-03 数据模型与校验（R-01）**：`Candle(timestamp:Long, open/high/low/close:Double, volume/turnover:Double?)`，OHLC 有限性与 low≤min(o,c)≤max(o,c)≤high、递增时间戳、重复/逆序/NaN 定位错误（操作+索引+原因），整次提交原子性。测试覆盖 A-01/A-02 与 F-01/F-05/F-06 子集 → **commit**
-6. **T-04 串行数据变更（R-02 基础）**：Store 单线程串行提交；Reset/ReplaceLatest/AppendBatch/PrependHistory；每次成功返回 revision 回执；同时间戳 upsert 语义（等于末根替换、大于追加、小于报错）；分页边界完全重复幂等去重、同时间戳不同内容冲突报错；有界接收队列、容量上限默认 100k 超限显式拒绝；补历史保持锚点不跳变。测试 A-03/A-04/A-05 → **commit**
-7. **T-05 会话门禁（R-03）**：Reset/切 MarketKey 生成新 sessionId；异步计算任务绑定 sessionId+dataRevision+实例配置版本；旧 session 结果一律丢弃（即使先发后至）；结果只在受控串行上下文提交；RenderSnapshot 版本一致性。测试 A-07/A-08/A-09 → **commit**
-8. **T-06 视口与基础坐标（R-05 + 线性轴）**：barSpacing/gap/candle 中心/content bounds 契约（px 与 dp 分离）；滑动、缩放（触点/末根锚点）、min/max barSpacing、右留白、scrollToTimestamp、回到最新；时间↔索引↔像素 Double 往返（误差≤0.5px 预算）；前插历史时间戳锚点保持。线性轴（normal）范围与刻度计算（含全同值/空数据的有限默认范围）。测试 A-12/A-13/A-14 → **commit**
+## 阶段 C：模板结构对齐（P0，跟进上游版本的核心）
 
-### 阶段 M2 Alpha：完整纵向链路（T-07~T-11、T-19、T-24 部分、T-10）
-9. **T-09 指标引擎与增量契约（R-08 框架）**：IndicatorDefinition（模板注册、calc 语义、输出 key、plots、precision）/IndicatorInstance（实例 ID、参数、pane/axis 绑定、独立状态，不共享可变状态）；Missing 与有效值区分（不自动当 0、不输出 Infinity）；全量接口 + 增量接口（上一确定状态基线，末根替换从上一根重算、追加才推进基状态）；缓存键=session+revision+定义/参数版本；参数变更失效；抛错实例标记 Error 不拖垮其他。测试 A-24/A-25 基础（固定随机变更序列增量 vs 全量一致性、同名不同参数实例隔离）→ **commit**
-10. **T-11 MA/VOL/MACD（I-01~I-03）**：严格按上游公式（MA 简单均值；VOL 均量线+涨跌色；MACD 的 EMA12/EMA26 种子=首值、DIF/DEA、柱=2*(DIF-DEA)），先手算样例钉死预期，再用 tools/oracle 生成 TS 对照 fixtures（有效值位置+Missing 掩码一并对照）；增量实现以探针证明不遍历全历史（工作量随参数而非 N）。测试 A-22/A-23 → **commit**
-11. **T-07 原生 candle 绘制（R-07）**：`KLineChart(state, config)` composable；pane 布局（主图+VOL+MACD）；DrawScope 绘制 candle_solid（涨跌色/影线/实体）、网格、轴标签、最后价格线；只绘可见区间（viewport 裁剪），无逐 candle Composable 节点；Double 计算只在最后一步转 Float；明/暗内置主题。测试：JVM 侧几何断言 + 截图验证 → **commit**
-12. **T-08 基础触摸与十字线（R-10/R-11）**：pointerInput 状态机——单指拖动、双指缩放、长按出十字线（所有 pane 对齐同一数据时间、当前 pane 显示本轴 y 值）、点击 candle 事件、第二指加入/取消/失焦结束交互；惯性滚动（基础版）；与父容器（LazyColumn/Pager）手势共存策略可配置。图例摘要（MA/VOL/MACD 数值、Missing 显示"—"）、时间/价格基础格式化（时区正确、UTC 存储不随显示变）。测试 A-31/A-32 基础 + 模拟器实操 → **commit**
-13. **T-19 绘图框架与 segment（R-09 框架 + O-01）**：OverlayDefinition/Instance（稳定 ID、控制点、样式、锁定/可见、层级）；状态机 Idle/Creating/Selected/Dragging/Completed/Cancelled，事件恰好一次；时间锚点存储（非裸 index）；磁吸（normal/weak/strong）；命中优先级（控制点>选中对象>其他对象>图表拖动）；line/point/text 三个基础图形；segment 两点创建/拖端点/整体拖动/取消/删除。测试 A-27/A-28 基础 → **commit**
-14. **T-10 DataSource 与加载状态（R-04）**：历史分页（双向 hasMore 独立、单游标防重复）+ 实时订阅契约接口；加载/空/失败/重试/断流状态可区分，分页失败保留图表与视口；本地确定性 DataSource 示例（固定种子随机行情）。测试 A-10/A-11 → **commit**
-15. **app-sample 集成 + 模拟器验证**：示例 App 演示基础图表、实时末根更新、追加、分页加载、切品种、MA/VOL/MACD、segment 画线；用 android-emulator 插件构建安装、截图确认首帧/交互正确 → **commit：示例应用与 Alpha 链路集成验证**
-16. 更新 compatibility.md 状态（已实现已验收/有意差异/延期）→ **commit：更新兼容台账至 Alpha 状态**
+- **C1 IndicatorTemplate 补齐**（对齐 22 字段）：缺 `minValue/maxValue/shouldOhlc/shouldFormatBigNumber/zLevel(现无)/visible/extendData/styles/shouldUpdate/createTooltipDataSource/draw`；`figures` 支持 `styles/attrs` 回调；`calc(dataList, indicatorContext)` 语义对齐；`regenerateFigures`（现 plotsFor 改名兼容）
+- **C2 内置 27 指标元数据 diff 自动化**：oracle 脚本导出上游模板元数据 JSON（name/shortName/series/calcParams/precision/figures key+title/min/max）→ Kotlin 测试逐字段比对注册表，0 差异为过
+- **C3 OverlayTemplate 补齐**：`totalStep`（兼容读取 = pointCount+1）、`needDefaultPointFigure/needDefaultXAxisFigure/needDefaultYAxisFigure`、`createPointFigures/createXAxisFigures/createYAxisFigures`（返回 Figure 原语描述）、`checkEventOn`、`drawingMode(step|continuous→现 continuous)`、`performEventPressedMove/performEventMoveForDrawing`、`on*` 事件回调族、`extendData`
+- **C4 内置 16 覆盖物元数据 diff 自动化**（同 C2）
+- **C5 figure 体系**：`registerFigure/getSupportedFigures/getFigureClass` + `checkCoordinateOn{Arc,Circle,Line,Polygon,Rect,Text}`（映射 FigureHit）
+- **C6 注册 API 同名**：`registerIndicator/registerOverlay/registerLocale/registerStyles/registerXAxis/registerYAxis/registerHotkey/getSupportedIndicators/getSupportedOverlays/getSupportedLocales/getSupportedHotkeys/getSupportedFigures`
+- **C7 验收**：C2/C4 自动 diff 全绿；矩阵模板字段全部非 E
 
-### 阶段 M3（视进度推进，每项独立提交，可中断续作）
-17. T-15 PatchHistory 显式历史纠正（后缀失效重算，A-06）
-18. T-12 均值/窗口指标组：EMA/SMA(上游递推口径)/BOLL/BIAS/BAIS…/AO/MTM/ROC/PSY（I-04~I-12）
-19. T-13 振荡/方向/量指标组：KDJ/RSI/WR/CCI/DMI/BRAR/CR/VR/EMV（I-13~I-21）
-20. T-14 递推/累计指标组：SAR/TRIX/OBV/PVT/AVP/DMA（I-22~I-27，含历史修正与状态回退）
-    （每个指标：公式冻结说明+手算样例+oracle fixtures+Missing 位置对照+增量或全量声明）
-21. T-16/T-17 完整 pane（增删/排序/调高）+ percentage（首可见 close 基准，零基准按 D-01 显"—"）+ logarithm（sign(v)*log10(1+|v|) signed-log）+ 自定义轴保护（A-16/A-17/A-18）
-22. T-18 剩余五种主图（candle_stroke/up_stroke/down_stroke/ohlc/area）+ 完整样式（价格标记、可见最高最低、面积填充、图例操作）（A-19/A-20/A-21）
+## 阶段 D：样式树与 Options 对齐（P1）
 
-## 4. 验证策略（对应 PRD 三层）
+- **D1 Styles Kotlin 化**：按 Styles.ts 逐接口 data class（字段名/类型/默认值对照）：Margin/Padding/LineStyle/SmoothLineStyle/PathStyle/PolygonStyle/RectStyle/TextStyle/StateLineStyle/StateTextStyle/ChangeColor/GradientColor/FeaturePathStyle/FeatureIconFontStyle/FeatureStyle/GridStyle/Tooltip*(ShowRule/ShowType/legend/title/features)/CandleStyle(type,bar,area,priceMark,tooltip)/IndicatorStyle/CrosshairStyle/OverlayStyle/SeparatorStyle/XAxisStyle/YAxisStyle
+- **D2 默认值对照**：上游 defaultStyles vs 现有 ChartTheme diff 表，不一致处以上游为准修正（现自定义主题登记迁移说明）
+- **D3 渐进接线**：样式树先全量定义；绘制消费按优先级（candle.bar 回调 → indicator lines/bars/circles → tooltip 文本/legend → crosshair/overlay 点 → grid/separator），未接线字段矩阵标 `wired=false`
+- **D4 setStyles 语义**：字符串内置主题（registerStyles dark/light）+ DeepPartial merge（对齐 utils.merge）
 
-1. **独立正确性**：每个指标先手算固定样例写入 JVM 测试，防复制上游错误。
-2. **TS 对照**：tools/oracle 用 tsx 直接运行 third_party 上游源码对同一输入产出 golden fixtures（值+Missing 掩码），core 测试逐位置比对，误差 `1e-9+1e-10*max`；D-01/D-03 差异项使用独立预期。
-3. **设备验收**：app-sample 经 android-emulator 插件安装运行，截图核对绘制/手势/十字线；JVM 不可验证的项在台账标注"待设备验收"。
+## 阶段 E：示例对齐（人工验收基准，P1）
 
-每阶段跑 `./gradlew :lkanvas-core:test :lkanvas-compose:test :app-sample:assembleDebug` 全绿后才 commit。
+- **E1**：以上游官方 demo 提取功能清单 → `docs/alignment/demo-checklist.md`（周期/指标选择、主图类型、画线工具、样式设置面板、loadMore 分页、实时更新、扩展指标线、精度/时区切换），每项含上游操作路径与预期
+- **E2**：app-sample 重排 UI 信息架构对齐 demo（顶部周期+指标+主图选择行、样式设置面板、16 种画线工具栏、分页/实时开关）——复用现有功能不重写内核
+- **E3**：checklist 逐项人工验收回填（含 TalkBack/字体 2.0 回归），全绿为过
 
-## 5. 关键边界与风险处理
+## 阶段 F：防漂移工具链（持续）
 
-- 不照搬上游 Store/View/Widget DOM 结构，按 PRD 4.2 领域模型重设计；仅映射领域行为与公式。
-- 上游指标"缺失字段默认 0"→ 本项目 Missing（D-03）；percentage 零基准显"—"（D-01）；非线性轴斐波那契按价格投影（D-02，M4 范围）。三项均登记台账。
-- 指针回调内不做同步全量计算/IO；指标计算在后台调度器、结果经 session/revision 门禁提交。
-- 本轮明确不做（留后续会话，遵循 PRD 里程碑）：全部 16 覆盖物（仅 segment）、存档/恢复、完整无障碍、PNG 导出、性能冻结与 Maven 发布。
-- 若 Alpha 阶段发现数据/坐标/性能路径不成立（PRD 10.1），先修基础再扩大范围，不"以后优化"式跳过。
+- **F1** 模板元数据自动 diff 进常规测试（C2/C4）
+- **F2** 上游检查清单衔接 `docs/upstream-sync.md`：compare 时同时 diff Chart.ts/Options.ts/Styles.ts/模板字段 → 更新矩阵
+- **F3** 矩阵统计脚本：aligned/adapted/intentional/missing 计数，unknown>0 即失败
+
+## 执行批次与出口
+
+| 批次 | 内容 | 出口条件 |
+|---|---|---|
+| 1 | 阶段 A | 3 文档 + 矩阵 100% 覆盖 0 unknown |
+| 2 | 阶段 B | 门面方法全映射、事件 9 种接线、sample 冒烟走门面 |
+| 3 | C1/C2/C6+F1 | 27 指标元数据自动 diff 0 差异 |
+| 4 | C3~C5 | 16 覆盖物 diff 0 差异、figure 注册对齐 |
+| 5 | 阶段 D | Styles 树全量定义+默认值对齐+高优接线 |
+| 6 | 阶段 E | demo-checklist 人工验收全绿；oracle 与 208 测试保持 0 失败 |
+
+## 明确不做（边界）
+
+- 内核不重写为上游 Store/View/Widget 的 DOM 结构映射（保留现引擎，门面提供 TS 语义）
+- DOM/CSS/浏览器事件不对齐（矩阵标 C，提供 Android 等价说明）
+- 有意差异 D-01/D-02/D-03 不回退（矩阵标 D）
+- 内置模板绘制不改为「上游 createPointFigures 逐字翻译」，模板层提供对齐接口（内置仍走现渲染器；自定义模板走新 Figure 描述接口）
