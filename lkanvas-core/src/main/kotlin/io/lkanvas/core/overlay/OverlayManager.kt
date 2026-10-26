@@ -18,27 +18,6 @@ enum class OverlayPhase { IDLE, CREATING, SELECTED, DRAGGING, COMPLETED, REMOVED
 /** 磁吸模式（PRD R-09）。 */
 enum class MagnetMode { NORMAL, WEAK, STRONG }
 
-/** 覆盖物模板定义（Alpha：segment；Beta 泛化到 16 种）。 */
-interface OverlayDefinition {
-    /** 模板名（注册键）。 */
-    val name: String
-
-    /** 控制点数量（segment=2）。 */
-    val pointCount: Int
-
-    /** 是否支持整体拖动。 */
-    val supportWholeDrag: Boolean get() = true
-
-    /** 是否支持强弱磁吸（价格线类不支持 y 磁吸等，登记于模板）。 */
-    val supportMagnet: Boolean get() = true
-}
-
-/** 内置模板注册（Alpha：segment）。 */
-object SegmentDefinition : OverlayDefinition {
-    override val name = "segment"
-    override val pointCount = 2
-}
-
 /** 覆盖物实例：稳定 ID、控制点、样式、锁定/可见、层级（PRD R-09）。 */
 class OverlayInstance(
     val id: String,
@@ -63,6 +42,9 @@ sealed interface OverlayEvent {
     data class CreatePointAdded(val id: String, val pointIndex: Int) : OverlayEvent
     data class Created(val id: String, val template: String) : OverlayEvent
     data class CreateCancelled(val id: String) : OverlayEvent
+
+    /** 连续采样（brush）达到点数上限：终止采样并报告（PRD R-09）。 */
+    data class SampleLimitReached(val id: String, val maxPoints: Int) : OverlayEvent
     data class Selected(val id: String) : OverlayEvent
     data object Deselected : OverlayEvent
     data class DragStarted(val id: String, val pointIndex: Int?) : OverlayEvent
@@ -83,8 +65,17 @@ class OverlayManager {
     private val instances = LinkedHashMap<String, OverlayInstance>()
     private var idSerial = 0L
 
-    /** 创建中实例的目标点数（beginCreate 时记录）。 */
+    /** 创建中实例的目标点数（beginCreate 时记录；continuous 模板为 0）。 */
     private var creatingPointCount: Int = 0
+
+    /** 创建中实例是否为连续采样模板。 */
+    private var creatingContinuous = false
+
+    /** 创建中实例的采样上限。 */
+    private var creatingMaxPoints = Int.MAX_VALUE
+
+    /** 采样上限事件是否已发（恰好一次）。 */
+    private var sampleLimitEmitted = false
 
     /** 当前创建中的实例 ID。 */
     val creatingId: String? get() = instances.values.firstOrNull { it.phase == OverlayPhase.CREATING }?.id
@@ -112,6 +103,9 @@ class OverlayManager {
         val inst = OverlayInstance(id, template.name, mutableListOf())
         inst.phase = OverlayPhase.CREATING
         creatingPointCount = template.pointCount
+        creatingContinuous = template.continuous
+        creatingMaxPoints = template.maxPoints
+        sampleLimitEmitted = false
         instances[id] = inst
         emit(OverlayEvent.CreateStarted(id, template.name))
         return id
@@ -119,10 +113,24 @@ class OverlayManager {
 
     /**
      * 创建中加控制点；补齐模板点数后自动完成（Created 恰好一次）。
+     * 连续模板（brush）：达到 [OverlayDefinition.maxPoints] 后拒绝采样并
+     * 发出恰好一次 [OverlayEvent.SampleLimitReached]（PRD R-09）。
      * @return 完成返回 true
      */
     fun addCreatePoint(id: String, point: OverlayPoint): Boolean {
         val inst = creating(id) ?: return false
+        if (creatingContinuous) {
+            if (inst.points.size >= creatingMaxPoints) {
+                if (!sampleLimitEmitted) {
+                    sampleLimitEmitted = true
+                    emit(OverlayEvent.SampleLimitReached(id, creatingMaxPoints))
+                }
+                return false
+            }
+            inst.points += point
+            emit(OverlayEvent.CreatePointAdded(id, inst.points.size - 1))
+            return false
+        }
         inst.points += point
         emit(OverlayEvent.CreatePointAdded(id, inst.points.size - 1))
         if (inst.points.size >= creatingPointCount) {
@@ -134,11 +142,25 @@ class OverlayManager {
         return false
     }
 
+    /** 连续模板显式完成创建（Created 恰好一次）；至少需要 2 个采样点。 */
+    fun finishCreate(id: String): Boolean {
+        val inst = creating(id) ?: return false
+        if (!creatingContinuous) return false
+        if (inst.points.size < 2) return false
+        inst.phase = OverlayPhase.COMPLETED
+        creatingPointCount = 0
+        creatingContinuous = false
+        emit(OverlayEvent.Created(id, inst.templateName))
+        return true
+    }
+
     /** 取消创建（Cancelled 恰好一次并移除实例）。 */
     fun cancelCreate() {
         val id = creatingId ?: return
         instances.remove(id)
         if (selectedId == id) selectedId = null
+        creatingPointCount = 0
+        creatingContinuous = false
         emit(OverlayEvent.CreateCancelled(id))
     }
 
