@@ -49,7 +49,18 @@
 ### 其他
 `LKanvas`（VERSION/UPSTREAM_BASELINE）
 
-## 2. lkanvas-compose（13 类型 + 4 顶层函数）
+## 2. 核心类成员签名（v2 补充：可复现提取）
+
+> 由脚本从源码正则提取（`fun name(` 与 `var/val name`），保证与代码同步；矩阵"Kotlin 现状"列以此为准。完整参数签名见源文件。
+
+- **ChartDataStore**（store）：fun snapshot, candlesView, patchHistory, reset, replaceLatest, upsertLatest, appendBatch, prependHistory；var/val marketKey, sessionId, revision, candleCount, isEmpty, firstTimestamp, lastTimestamp, lastCandle
+- **ChartEngine**（compute）：fun apply, tryApply, bumpConfig, launchCompute, run, close；var/val snapshot, droppedResults, lastDropReason, onSnapshot, onResultApplied, onResultDropped, lastApplied
+- **OverlayManager**（overlay）：fun all, get, beginCreate, addCreatePoint, finishCreate, cancelCreate, select, beginDrag, drag, endDrag, setLocked, setVisible, remove, removeSelected, restoreFrom, exportCompleted；var/val creatingId, selectedId, onEvent, magnetMode
+- **Viewport**（viewport）：fun layout, candleCenterX, logicalIndexAt, dataIndexCenterX, scrollBy, zoomBy, zoomAtLatest, scrollToIndex, scrollToTimestamp, scrollToLatest, isAtLatest, onPrepended, onAppended, onReset, restoreAnchor, restoreAnchor, currentAnchor；var/val scrollIndex, contentWidth, visibleCount
+- **IndicatorRegistry**（indicator-registry）：fun register, get, unregister, all；var/val 
+- **ChartLoader**（loader）：fun start, loadMoreEarlier；var/val state, onStateChange
+
+## 3. lkanvas-compose（13 类型 + 4 顶层函数）
 
 ### 组件与状态
 `KLineChart(state, modifier, theme, config, legendSlot?)`、`ChartState`（约 45 公开成员：数据操作 reset/upsertLatest/appendBatch/prependHistory/patchHistory、视口 panBy/zoomAt/fling、十字线 show/move/hide、覆盖物 beginCreateOverlay/finishCreateOverlay/cancelCreateOverlay/currentTool、布局 onLayout/adjustPane/paneSeparatorAt/axisZoomBy/isInAxisGutter、无障碍 select{Previous,Next}Candle/zoom{In,Out}/removeSelectedOverlay/accessibilityText、存档 applyRestoredArchive/restoreGate/onArchiveDirty、诊断 diagnostics、快照 dataSnapshot/maResult/volResult/macdResult/viewport/locale/legendMode/mainAxisSpec/mainChartType/gapRatio/onCandleClick/onSnapshot 等）、`LegendData`、`GestureOwner`

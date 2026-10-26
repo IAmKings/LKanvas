@@ -1,199 +1,296 @@
-# 差距矩阵（TS ↔ Kotlin 对齐现状）
+# 差距矩阵（TS ↔ Kotlin 对齐现状）v2
 
-> A3 产物。分类：**A** 直接对齐（已有同名等价物）｜**B** 适配（语义同需映射/重命名）｜**C** 平台不适用（附 Android 等价说明）｜**D** 有意差异（D-01/D-02/D-03 或 PRD 登记）｜**E** 缺失（需实现）。
-> 工作量：S（小时级）/ M（天级）/ L（多天）。批次 = 执行批次 1~6。
-> 状态统计见文末；**unknown 必须为 0**。
+> A3 产物（v2 修复版：一符号一行 / 行 ID / 单字母分类 / 验收方式列 / 批次 2a·2b·2c / 纠正方法名 / 补 convertToPixel·convertFromPixel / Styles 字段级 / 统计改由脚本生成）。
+> 分类：**A** 直接对齐｜**B** 适配｜**C** 平台不适用｜**D** 有意差异｜**E** 缺失。验收：**test** 单测｜**diff** 上游自动对照｜**compile** 编译即证｜**parity** 上游文档示例迁移测试｜**manual** 人工｜**—** 不适用。
+> **完整性由 `tools/alignment/check.py` 强制校验**（Chart.ts 全部方法必须有行、格式违规即失败）；统计数字由该脚本输出，本文不手写。
+
+## 批次定义与出口条件（v2）
+
+| 批次 | 范围 | 出口条件 |
+|---|---|---|
+| 2a | 数据（DataLoader 适配/SymbolInfo/Period）+ 事件 9 种 + 坐标转换 + 生命周期 | 门面数据链路单测绿；**parity-1**：上游 quickstart 数据接入示例改初始化后在门面跑通 |
+| 2b | 指标 CRUD + 覆盖物 CRUD | create/remove/getIndicators/getOverlays 单测绿；**parity-2**：上游 createIndicator/createOverlay 文档示例跑通 |
+| 2c | 视口全量 + 配置组 + pane/轴基础 | scroll/zoom/offset/enabled 单测绿；**parity-3**：上游视口控制示例跑通 |
+| 3 | 指标模板 22 字段 + 注册 API + 27 指标元数据自动 diff | diff 0 差异 |
+| 4 | 覆盖物模板字段 + figure 注册 + 16 覆盖物元数据 diff | diff 0 差异 |
+| 5 | Styles 树 43 接口 + 默认值对照 + tooltip features + 多轴 | 默认值 diff 0 差异；高优样式接线 |
+| 6 | app-sample 对齐上游 demo + 人工验收 | demo-checklist 全绿；全部既有测试 0 失败 |
+
+**验收方式新增 parity 定义**：取上游官方文档代码片段，仅替换初始化（`init(ds)`→`LKanvasChart(state)`），在门面上编译并通过行为断言；parity 用例纳入常规测试（防接口漂移）。
+
 
 ## 1. index.ts 顶层导出
 
-| TS 符号 | Kotlin 现状 | 分类 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|
-| `init(ds, options?)` | E：`LKanvasChart` 门面未建（现 KLineChart composable + ChartState） | B | M | 2 | Android 无 DOM：ds → `init(state, options)` 或工厂 |
-| `dispose(dcs)` | E：scope 未暴露销毁 | B | S | 2 | 映射 scope.cancel + engine.close |
-| `version()` | A：`LKanvas.VERSION` | B | S | 2 | 门面补同名静态 |
-| `utils.clone/merge` | B：Kotlin data class copy / 自研 merge 未抽公共 | E | S | 2 | `LkanvasUtils.merge(DeepPartial)` |
-| `utils.isString/…` 7 项 | E（Kotlin 类型系统等价不需要） | C | S | 2 | 提供空实现或不移植（矩阵登记） |
-| `utils.formatValue/formatPrecision/formatBigNumber/formatThousands/formatFoldDecimal/formatDate` | B：分散在 ChartText.price/volume/ChartLocale | E | M | 2 | 抽 `LkanvasUtils` 单例对齐命名 |
-| `utils.calcTextWidth` | B：ChartText.measureWidth | E | S | 2 | 同上 |
-| `utils.getLinearSlopeIntercept/getLinearYFrom*` | B：OverlayGeometry 内联（parallelLine 斜率计算） | E | S | 2 | 抽公共 |
-| `utils.checkCoordinateOn*` 6 种 | A：FigureHit（7 种含 path） | B | S | 4 | 同名包装 |
-| `registerIndicator/getSupportedIndicators` | B：IndicatorRegistry（实例级，无全局名注册表） | E | M | 3 | 门面静态全局注册表 |
-| `registerOverlay/getSupportedOverlays/getOverlayClass` | B：OverlayTemplates（16 内置 + 手动单例） | E | M | 4 | 统一注册表 |
-| `registerFigure/getFigureClass/getSupportedFigures` | B：Figure 原语无注册表 | E | S | 4 | |
-| `registerStyles`（dark/light） | B：ChartTheme.dark()（字段树不同，见 §5） | E | M | 5 | |
-| `registerLocale/getSupportedLocales` | B：ChartLocale.ZH_CN/EN_US 常量（无注册表） | E | S | 3 | |
-| `registerXAxis/registerYAxis` | E：YAxisSpec 存在但无注册体系 | E | M | 4 | |
-| `registerHotkey/getHotkey/getSupportedHotkeys` | E：无（浏览器键鼠） | C | S | 2 | Android 键鼠外设 P2（PRD 3.3） |
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| IDX-001 | `init` | index.ts | 门面工厂未建 | E | test+parity | S | 2a | Android 无 DOM：init(state) |
+| IDX-002 | `dispose` | index.ts | 未暴露销毁 | E | test | S | 2a | |
+| IDX-003 | `version` | index.ts | LKanvas.VERSION | B | compile | S | 2a | 门面静态同名 |
+| IDX-004 | `utils.clone` | utils | data class copy 等价 | B | compile | S | 2a | |
+| IDX-005 | `utils.merge` | utils | 未抽公共 DeepPartial merge | E | test | S | 2a | setStyles 语义基础 |
+| IDX-006~012 | `utils.isString/isNumber/isValid/isObject/isArray/isFunction/isBoolean` | utils | Kotlin 类型系统等价 | C | compile | S | 2a | 提供 utils 对象占位 |
+| IDX-013 | `utils.formatValue` | utils/format | 分散 | E | test | S | 2a | |
+| IDX-014 | `utils.formatPrecision` | utils/format | ChartText.price 近似 | E | test | S | 2a | |
+| IDX-015 | `utils.formatBigNumber` | utils/format | ChartText.volume 近似 | E | test | S | 2a | |
+| IDX-016 | `utils.formatDate` | utils/format | ChartText.timeLabel 近似 | E | test | S | 2a | 模板化 |
+| IDX-017 | `utils.formatThousands` | utils/format | DecimalFormat 近似 | E | test | S | 2a | |
+| IDX-018 | `utils.formatFoldDecimal` | utils/format | 无 | E | test | S | 2a | |
+| IDX-019 | `utils.calcTextWidth` | utils/canvas | ChartText.measureWidth | B | test | S | 2a | |
+| IDX-020 | `utils.getLinearSlopeIntercept` | figure/line | OverlayGeometry 内联 | E | test | S | 2a | 抽公共 |
+| IDX-021 | `utils.getLinearYFromSlopeIntercept` | figure/line | 无独立函数 | E | test | S | 2a | |
+| IDX-022 | `utils.getLinearYFromCoordinates` | figure/line | 无独立函数 | E | test | S | 2a | |
+| IDX-023~028 | `utils.checkCoordinateOn{Arc,Circle,Line,Polygon,Rect,Text}` | figure/* | FigureHit 命中（7 种含 path） | B | test | S | 4 | 同名包装 |
+| IDX-029 | `registerIndicator` | ext/indicator | IndicatorRegistry（实例级） | E | test | M | 3 | 全局注册表 |
+| IDX-030 | `getSupportedIndicators` | ext/indicator | 无 | E | test | S | 3 | |
+| IDX-031 | `registerOverlay` | ext/overlay | OverlayTemplates（内置） | E | test | M | 4 | |
+| IDX-032 | `getSupportedOverlays` | ext/overlay | 无 | E | test | S | 4 | |
+| IDX-033 | `getOverlayClass` | ext/overlay | 无（模板即对象） | B | compile | S | 4 | |
+| IDX-034 | `registerFigure` | ext/figure | 无注册表 | E | test | S | 4 | |
+| IDX-035 | `getFigureClass` | ext/figure | 无 | B | compile | S | 4 | |
+| IDX-036 | `getSupportedFigures` | ext/figure | 无 | E | test | S | 4 | |
+| IDX-037 | `registerStyles` | ext/styles | ChartTheme.dark() 近似 | E | test | M | 5 | light/dark 注册 |
+| IDX-038 | `registerLocale` | ext/i18n | ChartLocale 常量 | E | test | S | 3 | |
+| IDX-039 | `getSupportedLocales` | ext/i18n | 无 | E | test | S | 3 | |
+| IDX-040 | `registerXAxis` | ext/x-axis | 无 | E | test | M | 4 | |
+| IDX-041 | `registerYAxis` | ext/y-axis | CustomYAxis 近似 | E | test | M | 4 | |
+| IDX-042 | `registerHotkey` | ext/hotkey | 无 | C | compile | S | 2c | 浏览器键鼠 |
+| IDX-043 | `getHotkey` | ext/hotkey | 无 | C | compile | S | 2c | |
+| IDX-044 | `getSupportedHotkeys` | ext/hotkey | 无 | C | compile | S | 2c | |
 
-## 2. Chart 数据组（v10 DataLoader 模式）
+## 2. Chart 方法（79，一方法一行）
 
-| TS 符号 | Kotlin 现状 | 分类 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|
-| `setDataLoader(loader)` | B：ChartLoader + HistorySource（构造注入，非运行时替换） | E | M | 2 | **v10 无 setData/applyNewData/updateData（v9 遗留已删）**；门面提供 loader + 直接提交双通道 |
-| `DataLoader.getBars{type: init/forward/backward/update}` | A：HistorySource.loadInitial/loadEarlier + DeterministicDataSource | B | M | 2 | type 四值语义一一对应；callback 风格 vs suspend 适配 |
-| `DataLoader.subscribeBar/unsubscribeBar` | B：RealtimeSource/Subscription | B | S | 2 | |
-| `DataLoadMore = boolean\|{backward,forward}` | B：HistorySource.Page.hasMore（单方向） | E | S | 2 | 补双向对象形式 |
-| `getDataList()` | A：ChartState.dataSnapshot.candles / store.candlesView | B | S | 2 | |
-| `resetData()` | A：ChartDataStore.reset | B | S | 2 | |
-| `setSymbol/getSymbol` | B：MarketKey（symbol/period/adjust） | E | S | 2 | SymbolInfo{ticker,pricePrecision,volumePrecision} → 补精度字段到 MarketKey 或旁路 |
-| `setPeriod/getPeriod` | A：MarketKey.period（字符串） | B | S | 2 | Period{type,milliseconds} 类型化 |
-| `setLoadMoreDataCount` | E | E | S | 2 | ChartLoader 触发阈值 |
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| CH-001 | `getDrawPaneById` | Chart.ts:208 | PaneHeights 简化 pane 模型 | B | compile | S | 2c | 等价 getPaneBounding(paneId) |
+| CH-002 | `getContainer` | Chart.ts:219 | 无 DOM；Android 等价 getBounding() | C | compile | S | 2c | 容器尺寸查询替代 |
+| CH-003 | `getChartStore` | Chart.ts:223 | 架构决策：内核不暴露 | D | — | — | — | 门面封装内核 |
+| CH-004 | `getXAxisPane` | Chart.ts:227 | 架构决策：内核不暴露 | D | — | — | — |  |
+| CH-005 | `getDrawPanes` | Chart.ts:231 | 固定三 pane | B | compile | S | 2c |  |
+| CH-006 | `getSeparatorPanes` | Chart.ts:235 | adjustPane 分隔条手势 | B | compile | S | 2c |  |
+| CH-007 | `layout` | Chart.ts:239 | onLayout 自动布局 | B | test | S | 2c |  |
+| CH-008 | `updatePane` | Chart.ts:518 | viewRevision 驱动重绘 | B | test | S | 2c |  |
+| CH-009 | `getDom` | Chart.ts:530 | 无 DOM | C | compile | S | 2c | Android 无等价，文档标注 |
+| CH-010 | `getSize` | Chart.ts:553 | paneHeightsPx/contentWidthPx | B | test | S | 2c | getBounding(paneId?) 等价 |
+| CH-011 | `setSymbol` | Chart.ts:584 | MarketKey（缺精度字段） | B | test | S | 2a | SymbolInfo 精度旁路存储 |
+| CH-012 | `getSymbol` | Chart.ts:591 | 同上 | B | test | S | 2a |  |
+| CH-013 | `setPeriod` | Chart.ts:595 | MarketKey.period 字符串 | B | test | S | 2a | Period{type,milliseconds} 类型化 |
+| CH-014 | `getPeriod` | Chart.ts:602 | 同上 | B | test | S | 2a |  |
+| CH-015 | `setStyles` | Chart.ts:606 | ChartTheme（字段树不同） | B | test | M | 5 | 字符串主题+DeepPartial merge |
+| CH-016 | `getStyles` | Chart.ts:612 | 同上 | B | test | S | 5 |  |
+| CH-017 | `setLayoutOptions` | Chart.ts:616 | ChartLayoutConfig 部分 | B | compile | M | 5 | barSpaceLimit/pane/yAxis |
+| CH-018 | `getLayoutOptions` | Chart.ts:620 | 同上 | B | compile | S | 5 |  |
+| CH-019 | `setFormatter` | Chart.ts:624 | lambda 分散（ChartText/locale） | B | test | S | 2c | Formatter 接口对齐 |
+| CH-020 | `getFormatter` | Chart.ts:630 | 同上 | B | compile | S | 2c |  |
+| CH-021 | `setLocale` | Chart.ts:634 | ChartLocale（T-24 已有） | B | test | S | 2c | setLocale('en-US')→EN_US |
+| CH-022 | `getLocale` | Chart.ts:640 | state.locale | B | test | S | 2c |  |
+| CH-023 | `setTimezone` | Chart.ts:644 | 默认系统时区，无注入 | E | test | S | 2c |  |
+| CH-024 | `getTimezone` | Chart.ts:650 | 无 | E | test | S | 2c |  |
+| CH-025 | `setThousandsSeparator` | Chart.ts:654 | DecimalFormat 内建千分位 | E | test | S | 2c | {sign} 可配 |
+| CH-026 | `getThousandsSeparator` | Chart.ts:660 | 无 | E | compile | S | 2c |  |
+| CH-027 | `setDecimalFold` | Chart.ts:664 | 无小数折叠 | E | test | S | 2c | {threshold:3} 默认 |
+| CH-028 | `getDecimalFold` | Chart.ts:670 | 无 | E | compile | S | 2c |  |
+| CH-029 | `setHotkey` | Chart.ts:674 | 浏览器键鼠 | C | compile | S | 2c | Android 外接键鼠 P2 |
+| CH-030 | `getHotkey` | Chart.ts:678 | 无 | C | compile | S | 2c |  |
+| CH-031 | `getHotKey` | Chart.ts:682 | 无（旧拼写别名） | C | compile | S | 2c |  |
+| CH-032 | `setOffsetRightDistance` | Chart.ts:697 | rightOffsetSlots（槽位非 px） | B | test | S | 2c | px↔槽位换算 |
+| CH-033 | `getOffsetRightDistance` | Chart.ts:701 | 无 getter | E | test | S | 2c |  |
+| CH-034 | `setMaxOffsetLeftDistance` | Chart.ts:705 | overscrollSlots=0 | E | test | S | 2c |  |
+| CH-035 | `setMaxOffsetRightDistance` | Chart.ts:713 | 无 | E | test | S | 2c |  |
+| CH-036 | `setLeftMinVisibleBarCount` | Chart.ts:721 | 无 | E | test | S | 2c | clamp 语义 |
+| CH-037 | `setRightMinVisibleBarCount` | Chart.ts:729 | 无 | E | test | S | 2c |  |
+| CH-038 | `setBarSpace` | Chart.ts:737 | barSpacing 直改 | B | test | S | 2c | BarSpace{bar,halfBar,gapBar,halfGapBar} |
+| CH-039 | `getBarSpace` | Chart.ts:741 | 无结构 getter | E | test | S | 2c |  |
+| CH-040 | `getVisibleRange` | Chart.ts:745 | visibleRange 扩展（缺 realFrom/realTo） | B | test | S | 2a | 结构补 realFrom/realTo |
+| CH-041 | `resetData` | Chart.ts:789 | ChartDataStore.reset | B | test | S | 2a |  |
+| CH-042 | `getDataList` | Chart.ts:793 | dataSnapshot.candles | B | test | S | 2a |  |
+| CH-043 | `setDataLoader` | Chart.ts:797 | ChartLoader+HistorySource 构造注入 | B | test+parity | M | 2a | 运行时替换+四 type 适配（init/forward/backward/update） |
+| CH-044 | `createIndicator` | Chart.ts:802 | 内置 3 实例，无按名运行时创建 | E | test+parity | M | 2b | isStack 依赖 pane 模型（批次 5） |
+| CH-045 | `overrideIndicator` | Chart.ts:837 | updateParams（部分） | E | test | M | 2b | styles/visible/extendData… |
+| CH-046 | `getIndicators` | Chart.ts:863 | computeInstances 私有 | E | test | S | 2b | filter{id,name,paneId,isStack} |
+| CH-047 | `removeIndicator` | Chart.ts:867 | 内置实例不可移除 | E | test | M | 2b |  |
+| CH-048 | `createOverlay` | Chart.ts:903 | beginCreate 交互式；编程式不完整 | E | test+parity | M | 2b | 数组重载+直接完成 |
+| CH-049 | `getOverlays` | Chart.ts:939 | all() 无 filter | E | test | S | 2b | filter{id,groupId,name,paneId} |
+| CH-050 | `overrideOverlay` | Chart.ts:943 | 无 | E | test | M | 2b | points/styles/extendData |
+| CH-051 | `removeOverlay` | Chart.ts:947 | remove/removeSelected | E | test | S | 2b | 批量 |
+| CH-052 | `setPaneOptions` | Chart.ts:951 | adjustPane（拖动） | B | test | M | 2c | pane{id,height,axis?} |
+| CH-053 | `createYAxis` | Chart.ts:1003 | YAxisSpec 单主轴 | E | test | L | 5 | 多轴实例化 |
+| CH-054 | `removeYAxis` | Chart.ts:1025 | 无 | E | test | S | 5 |  |
+| CH-055 | `getYAxes` | Chart.ts:1057 | 无 | E | compile | S | 5 |  |
+| CH-056 | `overrideYAxis` | Chart.ts:1079 | 无 | E | test | S | 5 |  |
+| CH-057 | `overrideXAxis` | Chart.ts:1096 | 无 | E | test | S | 5 |  |
+| CH-058 | `getPaneOptions` | Chart.ts:1106 | PaneHeights 只读 | B | test | S | 2c |  |
+| CH-059 | `setZoomEnabled` | Chart.ts:1114 | 无开关 | E | test | S | 2c | 手势层 |
+| CH-060 | `isZoomEnabled` | Chart.ts:1118 | 无 | E | test | S | 2c |  |
+| CH-061 | `setZoomAnchor` | Chart.ts:1122 | 手势固定触点锚 | D | test | S | 2c | cursor/last_bar 语义等价 |
+| CH-062 | `getZoomAnchor` | Chart.ts:1126 | 无 | E | compile | S | 2c |  |
+| CH-063 | `setScrollEnabled` | Chart.ts:1130 | 无开关 | E | test | S | 2c |  |
+| CH-064 | `isScrollEnabled` | Chart.ts:1134 | 无 | E | test | S | 2c |  |
+| CH-065 | `scrollByDistance` | Chart.ts:1138 | scrollBy（无动画） | B | test | M | 2c | Animatable 动画 |
+| CH-066 | `scrollToRealTime` | Chart.ts:1154 | scrollToLatest | B | test | S | 2c |  |
+| CH-067 | `scrollToDataIndex` | Chart.ts:1161 | scrollToIndex | B | test | S | 2c |  |
+| CH-068 | `scrollToTimestamp` | Chart.ts:1166 | scrollToTimestamp | A | test | S | 2c |  |
+| CH-069 | `zoomAtCoordinate` | Chart.ts:1171 | zoomBy(anchorX) | B | test | S | 2c |  |
+| CH-070 | `zoomAtDataIndex` | Chart.ts:1191 | 无索引重载 | E | test | S | 2c |  |
+| CH-071 | `zoomAtTimestamp` | Chart.ts:1196 | 无时间重载 | E | test | S | 2c |  |
+| CH-072 | `convertToPixel` | Chart.ts:1201 | overlayPointToPx（单点） | B | test+parity | M | 2a | 数组+ConvertFilter |
+| CH-073 | `convertFromPixel` | Chart.ts:1232 | overlayPointFromPx（单点） | B | test+parity | M | 2a |  |
+| CH-074 | `executeAction` | Chart.ts:1261 | 无统一入口 | E | test | S | 2a |  |
+| CH-075 | `subscribeAction` | Chart.ts:1278 | 分散回调（onCandleClick 等） | E | test+parity | M | 2a | 9 种 ActionType |
+| CH-076 | `unsubscribeAction` | Chart.ts:1282 | 无 | E | test | S | 2a |  |
+| CH-077 | `getConvertPictureUrl` | Chart.ts:1286 | ChartSnapshotExporter（PNG only） | B | test | S | 2a | 补 jpeg/bmp+backgroundColor |
+| CH-078 | `resize` | Chart.ts:1315 | onLayout 自动 | A | test | — | — |  |
+| CH-079 | `destroy` | Chart.ts:1327 | scope 未暴露销毁 | E | test | S | 2a | engine.close+scope.cancel |
 
-## 3. Chart 指标组
+## 3. 事件 payload（9 种 ActionType）
 
-| TS 符号 | Kotlin 现状 | 分类 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|
-| `createIndicator(value, isStack?)` | B：IndicatorRegistry/ChartState 内置 3 实例；无运行时按名创建公开 API | E | M | 2/3 | isStack（同 pane 叠加）依赖 pane 模型（阶段 D/pane 项） |
-| `overrideIndicator` | B：IndicatorInstance.updateParams（部分） | E | M | 2 | override 面宽（styles/visible/calcParams/extendData…） |
-| `getIndicators(filter)` | B：ChartState 私有 computeInstances | E | S | 2 | filter{id,name,paneId,isStack} |
-| `removeIndicator(filter)` | E（内置实例不可移除） | E | M | 2 | |
-| `getIndicatorByInstanceId(id)` | E | E | S | 2 | |
-| Indicator 22 字段 | B：Definition 仅 name/shortName/calcParams/precision/series/plots/incremental | E | L | 3 | minValue/maxValue/shouldOhlc/shouldFormatBigNumber/visible/zLevel/extendData/styles/shouldUpdate/createTooltipDataSource/draw/figures 回调（批次 3 C1） |
-| `series` 三值 | A：IndicatorSeries（PRICE/VOLUME/NORMAL） | A | — | — | |
-| calc 逐位语义 | A：oracle fixtures 逐位对照（27/27） | A | — | — | L1 已达标 |
-
-## 4. Chart 覆盖物组
-
-| TS 符号 | Kotlin 现状 | 分类 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|
-| `createOverlay(value, paneId?)` | B：OverlayManager.beginCreate（交互创建）/ restoreFrom（编程创建不完整） | E | M | 2 | 编程式两点直接完成需补 |
-| `getOverlays(filter)` | B：all()（无 filter） | E | S | 2 | filter{id,groupId,name,paneId}；groupId 缺 |
-| `overrideOverlay` | E | E | M | 2 | points/styles/extendData/locked/visible |
-| `removeOverlay(filter)` | B：remove/removeSelected | E | S | 2 | 支持数组/批量 |
-| OverlayTemplate 字段 | B：Definition 仅 name/pointCount/constraint/continuous/maxPoints | E | L | 4 | totalStep/needDefault*Figure/create*Figures/checkEventOn/drawingMode/performEvent*/on* 回调（批次 4 C3） |
-| `OverlayMode` 三档 | A：MagnetMode（NORMAL/WEAK/STRONG） | B | S | 2 | 门面同名枚举 |
-| `drawingMode(step\|continuous)` | A：continuous 布尔 | B | S | 4 | |
-| 16 内置覆盖物 totalStep 等元数据 | B：pointCount（totalStep-1） | B | S | 4 | C4 自动 diff |
-| 斐波那契价格空间投影 | A：实现 | D-02 | — | — | 有意差异登记 |
-
-## 5. Chart 视口组
-
-| TS 符号 | Kotlin 现状 | 分类 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|
-| `setBarSpace(space)` | B：Viewport.barSpacing + zoomBy | E | S | 2 | BarSpace{bar,halfBar} 结构 |
-| `getBarSpace()` | E | E | S | 2 |
-| `getVisibleRange()` | B：Viewport.visibleRange（compose 扩展） | E | S | 2 | VisibleRange{from,to,realFrom,realTo} 结构对齐 |
-| `scrollByDistance(d, animation?)` | B：Viewport.scrollBy | E | M | 2 | 动画补（ValueAnimator/Animatable） |
-| `scrollToRealTime(animation?)` | B：scrollToLatest | E | S | 2 | |
-| `scrollToDataIndex/scrollToTimestamp` | A：Viewport.scrollToIndex/scrollToTimestamp | B | S | 2 |
-| `scrollToTimestamp(timestamp, animation?)` | A：同上（时间重载） | B | S | 2 |
-| `zoomAtDataIndex(scale, dataIndex, animation?)` | E：仅按 px 锚点，缺索引重载 | E | S | 2 |
-| `zoomAtTimestamp(scale, timestamp, animation?)` | E：缺时间重载 | E | S | 2 | |
-| `zoomAtCoordinate/zoomAtDataIndex/zoomAtTimestamp` | B：zoomBy(anchorX) | E | S | 2 | 坐标系换算 |
-| `setOffsetRightDistance(distance)` | E：rightOffsetSlots（槽位非 px） | E | S | 2 | px→槽位换算 |
-| `getOffsetRightDistance()` | E | E | S | 2 |
-| `setMaxOffsetLeft/RightDistance` | E | E | S | 2 | overscroll 语义 |
-| `setMaxOffsetLeftDistance(d)` | E | E | S | 2 | 同上（单侧） |
-| `setMaxOffsetRightDistance(d)` | E | E | S | 2 | 同上（单侧） |
-| `setLeftMinVisibleBarCount(count)` | E | E | S | 2 | 左侧最小可见数 clamp |
-| `setRightMinVisibleBarCount(count)` | E | E | S | 2 | 右侧最小可见数 clamp |
-| `setZoomEnabled(enabled)` | E | E | S | 2 | 手势层开关 |
-| `isZoomEnabled()` | E | E | S | 2 |
-| `setScrollEnabled(enabled)` | E | E | S | 2 | |
-| `isScrollEnabled()` | E | E | S | 2 |
-| `setZoomAnchor(anchor)` | D：缩放锚点按手势（触点）实现 | E | S | 2 | cursor/last_bar 语义等价登记 |
-| `getZoomAnchor()` | E | E | S | 2 |
-
-## 6. Chart 配置组
-
-| TS 符号 | Kotlin 现状 | 分类 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|
-| `setStyles(string\|DeepPartial)` / `getStyles` | B：ChartTheme（字段树不同）+ registerStyles 未建 | E | L | 5 | 阶段 D：Styles 树全量定义 |
-| `setLayoutOptions/getLayoutOptions` | E（barSpaceLimit/pane/yAxis） | E | M | 5 | |
-| `setFormatter`（formatDate/formatBigNumber/formatExtendText） | B：ChartText/ChartLocale/ChartState timeText lambda | E | S | 2 | Formatter 接口对齐 |
-| `setLocale(locale)` | B：ChartLocale + state.locale（T-24） | E | S | 2 | setLocale('en-US') 映射 EN_US |
-| `getLocale()` | E | E | S | 2 |
-| `setTimezone(tz)` | B：ChartText 用 TimeZone.getDefault | E | S | 2 | 显式时区注入补齐 |
-| `getTimezone()` | E | E | S | 2 |
-| `setThousandsSeparator/setDecimalFold` | B：DecimalFormat 千分位有；小数折叠无 | E | S | 2 | |
-| `setDecimalFold(opts)/getDecimalFold()` | E：小数折叠未实现 | E | S | 2 | `{threshold, precision}` |
-| `setHotkey` | C | C | — | — | 浏览器键鼠；Android 外接键鼠 P2 |
-| `setPaneOptions/getPaneOptions` | B：adjustPane（拖动）+ PaneHeights | E | M | 2 | pane{id,height,axis?} |
-| `createYAxis/removeYAxis/getYAxes/overrideYAxis/overrideXAxis` | B：YAxisSpec/CustomYAxis（单主轴规格） | E | L | 5 | 多轴实例化在固定三 pane 内渐进 |
-| `removeYAxis(filter)` | E | E | S | 5 | |
-| `getYAxes(filter)` | E | E | S | 5 | |
-| `overrideYAxis(yAxis)` | E | E | S | 5 | |
-| `overrideXAxis(xAxis)` | E | E | S | 5 | |
-| `unsubscribeAction(type, callback?)` | E（随 subscribeAction 一起实现） | E | S | 2 | |
-
-## 7. 事件与生命周期
-
-| TS 符号 | Kotlin 现状 | 分类 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|
-| `subscribeAction/unsubscribeAction` 9 种 | B：分散回调（onCandleClick/onSnapshot/onArchiveDirty/onEvent） | E | M | 2 | ActionType 枚举 + 统一注册表 |
-| `executeAction(type, data)` | E | E | S | 2 | |
-| `onCrosshairChange` | B：crosshairPosition 可观察 | E | S | 2 | |
-| `onVisibleRangeChange` | B：viewRevision + viewport（无回调） | E | S | 2 | |
-| `onZoom/onScroll` | B：手势内无区分回调 | E | S | 2 | |
-| `onCandleBarClick` | A：onCandleClick | B | S | 2 | |
-| `onPaneDrag` | B：PANE_ADJUST 手势（无回调） | E | S | 2 | |
-| 三个 FeatureClick（tooltip 图标点击） | E（tooltip features 未实现） | E | M | 5 | 依赖阶段 D tooltip |
-| `resize()` | A：onLayout 自动 | A | — | — | |
-| `destroy()` | E：scope 未暴露销毁 | E | S | 2 | |
-| `convertToPictureUrl(includeOverlay,type,bg)` | B：ChartSnapshotExporter（PNG only） | E | S | 2 | 补 jpeg/bmp 编码与背景色参 |
-| `getDom/getSize/getContainer` | C（Android 无 DOM）→ 提供尺寸查询等价 | C | S | 2 | getBounding(paneId?) |
-| `getDrawPaneById/getDrawPanes/getSeparatorPanes/layout/updatePane` | B：PaneHeights/adjustPane（简化 pane 模型） | E | M | 5 | 固定三 pane 的渐进开放 |
-| `getChartStore/getXAxisPane` | C（内核不暴露） | D | — | — | 架构决策：内核封装 |
-
-## 8. Options（init 第二参）
-
-| TS 字段 | Kotlin 现状 | 分类 | 工作量 | 批次 |
-|---|---|---|---|---|
-| `locale` | B：ChartLocale + state.locale | E | S | 2 |
-| `timezone` | B：默认时区（无注入） | E | S | 2 |
-| `styles: string\|DeepPartial` | B：ChartTheme 实例 | E | L | 5 |
-| `formatter` | B：lambda 分散 | E | S | 2 |
-| `thousandsSeparator/decimalFold` | B：部分内建 | E | S | 2 |
-| `zoomAnchor/hotkey` | D/C | C | — | 2 |
-| `layout` | E | E | M | 5 |
-
-## 9. Styles 树（接口级；字段级明细在批次 5 时细化追加）
-
-| TS 接口 | Kotlin 现状 | 分类 | 工作量 | 批次 |
-|---|---|---|---|---|
-| `Styles` 9 节 | B：ChartTheme 平面色板（字段树不同） | E | L | 5 |
-| `CandleStyle.type` 六值 | A：MainChartType（6 种同名） | A | — | — |
-| `CandleBarColor`（含回调） | B：up/down/noChange 常量色 | E | M | 5 |
-| `IndicatorStyle{ohlc,bars,lines,circles,texts,lastValueMark,tooltip}` | B：linePalette + 固定绘制 | E | L | 5 |
-| `TooltipStyle`（showRule/showType/legend/features） | B：图例（slot 定制已支持） | E | L | 5 |
-| `CrosshairStyle` | B：crosshairLine 单色 | E | M | 5 |
-| `OverlayStyle`（point 六态等） | B：OverlayRenderer 常量 | E | M | 5 |
-| `XAxisStyle/YAxisStyle` | B：axisText/axisLine | E | M | 5 |
-| `SeparatorStyle` | B：axisLine | E | S | 5 |
-| `GridStyle` | B：gridLine | E | S | 5 |
-
-## 10. 数据与模型
-
-| TS 类型 | Kotlin 现状 | 分类 | 备注 |
-|---|---|---|---|
-| `KLineData{timestamp,open,high,low,close,volume?,turnover?}` | A：Candle 字段同名同义 | A | — |
-| OHLC 校验（递增/有限） | D：Kotlin 严格校验 + 定位错误（比上游严格，PRD R-01） | D | 登记 |
-| `SymbolInfo{ticker,pricePrecision,volumePrecision}` | B：MarketKey 无精度字段 | E | S | 2 |
-| `Period{type,milliseconds}` | B：MarketKey.period 字符串 | E | S | 2 |
-| `Crosshair{...}` 事件数据 | B：Offset十字线 | E | S | 2 |
-| `VisibleRange{from,to,realFrom,realTo}` | B：仅 from/to | E | S | 2 |
-
-## 11. 数值语义（L1）
-
-| 项 | 状态 |
-|---|---|
-| 27 指标 oracle 逐位对照 | A（fixtures + 手算 + 增量一致性） |
-| D-01 percentage 零基准 | D（有意差异） |
-| D-02 斐波那契价格投影 | D（有意差异） |
-| D-03 缺失字段 Missing | D（有意差异） |
-| 视口往返 ≤0.5px | A（A-12 测试） |
-
-## 统计（批次 1 出口）
-
-| 分类 | 数量 |
-|---|---|
-| A 直接对齐 | 4 |
-| B 适配 | 13 |
-| C 平台不适用 | 5 |
-| D 有意差异 | 1 |
-| E 缺失（待实现） | 85 |
-| unknown | **0** |
-| 合计 | 108 |
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| EVT-001 | `onZoom`（payload `{scale}`） | Store.ts:1247 | 无 | E | test | S | 2a | |
+| EVT-002 | `onScroll`（`{distance}`） | Store.ts:946 | 无 | E | test | S | 2a | |
+| EVT-003 | `onVisibleRangeChange`（`VisibleRange`） | Store.ts:742 | viewRevision 近似 | E | test | S | 2a | |
+| EVT-004 | `onCrosshairChange`（`Crosshair`） | Store.ts:1309 | crosshairPosition（Offset） | E | test | S | 2a | payload 结构补 |
+| EVT-005 | `onCandleBarClick`（`VisibleRangeData`） | CandleBarView.ts:35 | onCandleClick（仅 Candle） | E | test | S | 2a | payload 补 prev/next |
+| EVT-006 | `onPaneDrag`（`{paneId}`） | SeparatorWidget.ts:149 | adjustPane 无回调 | E | test | S | 2a | |
+| EVT-007 | `onCandleTooltipFeatureClick` | tooltip | 无（features 未实现） | E | test | M | 5 | 依赖批次 5 |
+| EVT-008 | `onIndicatorTooltipFeatureClick` | tooltip | 无 | E | test | M | 5 | 同上 |
+| EVT-009 | `onCrosshairFeatureClick` | crosshair | 无 | E | test | M | 5 | 同上 |
 
 
-E 项全部指派批次（2：26 项 / 3：8 项 / 4：9 项 / 5：19 项），其余 E 在阶段 B~E 进行时并入。注：Styles 字段级（§9 之下）按接口级登记，批次 5 展开字段级后追加矩阵行。
+## 4. 公共类型
+
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| TYP-001 | `KLineData` | Data.ts | Candle 同名同义 | A | existing | — | — | |
+| TYP-002 | `Crosshair` | Crosshair.ts | Offset 十字线 | E | test | S | 2a | 字段级见 ts-inventory §5 |
+| TYP-003 | `BarSpace{bar,halfBar,gapBar,halfGapBar}` | BarSpace.ts | barSpacing 单值 | E | test | S | 2c | |
+| TYP-004 | `VisibleRange{from,to,realFrom,realTo}` | VisibleRange.ts | from/to | E | test | S | 2a | |
+| TYP-005 | `VisibleRangeData` | Data.ts:36 | 无 | E | test | S | 2a | 事件 payload 用 |
+| TYP-006 | `SymbolInfo` | SymbolInfo.ts | MarketKey 无精度 | E | test | S | 2a | |
+| TYP-007 | `Period` | Period.ts | 字符串 | E | test | S | 2a | |
+| TYP-008 | `DataLoader`（含 DataLoadMore 双向） | DataLoader.ts | HistorySource 单向 more | E | test+parity | M | 2a | 四 type 对齐 |
+| TYP-009 | `CandleType` 六值 | Styles.ts:242 | MainChartType 同名 | A | existing | — | — | |
+| TYP-010 | `LineType/PolygonType/PathType/TooltipShowRule/TooltipShowType/TooltipFeaturePosition/FeatureType/FormatDateType/ZoomAnchorType` | Styles.ts 等 | 部分散落 | E | compile | S | 5 | 枚举同名化 |
+| TYP-011 | `IndicatorSeries` 三值 | Indicator.ts:34 | IndicatorSeries（PRICE/VOLUME/NORMAL） | A | existing | — | — | 字符串值对齐在批次 3 |
+| TYP-012 | `OverlayMode` 三值 | Overlay.ts:29 | MagnetMode | B | test | S | 2b | 门面同名枚举 |
+| TYP-013 | `OverlayDrawingMode` | Overlay.ts:44 | continuous 布尔 | B | test | S | 4 | |
+| TYP-014 | `ActionType` 九值 | Action.ts:19 | 分散回调 | E | test | S | 2a | |
+
+
+## 5. 指标模板字段（22，逐字段）
+
+| ID | TS 字段 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|
+| IND-01 | `id` | IndicatorInstance.id | A | existing | — | — | |
+| IND-02 | `paneId` | 无 | E | test | S | 3 | |
+| IND-03 | `yAxisId` | 无 | E | test | S | 5 | 依赖多轴 |
+| IND-04 | `name` | 有 | A | existing | — | — | |
+| IND-05 | `shortName` | 有 | A | existing | — | — | |
+| IND-06 | `precision` | 有 | A | existing | — | — | |
+| IND-07 | `calcParams` | 有 | A | existing | — | — | |
+| IND-08 | `shouldOhlc` | 无 | E | diff | S | 3 | MA 等 5 个模板为 true |
+| IND-09 | `shouldFormatBigNumber` | 无 | E | diff | S | 3 | VOL 为 true |
+| IND-10 | `visible` | Instance.visible 近似 | B | test | S | 2b | |
+| IND-11 | `zLevel` | 无 | E | test | S | 3 | |
+| IND-12 | `extendData` | 无 | E | test | M | 3 | |
+| IND-13 | `series` | IndicatorSeries | A | diff | — | 3 | 值字符串化（price） |
+| IND-14 | `figures`（含 styles/attrs 回调） | PlotDef（无回调） | E | diff | M | 3 | |
+| IND-15 | `minValue` | 无 | E | diff | S | 3 | VOL=0 |
+| IND-16 | `maxValue` | 无 | E | diff | S | 3 | |
+| IND-17 | `styles` | 无 | E | test | M | 5 | |
+| IND-18 | `shouldUpdate` | 无 | E | test | S | 3 | |
+| IND-19 | `calc` | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 |
+| IND-20 | `regenerateFigures` | plotsFor | B | diff | S | 3 | 改名兼容 |
+| IND-21 | `createTooltipDataSource` | 无 | E | test | M | 5 | |
+| IND-22 | `draw` | 无 | E | test | M | 5 | 自定义绘制 |
+| IND-23 | 27 指标元数据（name/params/figures 等） | oracle 数值已对齐；元数据未 diff | E | diff | M | 3 | F1 自动 diff |
+
+
+## 6. 覆盖物模板字段（逐字段）
+
+| ID | TS 字段 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|
+| OVL-01 | `name` | 有 | A | existing | — | — | |
+| OVL-02 | `totalStep` | pointCount+1 | B | diff | S | 4 | 兼容读取 |
+| OVL-03 | `needDefaultPointFigure` | 无 | E | diff | S | 4 | |
+| OVL-04 | `needDefaultXAxisFigure` | 无 | E | diff | S | 4 | |
+| OVL-05 | `needDefaultYAxisFigure` | 无 | E | diff | S | 4 | |
+| OVL-06 | `createPointFigures` | 内置渲染器分支 | E | test | L | 4 | 返回 Figure 原语 |
+| OVL-07 | `createXAxisFigures` | 无 | E | test | M | 4 | |
+| OVL-08 | `createYAxisFigures` | 无 | E | test | M | 4 | |
+| OVL-09 | `checkEventOn` | hitTest | B | test | S | 4 | |
+| OVL-10 | `drawingMode(step/continuous)` | continuous 布尔 | B | diff | S | 4 | |
+| OVL-11 | `performEventPressedMove` | 手势内置 | E | test | M | 4 | |
+| OVL-12 | `performEventMoveForDrawing` | 手势内置 | E | test | M | 4 | |
+| OVL-13 | `onRemoved` | OverlayEvent.Removed | B | test | S | 4 | |
+| OVL-14 | `onClick/onDoubleClick/onRightClick` | 无（右键平台不适用） | E | test | M | 4 | 右键→长按菜单等价 |
+| OVL-15 | `onMouseDown/Enter/Leave/Move/Up` | 无 | E | test | M | 4 | 指针语义映射 |
+| OVL-16 | `onTouchStart/Move/End` | 手势内置 | E | test | M | 4 | |
+| OVL-17 | `onPressedMove` | DRAGGING 状态 | B | test | S | 4 | |
+| OVL-18 | `extendData` | extensionData | B | test | S | 4 | |
+| OVL-19 | 16 覆盖物元数据 diff | pointCount 已核 | E | diff | S | 4 | F1 自动 diff |
+| OVL-20 | `groupId`（filter 用） | 无 | E | test | S | 2b | |
+
+## 7. Styles 接口（43，一接口一行；字段级见 ts-inventory §6）
+
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| STY-001 | `Margin` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-002 | `Padding` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-003 | `Offset` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-004 | `LineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-005 | `SmoothLineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-006 | `StateLineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-007 | `PathStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-008 | `PolygonStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-009 | `RectStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-010 | `TextStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-011 | `StateTextStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-012 | `ChangeColor` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-013 | `GradientColor` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-014 | `FeaturePathStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-015 | `FeatureIconFontStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-016 | `FeatureStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-017 | `GridStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-018 | `TooltipLegendChild` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-019 | `TooltipLegend` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-020 | `TooltipFeatureStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-021 | `TooltipStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-022 | `CandleAreaPointStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-023 | `CandleAreaStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-024 | `CandleHighLowPriceMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-025 | `CandleLastPriceMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-026 | `CandlePriceMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-027 | `CandleTooltipRectStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-028 | `CandleTooltipStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-029 | `CandleBarColor` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-030 | `CandleBarColorCallbackReturnStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-031 | `CandleStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-032 | `IndicatorLastValueMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-033 | `IndicatorTooltipStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-034 | `IndicatorStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-035 | `AxisTickLineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-036 | `AxisTickTextStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-037 | `AxisStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-038 | `CrosshairDirectionStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-039 | `CrosshairStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-040 | `OverlayPointStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-041 | `OverlayStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-042 | `SeparatorStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-043 | `Styles` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+
+## 8. 数值语义（L1，防回归项）
+
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| NUM-001 | 27 指标 calc 数值 | extension/indicator/* | oracle 逐位对照已达标 | A | diff | — | — | 既有 fixtures 防回归 |
+| NUM-002 | percentage 零基准行为 | y-axis/percentage.ts | 「—」+有限范围 | D | existing | — | — | 有意差异 D-01 |
+| NUM-003 | 斐波那契价格投影 | overlay/fibonacciLine.ts | 价格空间算层级 | D | existing | — | — | 有意差异 D-02 |
+| NUM-004 | 缺失字段语义 | extension/indicator/* | Missing（NaN） | D | existing | — | — | 有意差异 D-03 |
+| NUM-005 | 视口数据↔像素往返 | — | ≤0.5px 达标 | A | test | — | — | A-12 既有 |
+| NUM-006 | OHLC 输入校验 | — | 严于上游（定位错误） | D | existing | — | — | PRD R-01 |
+
+---
+
+## 统计
+
+**本文不手写统计**——数字由 `tools/alignment/check.py` 输出（分类/批次计数 + 完整性校验），避免 v1 手写失真。校验失败（格式违规/方法缺行/枚举非法）即退出非 0。
