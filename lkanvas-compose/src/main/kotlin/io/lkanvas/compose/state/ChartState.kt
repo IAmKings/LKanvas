@@ -258,6 +258,80 @@ class ChartState(
     /** candle 点击事件（PRD R-10）。 */
     var onCandleClick: ((io.lkanvas.core.data.Candle) -> Unit)? = null
 
+    /** 无障碍当前选择索引（null=跟随最新；A-40）。 */
+    var accessibilitySelectedIndex: Int? = null
+        private set
+
+    /** 无障碍动作：切换到上一根（返回是否成功）。 */
+    fun selectPreviousCandle(): Boolean {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return false
+        val next = ((accessibilitySelectedIndex ?: (candles.size - 1)) - 1).coerceIn(candles.indices)
+        accessibilitySelectedIndex = next
+        showCrosshairAt(
+            viewport.candleCenterX(next.toDouble()).toFloat(),
+            paneHeightsPx.main / 2f,
+        )
+        viewRevision++
+        return true
+    }
+
+    /** 无障碍动作：切换到下一根。 */
+    fun selectNextCandle(): Boolean {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return false
+        val next = ((accessibilitySelectedIndex ?: (candles.size - 1)) + 1).coerceIn(candles.indices)
+        accessibilitySelectedIndex = next
+        showCrosshairAt(
+            viewport.candleCenterX(next.toDouble()).toFloat(),
+            paneHeightsPx.main / 2f,
+        )
+        viewRevision++
+        return true
+    }
+
+    /** 无障碍动作：放大/缩小（以最新为锚）。 */
+    fun zoomIn(): Boolean {
+        zoomAt(1.3f, paneHeightsPx.main / 2f)
+        return true
+    }
+
+    fun zoomOut(): Boolean {
+        zoomAt(1f / 1.3f, paneHeightsPx.main / 2f)
+        return true
+    }
+
+    /** 无障碍动作：删除选中覆盖物（无选中返回 false）。 */
+    fun removeSelectedOverlay(): Boolean {
+        val id = overlays.selectedId ?: return false
+        overlays.remove(id)
+        notifyOverlayChanged()
+        return true
+    }
+
+    /** 当前无障碍摘要文本（TalkBack contentDescription；供 semantics 层调用）。 */
+    fun accessibilityText(timeText: (Long) -> String): String {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return "K线图，暂无数据"
+        val idx = accessibilitySelectedIndex ?: (candles.size - 1)
+        val c = candles[idx]
+        val prevClose = candles.getOrNull(idx - 1)?.close
+        val candleText = io.lkanvas.core.accessibility.AccessibilitySummary.candleSummary(
+            c, prevClose, timeText(c.timestamp),
+        ) { v -> String.format("%.2f", v) }
+        val maText = maResult?.let { ma ->
+            io.lkanvas.core.accessibility.AccessibilitySummary.indicatorSummary(
+                "MA",
+                ma.result.keys.toList(),
+                ma.result.keys.map { ma.result[it][idx] },
+            ) { v -> String.format("%.2f", v) }
+        }
+        return buildString {
+            append(candleText)
+            if (maText != null) append("。").append(maText)
+        }
+    }
+
     /** 手势所有权：任一时刻至多一个交互所有者（PRD A-33 前置）。 */
     var gestureOwner: GestureOwner = GestureOwner.NONE
         private set

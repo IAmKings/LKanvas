@@ -3,10 +3,15 @@ package io.lkanvas.compose
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
 import io.lkanvas.compose.draw.ChartText
 import io.lkanvas.compose.draw.PaneRenderers
@@ -47,11 +52,28 @@ fun KLineChart(
         state.onLayout(contentW, ChartState.PaneHeights(mainH, subPaneH, subPaneH, timeAxisH))
     }
 
+    // 无障碍摘要依赖的状态（读取以触发语义更新）
+    val a11yRevision = state.viewRevision + state.overlayRevision +
+        (state.accessibilitySelectedIndex ?: -1)
+    val a11yText = remember(a11yRevision, state.dataSnapshot.candles.size) {
+        state.accessibilityText { ts -> ChartText.timeLabel(ts, 60_000L) }
+    }
+
     Canvas(
         modifier = modifier
             .fillMaxSize()
             .then(layoutModifier)
-            .chartGestures(state),
+            .chartGestures(state)
+            .semantics {
+                contentDescription = a11yText
+                customActions = listOf(
+                    CustomAccessibilityAction("上一根") { state.selectPreviousCandle() },
+                    CustomAccessibilityAction("下一根") { state.selectNextCandle() },
+                    CustomAccessibilityAction("放大") { state.zoomIn() },
+                    CustomAccessibilityAction("缩小") { state.zoomOut() },
+                    CustomAccessibilityAction("删除选中画线") { state.removeSelectedOverlay() },
+                )
+            },
     ) {
         // 读取 viewRevision 触发重绘
         val rev = state.viewRevision
