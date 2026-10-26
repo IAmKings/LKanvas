@@ -104,12 +104,12 @@
 | 2026-10-26 | **M4 收尾完成**：恢复门禁与保存事件抑制（A-37，含 compose 层接线测试）；无障碍摘要与五个替代动作（A-40 基础，真机 TalkBack content-desc 验证）；pane 分隔条拖动 + 轴区拖动缩放（A-33，真机验证）。**192 测试 0 失败** |
 | 2026-10-26 | **M5 启动**：PNG 导出（T-29，ChartRenderer 可重放渲染器 + 等比缩放三 pane 完整导出，真机验证 1080×1600）；诊断设施（T-30，可开关零开销 + B-01 JVM 初测 P95=0.270ms 优于 D1 目标 15 倍） |
 | 2026-10-26 | **M6 前置完成**：基础图形 7/7（core 原语+命中+compose 映射，修 arc 全圆取模坍缩 bug）；Maven 本地发布（core JAR+sources / compose AAR，Apache-2.0 POM）；app-sample R8 release（931KB）真机运行正常；独立 consumer 仅凭 Maven 制品编译通过（A-46）；上游同步演练 #1（T-33：v10.1.0 后唯一提交为文档类→不适用，见 upstream-sync.md） |
+| 2026-10-26 | **T-24 完整版 + A-41**：ChartLocale 中英文词条（摘要/方向词/无障碍动作，宿主可整体替换）；LegendData + legendSlot 插槽与 LegendMode（R-11 slot 定制）；右轴留白随字体缩放 + 主 pane 35% 保底钳制（真机 font_scale=2.0 与横屏验证）。**208 测试 0 失败** |
 
 ## 6. 已知问题与后续计划
 
-- 图例/tooltip 完整定制（slot/事件）与中英文资源扩展待 T-24 完整版。
 - 基础图形 circle/polygon/rect/arc 的宿主自定义模板样例待补（原语与命中已实现）。
-- 无障碍深度项：TalkBack 遍历覆盖物列表、字体缩放 2.0 矩阵（A-41）待补测。
+- 无障碍余项：TalkBack 遍历覆盖物列表待补；字体缩放 2.0 与横屏已真机验证（A-41 达标，允许降级）。已知 S2：可见最高/最低标记在 2 倍字体下可溢出内容区（不阻断）。
 - 诊断可视化（宿主诊断入口 UI/导出）待 T-30 余量；当前经 ChartDiagnostics API 读取。
 - 性能门槛（B-02 容量/突发/泄漏/持续运行）尚未完成：B-01 增量路径 JVM 初测已达标（P95=0.270ms vs 4ms），Macrobenchmark 冻结设备测量（真机帧率/内存/启动）待 T-34。
 - D8 构建 WARNING：Kotlin metadata 重写 "Should never be called"（R8 已知噪音，debug 运行正常）；R8 release 验证在 M6/T-31。
