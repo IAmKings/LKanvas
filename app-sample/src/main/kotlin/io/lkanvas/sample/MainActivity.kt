@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val feed = remember { LocalFeed() }
             val state = remember { ChartState() }
+            val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
             LaunchedEffect(state) { feed.start(state) }
             // 左缘分页：滚动到边缘时补充更早历史（锚点保持由 core 保证）
             LaunchedEffect(state) {
@@ -95,9 +96,34 @@ class MainActivity : ComponentActivity() {
                             },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text("轴") }
+                        // PNG 导出（T-29）：cacheDir/lkanvas-export.png
+                        Button(
+                            onClick = { exportPng(state, textMeasurer) },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text("导出") }
                     }
                 }
             }
+        }
+    }
+
+    /** PNG 导出演示（T-29）：写 cacheDir，宿主自行决定分享/存储。 */
+    private fun exportPng(state: ChartState, textMeasurer: androidx.compose.ui.text.TextMeasurer) {
+        val out = java.io.File(cacheDir, "lkanvas-export.png")
+        runCatching {
+            java.io.FileOutputStream(out).use { fos ->
+                io.lkanvas.compose.export.ChartSnapshotExporter.exportPng(
+                    state = state,
+                    textMeasurer = textMeasurer,
+                    output = fos,
+                    widthPx = 1080,
+                    heightPx = 1600,
+                )
+            }
+        }.onSuccess {
+            android.util.Log.i("LKanvas", "PNG 导出成功：${out.absolutePath} (${out.length()} bytes)")
+        }.onFailure {
+            android.util.Log.e("LKanvas", "PNG 导出失败", it)
         }
     }
 }

@@ -111,6 +111,9 @@ class ChartState(
     /** 覆盖物管理器（领域状态；串行上下文操作）。 */
     val overlays = io.lkanvas.core.overlay.OverlayManager()
 
+    /** 运行诊断（默认关闭零开销；T-30/A-44）。 */
+    val diagnostics = io.lkanvas.core.diagnostics.ChartDiagnostics()
+
     /** 存档恢复门禁（A-37：恢复期抑制保存事件）。 */
     val restoreGate = io.lkanvas.core.archive.RestoreGate()
 
@@ -451,7 +454,11 @@ class ChartState(
             io.lkanvas.core.store.DataOp.APPEND_BATCH -> ChangeKind.Append(change.appendedCount)
         }
         for (inst in computeInstances) {
-            if (inst.visible) IndicatorEngine.computeInto(inst, snap.candles, kind)
+            if (inst.visible) {
+                diagnostics.timeCompute(snap.sessionId, snap.revision, { inst.id }) {
+                    IndicatorEngine.computeInto(inst, snap.candles, kind)
+                }
+            }
         }
         maResult = maInstance.state
         volResult = volInstance.state
