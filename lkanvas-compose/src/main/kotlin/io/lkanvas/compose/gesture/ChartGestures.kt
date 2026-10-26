@@ -46,11 +46,25 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         var dragInstanceId: String? = null
         var dragPointIndex: Int? = null
         var lastAnchor: io.lkanvas.core.overlay.OverlayPoint? = null
+        // brush 连续采样位置
+        var lastBrushX = 0f
+        var lastBrushY = 0f
 
         // 创建模式优先接管本次手势
         if (state.overlays.creatingId != null) {
             mode = GMode.CREATE
             state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
+            // brush：按下即采首点，随后 Move 连续采样
+            if (state.currentTool == "brush") {
+                lastBrushX = down.position.x
+                lastBrushY = down.position.y
+                val anchor = state.overlayPointFromPx(down.position.x, down.position.y)
+                val id = state.overlays.creatingId
+                if (anchor != null && id != null) {
+                    state.overlays.addCreatePoint(id, anchor)
+                    state.notifyOverlayChanged()
+                }
+            }
         } else {
             val hit = OverlayRenderer.hitTest(state, down.position.x, down.position.y, size.width.toFloat(), size.height.toFloat())
             if (hit != null) {
@@ -177,7 +191,24 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                         }
 
                         GMode.CREATE -> {
-                            // 创建中：无需移动处理（点击在 Release 分支加点）
+                            // brush：按住拖动连续采样（4px 去抖）；其余模板点击在 Release 加点
+                            if (state.currentTool == "brush") {
+                                val c = event.changes.firstOrNull() ?: continue
+                                if (c.positionChanged()) {
+                                    val dx = c.position.x - lastBrushX
+                                    val dy = c.position.y - lastBrushY
+                                    if (hypot(dx, dy) >= 4f) {
+                                        lastBrushX = c.position.x
+                                        lastBrushY = c.position.y
+                                        val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                                        val id = state.overlays.creatingId
+                                        if (anchor != null && id != null) {
+                                            state.overlays.addCreatePoint(id, anchor)
+                                            state.notifyOverlayChanged()
+                                        }
+                                    }
+                                }
+                            }
                             event.changes.forEach { if (it.positionChanged()) it.consume() }
                         }
                     }
@@ -199,13 +230,16 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                         GMode.IDLE -> if (!moved) state.tapCandle(down.position.x)
                         GMode.PINCH -> Unit
                         GMode.CREATE -> {
-                            val c = event.changes.firstOrNull() ?: break
-                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
-                            if (anchor != null) {
-                                val id = state.overlays.creatingId
-                                if (id != null) {
-                                    state.overlays.addCreatePoint(id, anchor)
-                                    state.notifyOverlayChanged()
+                            // brush 已在按下/移动中采样，抬起只结束本次手势（宿主按完成/取消收尾）
+                            if (state.currentTool != "brush") {
+                                val c = event.changes.firstOrNull() ?: break
+                                val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                                if (anchor != null) {
+                                    val id = state.overlays.creatingId
+                                    if (id != null) {
+                                        state.overlays.addCreatePoint(id, anchor)
+                                        state.notifyOverlayChanged()
+                                    }
                                 }
                             }
                         }

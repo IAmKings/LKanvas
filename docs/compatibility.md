@@ -51,12 +51,26 @@
 
 ## 3. 覆盖物（16，PRD 6.2）
 
-上游文件：`src/extension/overlay/`（segment、straightLine、rayLine、horizontalRayLine、horizontalSegment、horizontalStraightLine、verticalRayLine、verticalSegment、verticalStraightLine、parallelStraightLine、priceChannelLine、fibonacciLine、priceLine、simpleAnnotation、simpleTag、brush）。
+**M4 全部完成（16/16）**：Kotlin 位置 core `overlay/`（模板/几何/管理器）+ compose `draw/OverlayRenderer.kt`（渲染与命中）。全部共用生命周期状态机（创建/选中/拖动/锁定/删除恰好一次事件）、时间锚点存储、磁吸、层级命中优先级。
 
-| 编号 | 名称 | 状态 | Kotlin 位置 | 测试 |
+| 编号 | 名称 | 控制点 | 状态 | 关键验收 |
 |---|---|---|---|---|
-| O-01 | segment | **已实现已验收（Alpha）** | core `overlay/OverlayManager.kt` + compose `draw/OverlayRenderer.kt` | 状态机/锁定/拖动/删除/隔离 + 真机画线入口 |
-| O-02~O-16 | 其余 15 种 | 已映射待实现（Beta/T-20~T-22） | 待实现 | — |
+| O-01 | segment | 2 | 已实现已验收 | 两点/拖端点/整体/取消/命中（真机） |
+| O-02 | straightLine | 2 | 已实现已验收 | 双向延伸 Liang-Barsky 裁剪 |
+| O-03 | rayLine | 2 | 已实现已验收 | 单向射线头端固定 |
+| O-04 | horizontalRayLine | 2 | 已实现已验收 | 方向由第二点符号决定 |
+| O-05 | horizontalSegment | 2 | 已实现已验收 | 水平约束同 y、区间有序 |
+| O-06 | horizontalStraightLine | 1 | 已实现已验收 | 全宽 + 价格锚点 |
+| O-07 | verticalRayLine | 2 | 已实现已验收 | 垂直射线方向 |
+| O-08 | verticalSegment | 2 | 已实现已验收 | 垂直约束同 x |
+| O-09 | verticalStraightLine | 1 | 已实现已验收 | 全高 + 时间锚点 |
+| O-10 | parallelStraightLine | 3 | 已实现已验收 | 过第三点平行、垂直退化两竖线 |
+| O-11 | priceChannelLine | 3 | 已实现已验收 | 主线+平行+间距延伸线（上游 count=1） |
+| O-12 | fibonacciLine | 2 | 已实现已验收 | 比例[1,.786,.618,.5,.382,.236,0]；价格空间层级投影（D-02，真机验证） |
+| O-13 | priceLine | 1 | 已实现已验收 | 水平价格线 + 价格标签 |
+| O-14 | simpleAnnotation | 1 | 已实现已验收 | extendData 文本 |
+| O-15 | simpleTag | 1 | 已实现已验收 | 带底色标签 |
+| O-16 | brush | 连续 | 已实现已验收 | 5000 点上限恰好一次报告、4px 去抖连笔（真机验证） |
 
 ## 4. 其他能力
 
@@ -64,7 +78,8 @@
 |---|---|---|
 | 主图类型 6 种（candle_solid/stroke/up_stroke/down_stroke/ohlc/area） | common/Styles.ts、view/ | **已实现（M3/T-18）**：六形态 + 可见高低标记 + area 渐变；真机验证空心蜡烛/轴切换 |
 | 轴 3 种 + 自定义（normal/percentage/logarithm） | src/extension/y-axis/ | **已实现（M3/T-16、T-17）**：core `axis/YAxisSpec.kt` 统一规格；signed-log 负/零/小正值支持；percentage 零基准按 D-01；自定义轴 A-18 保护（非单调/超量/非有限降级） |
-| 基础图形 7 种（circle/line/polygon/rect/text/arc/path） | src/extension/figure/ | line/point 等价物已实现（segment 用）；text 以 Compose 文本实现；其余已映射待实现（Beta） |
+| 基础图形 7 种（circle/line/polygon/rect/text/arc/path） | src/extension/figure/ | **line/point/text 已实现**（segment/斐波那契/文本覆盖物/brush 折线使用）；circle/polygon/rect/arc 待 1.0 前（当前无内置模板依赖，宿主自定义模板可先经 path 等价） |
+| 存档/恢复 | — | **schema 与导出/恢复已实现（M4/T-25）**：core `archive/ChartArchive.kt`（schemaVersion=1、1MiB/500 覆盖物上限显式拒绝、损坏整次失败原文保留、未知模板保留、创建中不导出）；A-36/A-38 基础测试通过 |
 | 数据接入（loadMoreData/DataSource 语义） | Store.ts、docs/guide/ | **已实现已验收（Alpha）**（core `datasource/`：HistorySource/ChartLoader/确定性示例；原生等价而非逐字兼容） |
 | PatchHistory 显式历史纠正 | — | **已实现（M3/T-15）**：A-06 测试（最早/中间/末根纠正后与全量一致） |
 | 图例/tooltip/价格线/主题/格式化 | view/、common/ | **基础摘要已实现（Alpha）**（OHLC/MA 图例、末价线标签、明暗主题、时间/价格格式化）；完整 tooltip/资源扩展待 M4 |
@@ -85,16 +100,17 @@
 | 2026-10-25 | 初版：基线固定 v10.1.0；27 指标/16 覆盖物/其他能力登记；D-01/D-02/D-03 差异预登记 |
 | 2026-10-26 | **Alpha（M0–M2）完成**：数据模型/串行变更/会话门禁/视口坐标（A-01~A-14 JVM 测试）；指标引擎+MA/VOL/MACD（oracle 逐位对照）；candle_solid 三 pane 绘制；手势/十字线/图例；覆盖物框架+segment；DataSource 契约+加载协调器；真机（小米 23078PND5G）视觉验收通过 |
 | 2026-10-26 | **M3 完成**：27/27 指标（oracle 逐位对照 + 手算 + 增量一致性）；PatchHistory（A-06）；normal/logarithm/percentage/自定义轴（A-17/A-18）；六种主图类型 + 可见高低标记；真机验证图型/轴切换 |
+| 2026-10-26 | **M4 核心完成（Beta）**：16/16 覆盖物（几何约束/平行通道/斐波那契 D-02/brush 5000 点上限；真机验证斐波那契与 brush 连笔）；存档 schema 与导出/恢复（A-36/A-38 基础）；手势 brush 连笔采样 |
 
 ## 6. 已知问题与后续计划
 
-- 无障碍语义节点未提供（M4/T-27 范围）。
-- 手势中轴拖动缩放、pane 分隔条调整未实现（Beta/T-23）。
-- 覆盖物仅 segment（O-01）；其余 15 种待 M4/T-20~T-22。
-- 基础图形仅 line/point/text 等价物；circle/polygon/rect/arc/path 待 Beta。
-- 图例/tooltip 完整定制（slot/事件）与中英文资源扩展待 M4/T-24。
-- 存档/恢复、PNG 导出、诊断未实现（M4/M5）。
+- 无障碍语义节点未提供（M4/T-27 范围，下一批）。
+- 手势中轴拖动缩放、pane 分隔条调整未实现（T-23 余量）。
+- 基础图形 circle/polygon/rect/arc 待 1.0 前（当前内置模板无依赖）。
+- 图例/tooltip 完整定制（slot/事件）与中英文资源扩展待 T-24 完整版。
+- 存档生命周期竞态（恢复前空状态保存抑制，A-37）与恢复 UI 流程待 T-26。
+- PNG 导出、诊断未实现（M5）。
 - 性能门槛（第 7 节 B-01~B-06）尚未在冻结设备上测量（M5/T-30、T-34）；增量工作量已有 JVM 探针证明（末根替换 O(参数)，万根数据访问 <30 次）。
 - 惯性滚动为基础指数衰减实现，未接入 Android fling 动画曲线（后续优化）。
-- pane 增删/排序/调高为固定三 pane 布局，动态 pane 管理待 M4/T-16 完整版。
+- pane 增删/排序/调高为固定三 pane 布局，动态 pane 管理待 T-16 完整版。
 - PVT volume 缺失按上游显式取 1、ROC 零回看取 0、AVP 缺失按 0：上游明确代码行为，逐位对齐优先（登记备查）。
