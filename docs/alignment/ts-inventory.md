@@ -22,137 +22,132 @@
 
 类型别名导出：`ActionType, CandleTooltipRectPosition, CandleType, Chart, DomPosition, FeatureType, FormatDateType, IndicatorSeries, Layout, LineType, OverlayDrawingMode, OverlayMode, PolygonType, TooltipFeaturePosition, TooltipShowRule, TooltipShowType, YAxisFilter, YAxisOverride, ZoomAnchor`。
 
-## 2. Chart 实例方法（79 个，含行号）
+## 2. Chart 实例方法（79 个，含行号与完整签名；v3 修复签名列全空缺陷）
 
 #### 2.1 DOM 与内部布局
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `getContainer` | Chart.ts:219 | (): HTMLElement |
+| `getChartStore` | Chart.ts:223 | (): ChartStore（内部） |
+| `getXAxisPane` | Chart.ts:227 | (): XAxisPane（内部） |
+| `getDrawPaneById` | Chart.ts:208 | (paneId: string): Nullable<DrawPane> |
+| `getDrawPanes` | Chart.ts:231 | (): DrawPane[] |
+| `getSeparatorPanes` | Chart.ts:235 | (): Map<DrawPane, SeparatorPane> |
+| `layout` | Chart.ts:239 | (options: {sort?, measureHeight?, measureWidth?, secondMeasureWidth?, update?, buildYAxisTick?, forceBuildYAxisTick?}): void |
+| `updatePane` | Chart.ts:518 | (level: UpdateLevel, paneId?): void |
+| `getDom` | Chart.ts:530 | (paneId?, position?: DomPosition): Nullable<HTMLElement> |
+| `getSize` | Chart.ts:553 | (paneId?, position?: DomPosition): Nullable<Bounding> |
 
 #### 2.2 数据与品种周期
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `setSymbol` | Chart.ts:584 | (symbol: PickPartial<SymbolInfo, pricePrecision|volumePrecision>): void |
+| `getSymbol` | Chart.ts:591 | (): Nullable<SymbolInfo> |
+| `setPeriod` | Chart.ts:595 | (period: Period): void |
+| `getPeriod` | Chart.ts:602 | (): Nullable<Period> |
+| `resetData` | Chart.ts:789 | (): void |
+| `getDataList` | Chart.ts:793 | (): KLineData[] |
+| `setDataLoader` | Chart.ts:797 | (dataLoader: DataLoader): void（内部 resetData） |
 
 #### 2.3 配置
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `setStyles` | Chart.ts:606 | (value: string|DeepPartial<Styles>): void |
+| `getStyles` | Chart.ts:612 | (): Styles |
+| `setLayoutOptions` | Chart.ts:616 | (layout: DeepPartial<Layout>): void |
+| `getLayoutOptions` | Chart.ts:620 | (): DeepRequired<Layout> |
+| `setFormatter` | Chart.ts:624 | (formatter: Partial<Formatter>): void |
+| `getFormatter` | Chart.ts:630 | (): Formatter |
+| `setLocale` | Chart.ts:634 | (locale: string): void（未知名回退 en-US） |
+| `getLocale` | Chart.ts:640 | (): string |
+| `setTimezone` | Chart.ts:644 | (timezone: string): void（空=系统时区） |
+| `getTimezone` | Chart.ts:650 | (): string |
+| `setThousandsSeparator` | Chart.ts:654 | (o: Partial<ThousandsSeparator>): void |
+| `getThousandsSeparator` | Chart.ts:660 | (): ThousandsSeparator |
+| `setDecimalFold` | Chart.ts:664 | (o: Partial<DecimalFold>): void |
+| `getDecimalFold` | Chart.ts:670 | (): DecimalFold |
+| `setHotkey` | Chart.ts:674 | (hotkey: Partial<Hotkey>): void |
+| `getHotkey` | Chart.ts:678 | (): Hotkey |
+| `getHotKey` | Chart.ts:682 | (): Hotkey（旧拼写别名） |
 
 #### 2.4 视口与交互开关
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `setOffsetRightDistance` | Chart.ts:697 | (distance: number): void |
+| `getOffsetRightDistance` | Chart.ts:701 | (): number |
+| `setMaxOffsetLeftDistance` | Chart.ts:705 | (distance: number): void |
+| `setMaxOffsetRightDistance` | Chart.ts:713 | (distance: number): void |
+| `setLeftMinVisibleBarCount` | Chart.ts:721 | (barCount: number): void |
+| `setRightMinVisibleBarCount` | Chart.ts:729 | (barCount: number): void |
+| `setBarSpace` | Chart.ts:737 | (space: number): void |
+| `getBarSpace` | Chart.ts:741 | (): BarSpace |
+| `getVisibleRange` | Chart.ts:745 | (): VisibleRange |
+| `setZoomEnabled` | Chart.ts:1114 | (enabled: boolean): void |
+| `isZoomEnabled` | Chart.ts:1118 | (): boolean |
+| `setZoomAnchor` | Chart.ts:1122 | (anchor: ZoomAnchorType|Partial<ZoomAnchor>): void |
+| `getZoomAnchor` | Chart.ts:1126 | (): ZoomAnchor |
+| `setScrollEnabled` | Chart.ts:1130 | (enabled: boolean): void |
+| `isScrollEnabled` | Chart.ts:1134 | (): boolean |
 
 #### 2.5 指标
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `createIndicator` | Chart.ts:802 | (value: string|IndicatorCreate, isStack?): Nullable<string>（返回 instanceId） |
+| `overrideIndicator` | Chart.ts:837 | (override: IndicatorOverride): boolean |
+| `getIndicators` | Chart.ts:863 | (filter?: IndicatorFilter): Indicator[] |
+| `removeIndicator` | Chart.ts:867 | (filter?: IndicatorFilter): boolean |
 
 #### 2.6 覆盖物
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `createOverlay` | Chart.ts:903 | (value: string|OverlayCreate|Array<..>, paneId?): Nullable<string>|Array<Nullable<string>> |
+| `getOverlays` | Chart.ts:939 | (filter?: OverlayFilter): Overlay[] |
+| `overrideOverlay` | Chart.ts:943 | (override: OverlayOverride): boolean |
+| `removeOverlay` | Chart.ts:947 | (filter?: OverlayFilter): boolean |
 
 #### 2.7 Pane 与轴
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `setPaneOptions` | Chart.ts:951 | (options: Partial<PaneOptions>): void |
+| `getPaneOptions` | Chart.ts:1106 | (id?): Nullable<PaneOptions>|PaneOptions[] |
+| `createYAxis` | Chart.ts:1003 | (yAxis: YAxisOverride): Nullable<string> |
+| `removeYAxis` | Chart.ts:1025 | (filter: YAxisFilter): boolean |
+| `getYAxes` | Chart.ts:1057 | (filter?: YAxisFilter): YAxis[] |
+| `overrideYAxis` | Chart.ts:1079 | (yAxis: YAxisOverride): void |
+| `overrideXAxis` | Chart.ts:1096 | (xAxis: XAxisOverride): void |
 
 #### 2.8 滚动/缩放/坐标转换
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `scrollByDistance` | Chart.ts:1138 | (distance: number, animationDuration?): void |
+| `scrollToRealTime` | Chart.ts:1154 | (animationDuration?): void |
+| `scrollToDataIndex` | Chart.ts:1161 | (dataIndex: number, animationDuration?): void |
+| `scrollToTimestamp` | Chart.ts:1166 | (timestamp: number, animationDuration?): void |
+| `zoomAtCoordinate` | Chart.ts:1171 | (scale: number, coordinate?: Coordinate, animationDuration?): void |
+| `zoomAtDataIndex` | Chart.ts:1191 | (scale: number, dataIndex: number, animationDuration?): void |
+| `zoomAtTimestamp` | Chart.ts:1196 | (scale: number, timestamp: number, animationDuration?): void |
+| `convertToPixel` | Chart.ts:1201 | (points: Partial<Point>|Array, filter?: ConvertFilter): Partial<Coordinate>|Array |
+| `convertFromPixel` | Chart.ts:1232 | (coordinates: Array<Partial<Coordinate>>, filter?: ConvertFilter): Partial<Point>|Array |
 
 #### 2.9 事件与生命周期
 
-| 方法 | 行号 | 签名要点 |
+| 方法 | 行号 | 签名 |
 |---|---|---|
+| `executeAction` | Chart.ts:1261 | (type: ActionType, data: Nullable<Crosshair>): void |
+| `subscribeAction` | Chart.ts:1278 | (type: ActionType, callback: ActionCallback): void |
+| `unsubscribeAction` | Chart.ts:1282 | (type: ActionType, callback?): void |
+| `getConvertPictureUrl` | Chart.ts:1286 | (includeOverlay?, type?: 'png'|'jpeg'|'bmp', backgroundColor?): string |
+| `resize` | Chart.ts:1315 | (): void |
+| `destroy` | Chart.ts:1327 | (): void |
 
-#### 2.10 其他
-
-| 方法 | 行号 | 签名要点 |
-|---|---|---|
-| `constructor` | Chart.ts:148 | () |
-| `getDrawPaneById` | Chart.ts:208 | () |
-| `getContainer` | Chart.ts:219 | () |
-| `getChartStore` | Chart.ts:223 | () |
-| `getXAxisPane` | Chart.ts:227 | () |
-| `getDrawPanes` | Chart.ts:231 | () |
-| `getSeparatorPanes` | Chart.ts:235 | () |
-| `layout` | Chart.ts:239 | () |
-| `updatePane` | Chart.ts:518 | () |
-| `getDom` | Chart.ts:530 | () |
-| `getSize` | Chart.ts:553 | () |
-| `setSymbol` | Chart.ts:584 | () |
-| `getSymbol` | Chart.ts:591 | () |
-| `setPeriod` | Chart.ts:595 | () |
-| `getPeriod` | Chart.ts:602 | () |
-| `setStyles` | Chart.ts:606 | () |
-| `getStyles` | Chart.ts:612 | () |
-| `setLayoutOptions` | Chart.ts:616 | () |
-| `getLayoutOptions` | Chart.ts:620 | () |
-| `setFormatter` | Chart.ts:624 | () |
-| `getFormatter` | Chart.ts:630 | () |
-| `setLocale` | Chart.ts:634 | () |
-| `getLocale` | Chart.ts:640 | () |
-| `setTimezone` | Chart.ts:644 | () |
-| `getTimezone` | Chart.ts:650 | () |
-| `setThousandsSeparator` | Chart.ts:654 | () |
-| `getThousandsSeparator` | Chart.ts:660 | () |
-| `setDecimalFold` | Chart.ts:664 | () |
-| `getDecimalFold` | Chart.ts:670 | () |
-| `setHotkey` | Chart.ts:674 | () |
-| `getHotkey` | Chart.ts:678 | () |
-| `getHotKey` | Chart.ts:682 | () |
-| `setOffsetRightDistance` | Chart.ts:697 | () |
-| `getOffsetRightDistance` | Chart.ts:701 | () |
-| `setMaxOffsetLeftDistance` | Chart.ts:705 | () |
-| `setMaxOffsetRightDistance` | Chart.ts:713 | () |
-| `setLeftMinVisibleBarCount` | Chart.ts:721 | () |
-| `setRightMinVisibleBarCount` | Chart.ts:729 | () |
-| `setBarSpace` | Chart.ts:737 | () |
-| `getBarSpace` | Chart.ts:741 | () |
-| `getVisibleRange` | Chart.ts:745 | () |
-| `resetData` | Chart.ts:789 | () |
-| `getDataList` | Chart.ts:793 | () |
-| `setDataLoader` | Chart.ts:797 | () |
-| `createIndicator` | Chart.ts:802 | () |
-| `overrideIndicator` | Chart.ts:837 | () |
-| `getIndicators` | Chart.ts:863 | () |
-| `removeIndicator` | Chart.ts:867 | () |
-| `createOverlay` | Chart.ts:903 | () |
-| `getOverlays` | Chart.ts:939 | () |
-| `overrideOverlay` | Chart.ts:943 | () |
-| `removeOverlay` | Chart.ts:947 | () |
-| `setPaneOptions` | Chart.ts:951 | () |
-| `createYAxis` | Chart.ts:1003 | () |
-| `removeYAxis` | Chart.ts:1025 | () |
-| `getYAxes` | Chart.ts:1057 | () |
-| `overrideYAxis` | Chart.ts:1079 | () |
-| `overrideXAxis` | Chart.ts:1096 | () |
-| `getPaneOptions` | Chart.ts:1106 | () |
-| `setZoomEnabled` | Chart.ts:1114 | () |
-| `isZoomEnabled` | Chart.ts:1118 | () |
-| `setZoomAnchor` | Chart.ts:1122 | () |
-| `getZoomAnchor` | Chart.ts:1126 | () |
-| `setScrollEnabled` | Chart.ts:1130 | () |
-| `isScrollEnabled` | Chart.ts:1134 | () |
-| `scrollByDistance` | Chart.ts:1138 | () |
-| `scrollToRealTime` | Chart.ts:1154 | () |
-| `scrollToDataIndex` | Chart.ts:1161 | () |
-| `scrollToTimestamp` | Chart.ts:1166 | () |
-| `zoomAtCoordinate` | Chart.ts:1171 | () |
-| `zoomAtDataIndex` | Chart.ts:1191 | () |
-| `zoomAtTimestamp` | Chart.ts:1196 | () |
-| `convertToPixel` | Chart.ts:1201 | () |
-| `convertFromPixel` | Chart.ts:1232 | () |
-| `executeAction` | Chart.ts:1261 | () |
-| `subscribeAction` | Chart.ts:1278 | () |
-| `unsubscribeAction` | Chart.ts:1282 | () |
-| `getConvertPictureUrl` | Chart.ts:1286 | () |
-| `resize` | Chart.ts:1315 | () |
-| `destroy` | Chart.ts:1327 | () |
 ## 3. 事件与 payload（common/Action.ts + 分发点源码）
 
 `ActionType` 9 种；分发点与 payload 形状（自源码提取）：

@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-对齐矩阵完整性校验（F3 落地 / gap-matrix「统计」节的执行者）。
+对齐矩阵完整性校验 v3（gap-matrix「统计」节的执行者/发布判定工具）。
 
-校验项（任一失败退出码 1）：
-  1. Chart.ts 全部公开方法（正则提取）在 gap-matrix 有 CH- 行，且符号列精确同名
-  2. 每个方法名出现在 ts-inventory
-  3. 方法名纠错护栏：上游实际为 getConvertPictureUrl，文档不得再出现旧误名 convertToPictureUrl
-  4. Styles.ts 全部 export interface 在 ts-inventory（字段级）与 gap-matrix（STY- 行）出现
-  5. 矩阵行格式：ID 前缀合法且唯一；分类为单字母 A-E；验收/工作量/批次取值合法
-  6. 统计输出：按分类、按批次计数（矩阵本文不手写统计的唯一来源）
+相对 v2：覆盖面从 2/7 扩到 7/7——
+  ① Chart.ts 全部公开方法 → CH- 行（符号精确同名，禁合并行）
+  ② Styles.ts 全部 export interface → ts-inventory 字段级 + 矩阵 STY- 行
+  ③ index.ts export 块 39 符号 → 20 个值符号须在矩阵；19 类型别名须在 ts-inventory
+  ④ index.ts utils 对象 25 个 key → 逐一出现在矩阵
+  ⑤ Action.ts ActionType 9 种 → 矩阵 EVT- 行逐一对应
+  ⑥ Indicator.ts Indicator 接口 23 字段 → 矩阵 IND- 行逐一对应
+  ⑦ Overlay.ts Overlay 实例接口 24 字段 → 矩阵 OVL- 行逐一对应
+另：行格式（ID 唯一/前缀/分类单字母/验收/工作量/批次枚举）与
+    方法名纠错护栏（getConvertPictureUrl）。
 
-用法：python3 tools/alignment/check.py
+用法：python3 tools/alignment/check.py   （失败退出码 1，可挂 CI/pre-commit）
 """
 import re
 import sys
@@ -40,15 +43,52 @@ def extract_chart_methods():
     src = (UP / 'Chart.ts').read_text()
     out = []
     for m in re.finditer(r'^  ([a-zA-Z][a-zA-Z0-9]*)\(', src, re.M):
-        name = m.group(1)
-        if name != 'constructor':
-            out.append((name, src[:m.start()].count('\n') + 1))
+        if m.group(1) != 'constructor':
+            out.append((m.group(1), src[:m.start()].count('\n') + 1))
     return out
 
 
-def extract_style_interfaces():
-    src = (UP / 'common/Styles.ts').read_text()
-    return re.findall(r'export interface (\w+)', src)
+def extract_styles():
+    return re.findall(r'export interface (\w+)', (UP / 'common/Styles.ts').read_text())
+
+
+def extract_index_exports():
+    src = (UP / 'index.ts').read_text()
+    block = re.search(r'export \{(.+?)\}', src, re.S).group(1)
+    syms = [s.strip().replace('type ', '') for s in block.split(',') if s.strip()]
+    values, types = [], []
+    for s in syms:
+        (types if s[0].isupper() else values).append(s)
+    return values, types
+
+
+def extract_utils_keys():
+    src = (UP / 'index.ts').read_text()
+    block = re.search(r'const utils = \{(.+?)\n\}', src, re.S).group(1)
+    return re.findall(r'^\s{2}(\w+)[,\n]', block, re.M)
+
+
+def extract_action_types():
+    src = (UP / 'common/Action.ts').read_text()
+    line = re.search(r"ActionType = (.+)$", src, re.M).group(1)
+    return re.findall(r"'(on\w+)'", line)
+
+
+def extract_iface_fields(path, iface):
+    """锚定精确接口名（含泛型参数），避免误抓 IndicatorFigure/OverlayPerformEventParams 等前缀同名接口。"""
+    src = (UP / path).read_text()
+    m = re.search(rf'export interface {iface}(?![A-Za-z])(<[^{{>]*>)?[^{{]*\{{', src)
+    start = m.end()
+    depth = 1
+    i = start
+    while depth > 0 and i < len(src):
+        if src[i] == '{':
+            depth += 1
+        elif src[i] == '}':
+            depth -= 1
+        i += 1
+    body = src[start:i - 1]
+    return re.findall(r'^\s{2}([a-zA-Z]+)\??:', body, re.M)
 
 
 def parse_matrix():
@@ -57,29 +97,32 @@ def parse_matrix():
         if not re.match(r'^\| [A-Z]{2,3}-\d{3}', line):
             continue
         cells = [c.strip() for c in line.split('|')]
-        # | ID | 符号 | 源 | 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
         if len(cells) < 10:
-            err(f'矩阵:{i} 列数不足（{len(cells) - 1}/9）: {line[:60]}')
+            err(f'矩阵:{i} 列数不足（{len(cells)-1}/9）: {line[:60]}')
             continue
-        rows.append({
-            'line': i, 'id': cells[1], 'symbol': cells[2], 'cls': cells[5],
-            'verif': cells[6], 'work': cells[7], 'batch': cells[8],
-        })
+        rows.append({'line': i, 'id': cells[1], 'symbol': cells[2], 'cls': cells[5],
+                     'verif': cells[6], 'work': cells[7], 'batch': cells[8]})
     return rows
 
 
 def main():
     methods = extract_chart_methods()
-    interfaces = extract_style_interfaces()
+    interfaces = extract_styles()
+    idx_values, idx_types = extract_index_exports()
+    utils_keys = extract_utils_keys()
+    actions = extract_action_types()
+    ind_fields = extract_iface_fields('component/Indicator.ts', 'Indicator')
+    ovl_fields = extract_iface_fields('component/Overlay.ts', 'Overlay')
+
     matrix = parse_matrix()
     matrix_text = MATRIX.read_text()
     tsinv = TSINV.read_text()
 
-    # --- 格式与取值 ---
+    # ---- 格式与取值 ----
     ids = [r['id'] for r in matrix]
-    dup = [k for k, v in Counter(ids).items() if v > 1]
-    if dup:
-        err(f'ID 重复: {dup}')
+    for k, v in Counter(ids).items():
+        if v > 1:
+            err(f'ID 重复: {k}')
     for r in matrix:
         if not re.fullmatch(r'[A-Z]{2,3}-\d{3}(~\d{3})?', r['id']):
             err(f"矩阵:{r['line']} ID 非法: {r['id']}")
@@ -95,7 +138,7 @@ def main():
         if r['batch'] not in BATCHES:
             err(f"矩阵:{r['line']} 批次列非法: {r['batch']!r}")
 
-    # --- Chart 方法 100% 覆盖（符号列精确同名，杜绝合并行）---
+    # ---- ① Chart 方法 ----
     ch_symbols = set()
     for r in matrix:
         if r['id'].startswith('CH-'):
@@ -103,41 +146,96 @@ def main():
             if m:
                 ch_symbols.add(m.group(1))
             else:
-                err(f"矩阵:{r['line']} CH 行符号列须为单个方法名: {r['symbol']}")
+                err(f"矩阵:{r['line']} CH 行符号列须为单方法名: {r['symbol']}")
     for name, ln in methods:
         if name not in ch_symbols:
-            err(f'Chart.ts:{ln} 方法 `{name}` 无 CH- 行')
+            err(f'[Chart] Chart.ts:{ln} `{name}` 无 CH- 行')
         if name not in tsinv:
-            err(f'ts-inventory 缺方法 `{name}`')
+            err(f'[Chart] ts-inventory 缺 `{name}`')
+    # 签名列非空校验（v2 全空缺陷的回归护栏）
+    empty_sigs = re.findall(r'^\| `([a-zA-Z]+)` \| Chart\.ts:\d+ \| \(\) \|$', tsinv, re.M)
+    for n in empty_sigs:
+        if n in ('resize',):  # 个别确无参可豁免（显式列出）
+            continue
+        err(f'[Chart] ts-inventory `{n}` 签名列为空 ()')
 
-    # --- 方法名纠错护栏 ---
-    if '`convertToPictureUrl' in matrix_text or '`convertToPictureUrl' in tsinv:
-        err('出现已纠错的方法名 convertToPictureUrl（上游为 getConvertPictureUrl）')
-
-    # --- Styles 接口覆盖 ---
-    sty_rows = {r['symbol'].strip('`') for r in matrix if r['id'].startswith('STY-')}
+    # ---- ② Styles ----
+    sty = {r['symbol'].strip('`') for r in matrix if r['id'].startswith('STY-')}
     for itf in interfaces:
         if f'`{itf}`' not in tsinv:
-            err(f'ts-inventory 缺 Styles 接口 `{itf}`')
-        if itf not in sty_rows:
-            err(f'gap-matrix 缺 STY- 行: `{itf}`')
+            err(f'[Styles] ts-inventory 缺接口 `{itf}`')
+        if itf not in sty:
+            err(f'[Styles] 矩阵缺 STY- 行 `{itf}`')
 
-    # --- 统计输出 ---
+    # ---- ③ index.ts 导出 ----
+    for sym in idx_values:
+        # utils 对象本身以 `utils.` 前缀行展开（IDX-004~028）
+        hit = f'`{sym}`' in matrix_text or f'`{sym}.' in matrix_text or sym in ch_symbols
+        if not hit:
+            err(f'[index] 值导出 `{sym}` 未出现在矩阵')
+    for t in idx_types:
+        if t not in tsinv:
+            err(f'[index] 类型别名 `{t}` 未出现在 ts-inventory')
+
+    # ---- ④ utils ----
+    for k in utils_keys:
+        if k not in matrix_text:
+            err(f'[utils] `{k}` 未出现在矩阵')
+
+    # ---- ⑤ ActionType ----
+    evt_syms = set()
+    for r in matrix:
+        if r['id'].startswith('EVT-'):
+            m = re.match(r'`(on\w+)`', r['symbol'])
+            if m:
+                evt_syms.add(m.group(1))
+    for a in actions:
+        if a not in evt_syms:
+            err(f'[Action] `{a}` 无 EVT- 行')
+
+    # ---- ⑥ Indicator 字段 ----
+    ind_syms = set()
+    for r in matrix:
+        if r['id'].startswith('IND-'):
+            m = re.fullmatch(r'`([a-zA-Z]+)`', r['symbol'])
+            if m:
+                ind_syms.add(m.group(1))
+    for f in ind_fields:
+        if f not in ind_syms and f'`{f}`' not in matrix_text:
+            err(f'[Indicator] 字段 `{f}` 无 IND- 行/未出现')
+
+    # ---- ⑦ Overlay 实例字段 ----
+    ovl_syms = set()
+    for r in matrix:
+        if r['id'].startswith('OVL-'):
+            m = re.fullmatch(r'`([a-zA-Z]+)`', r['symbol'])
+            if m:
+                ovl_syms.add(m.group(1))
+    for f in ovl_fields:
+        if f not in ovl_syms:
+            err(f'[Overlay] 实例字段 `{f}` 无 OVL- 行')
+
+    # ---- 方法名纠错护栏 ----
+    for name in ('convertToPictureUrl',):
+        if f'`{name}' in matrix_text or f'`{name}' in tsinv:
+            err(f'[护栏] 出现已纠错方法名 {name}')
+
+    # ---- 统计输出 ----
     by_cls = Counter(r['cls'] for r in matrix)
     by_batch = Counter(r['batch'] for r in matrix)
-    print(f'Chart.ts 公开方法: {len(methods)}（100% 要求 CH- 行）')
-    print(f'Styles.ts 接口: {len(interfaces)}')
+    print(f'校验面: Chart 方法 {len(methods)} | Styles 接口 {len(interfaces)} | '
+          f'index 值导出 {len(idx_values)}+类型 {len(idx_types)} | utils {len(utils_keys)} | '
+          f'ActionType {len(actions)} | Indicator 字段 {len(ind_fields)} | Overlay 实例字段 {len(ovl_fields)}')
     print(f'矩阵数据行: {len(matrix)}')
-    print('按分类:', dict(sorted(by_cls.items())), '| unknown:',
-          sum(v for k, v in by_cls.items() if k not in CLASSES))
+    print('按分类:', dict(sorted(by_cls.items())))
     print('按批次:', dict(sorted(by_batch.items())))
 
     if errors:
         print(f'\n校验失败 {len(errors)} 项:', file=sys.stderr)
-        for e in errors[:40]:
+        for e in errors[:50]:
             print('  -', e, file=sys.stderr)
         sys.exit(1)
-    print('\n校验通过：覆盖完整、格式合法、0 unknown')
+    print('\n校验通过：7 面覆盖完整、格式合法、签名列非空')
 
 
 if __name__ == '__main__':

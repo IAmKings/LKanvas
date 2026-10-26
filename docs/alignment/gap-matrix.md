@@ -19,7 +19,7 @@
 **验收方式新增 parity 定义**：取上游官方文档代码片段，仅替换初始化（`init(ds)`→`LKanvasChart(state)`），在门面上编译并通过行为断言；parity 用例纳入常规测试（防接口漂移）。
 
 
-## 1. index.ts 顶层导出
+## 1. index.ts 顶层导出（上游实际 39 个：20 值符号 + 19 类型别名；`utils` 对象展开为 IDX-004~028 共 25 行；由 check.py 从 index.ts 提取校验）
 
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
@@ -39,7 +39,12 @@
 | IDX-020 | `utils.getLinearSlopeIntercept` | figure/line | OverlayGeometry 内联 | E | test | S | 2a | 抽公共 |
 | IDX-021 | `utils.getLinearYFromSlopeIntercept` | figure/line | 无独立函数 | E | test | S | 2a | |
 | IDX-022 | `utils.getLinearYFromCoordinates` | figure/line | 无独立函数 | E | test | S | 2a | |
-| IDX-023~028 | `utils.checkCoordinateOn{Arc,Circle,Line,Polygon,Rect,Text}` | figure/* | FigureHit 命中（7 种含 path） | B | test | S | 4 | 同名包装 |
+| IDX-023 | `utils.checkCoordinateOnArc` | extension/figure/arc.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
+| IDX-024 | `utils.checkCoordinateOnCircle` | extension/figure/circle.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
+| IDX-025 | `utils.checkCoordinateOnLine` | extension/figure/line.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
+| IDX-026 | `utils.checkCoordinateOnPolygon` | extension/figure/polygon.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
+| IDX-027 | `utils.checkCoordinateOnRect` | extension/figure/rect.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
+| IDX-028 | `utils.checkCoordinateOnText` | extension/figure/text.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
 | IDX-029 | `registerIndicator` | ext/indicator | IndicatorRegistry（实例级） | E | test | M | 3 | 全局注册表 |
 | IDX-030 | `getSupportedIndicators` | ext/indicator | 无 | E | test | S | 3 | |
 | IDX-031 | `registerOverlay` | ext/overlay | OverlayTemplates（内置） | E | test | M | 4 | |
@@ -178,58 +183,86 @@
 
 ## 5. 指标模板字段（22，逐字段）
 
-| ID | TS 字段 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|---|---|
-| IND-01 | `id` | IndicatorInstance.id | A | existing | — | — | |
-| IND-02 | `paneId` | 无 | E | test | S | 3 | |
-| IND-03 | `yAxisId` | 无 | E | test | S | 5 | 依赖多轴 |
-| IND-04 | `name` | 有 | A | existing | — | — | |
-| IND-05 | `shortName` | 有 | A | existing | — | — | |
-| IND-06 | `precision` | 有 | A | existing | — | — | |
-| IND-07 | `calcParams` | 有 | A | existing | — | — | |
-| IND-08 | `shouldOhlc` | 无 | E | diff | S | 3 | MA 等 5 个模板为 true |
-| IND-09 | `shouldFormatBigNumber` | 无 | E | diff | S | 3 | VOL 为 true |
-| IND-10 | `visible` | Instance.visible 近似 | B | test | S | 2b | |
-| IND-11 | `zLevel` | 无 | E | test | S | 3 | |
-| IND-12 | `extendData` | 无 | E | test | M | 3 | |
-| IND-13 | `series` | IndicatorSeries | A | diff | — | 3 | 值字符串化（price） |
-| IND-14 | `figures`（含 styles/attrs 回调） | PlotDef（无回调） | E | diff | M | 3 | |
-| IND-15 | `minValue` | 无 | E | diff | S | 3 | VOL=0 |
-| IND-16 | `maxValue` | 无 | E | diff | S | 3 | |
-| IND-17 | `styles` | 无 | E | test | M | 5 | |
-| IND-18 | `shouldUpdate` | 无 | E | test | S | 3 | |
-| IND-19 | `calc` | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 |
-| IND-20 | `regenerateFigures` | plotsFor | B | diff | S | 3 | 改名兼容 |
-| IND-21 | `createTooltipDataSource` | 无 | E | test | M | 5 | |
-| IND-22 | `draw` | 无 | E | test | M | 5 | 自定义绘制 |
-| IND-23 | 27 指标元数据（name/params/figures 等） | oracle 数值已对齐；元数据未 diff | E | diff | M | 3 | F1 自动 diff |
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| IND-001 | `id` | component/Indicator.ts | IndicatorInstance.id | A | existing | — | — | |
+| IND-002 | `paneId` | component/Indicator.ts | 无 | E | test | S | 3 | |
+| IND-003 | `yAxisId` | component/Indicator.ts | 无 | E | test | S | 5 | 依赖多轴 |
+| IND-004 | `name` | component/Indicator.ts | 有 | A | existing | — | — | |
+| IND-005 | `shortName` | component/Indicator.ts | 有 | A | existing | — | — | |
+| IND-006 | `precision` | component/Indicator.ts | 有 | A | existing | — | — | |
+| IND-007 | `calcParams` | component/Indicator.ts | 有 | A | existing | — | — | |
+| IND-008 | `shouldOhlc` | component/Indicator.ts | 无 | E | diff | S | 3 | MA 等 5 个模板为 true |
+| IND-009 | `shouldFormatBigNumber` | component/Indicator.ts | 无 | E | diff | S | 3 | VOL 为 true |
+| IND-010 | `visible` | component/Indicator.ts | Instance.visible 近似 | B | test | S | 2b | |
+| IND-011 | `zLevel` | component/Indicator.ts | 无 | E | test | S | 3 | |
+| IND-012 | `extendData` | component/Indicator.ts | 无 | E | test | M | 3 | |
+| IND-013 | `series` | component/Indicator.ts | IndicatorSeries | A | diff | — | 3 | 值字符串化（price） |
+| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef（无回调） | E | diff | M | 3 | |
+| IND-015 | `minValue` | component/Indicator.ts | 无 | E | diff | S | 3 | VOL=0 |
+| IND-016 | `maxValue` | component/Indicator.ts | 无 | E | diff | S | 3 | |
+| IND-017 | `styles` | component/Indicator.ts | 无 | E | test | M | 5 | |
+| IND-018 | `shouldUpdate` | component/Indicator.ts | 无 | E | test | S | 3 | |
+| IND-019 | `calc` | component/Indicator.ts | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 |
+| IND-020 | `regenerateFigures` | component/Indicator.ts | plotsFor | B | diff | S | 3 | 改名兼容 |
+| IND-021 | `createTooltipDataSource` | component/Indicator.ts | 无 | E | test | M | 5 | |
+| IND-022 | `draw` | component/Indicator.ts | 无 | E | test | M | 5 | 自定义绘制 |
+| IND-023 | 27 个内置模板元数据整体 | extension/indicator/*.ts | oracle 数值已对齐；元数据未 diff | E | diff | M | 3 | F1 自动 diff |
+| IND-024 | `result`（calc 输出数组，getIndicators 返回体） | component/Indicator.ts | IndicatorResult（列存） | B | test | S | 2b | 结构等价（行存↔列存），门面做视图转换 |
 
 
 ## 6. 覆盖物模板字段（逐字段）
 
-| ID | TS 字段 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
-|---|---|---|---|---|---|---|---|
-| OVL-01 | `name` | 有 | A | existing | — | — | |
-| OVL-02 | `totalStep` | pointCount+1 | B | diff | S | 4 | 兼容读取 |
-| OVL-03 | `needDefaultPointFigure` | 无 | E | diff | S | 4 | |
-| OVL-04 | `needDefaultXAxisFigure` | 无 | E | diff | S | 4 | |
-| OVL-05 | `needDefaultYAxisFigure` | 无 | E | diff | S | 4 | |
-| OVL-06 | `createPointFigures` | 内置渲染器分支 | E | test | L | 4 | 返回 Figure 原语 |
-| OVL-07 | `createXAxisFigures` | 无 | E | test | M | 4 | |
-| OVL-08 | `createYAxisFigures` | 无 | E | test | M | 4 | |
-| OVL-09 | `checkEventOn` | hitTest | B | test | S | 4 | |
-| OVL-10 | `drawingMode(step/continuous)` | continuous 布尔 | B | diff | S | 4 | |
-| OVL-11 | `performEventPressedMove` | 手势内置 | E | test | M | 4 | |
-| OVL-12 | `performEventMoveForDrawing` | 手势内置 | E | test | M | 4 | |
-| OVL-13 | `onRemoved` | OverlayEvent.Removed | B | test | S | 4 | |
-| OVL-14 | `onClick/onDoubleClick/onRightClick` | 无（右键平台不适用） | E | test | M | 4 | 右键→长按菜单等价 |
-| OVL-15 | `onMouseDown/Enter/Leave/Move/Up` | 无 | E | test | M | 4 | 指针语义映射 |
-| OVL-16 | `onTouchStart/Move/End` | 手势内置 | E | test | M | 4 | |
-| OVL-17 | `onPressedMove` | DRAGGING 状态 | B | test | S | 4 | |
-| OVL-18 | `extendData` | extensionData | B | test | S | 4 | |
-| OVL-19 | 16 覆盖物元数据 diff | pointCount 已核 | E | diff | S | 4 | F1 自动 diff |
-| OVL-20 | `groupId`（filter 用） | 无 | E | test | S | 2b | |
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| OVL-001 | `name` | component/Overlay.ts | 有 | A | existing | — | — | |
+| OVL-002 | `totalStep` | component/Overlay.ts | pointCount+1 | B | diff | S | 4 | 兼容读取 |
+| OVL-003 | `needDefaultPointFigure` | component/Overlay.ts | 无 | E | diff | S | 4 | |
+| OVL-004 | `needDefaultXAxisFigure` | component/Overlay.ts | 无 | E | diff | S | 4 | |
+| OVL-005 | `needDefaultYAxisFigure` | component/Overlay.ts | 无 | E | diff | S | 4 | |
+| OVL-006 | `createPointFigures` | component/Overlay.ts | 内置渲染器分支 | E | test | L | 4 | 返回 Figure 原语 |
+| OVL-007 | `createXAxisFigures` | component/Overlay.ts | 无 | E | test | M | 4 | |
+| OVL-008 | `createYAxisFigures` | component/Overlay.ts | 无 | E | test | M | 4 | |
+| OVL-009 | `checkEventOn` | component/Overlay.ts | hitTest | B | test | S | 4 | |
+| OVL-010 | `drawingMode(step/continuous)` | component/Overlay.ts | continuous 布尔 | B | diff | S | 4 | |
+| OVL-011 | `performEventPressedMove` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
+| OVL-012 | `performEventMoveForDrawing` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
+| OVL-013 | `onRemoved` | component/Overlay.ts | OverlayEvent.Removed | B | test | S | 4 | |
+| OVL-014 | `onClick/onDoubleClick/onRightClick` | component/Overlay.ts | 无（右键平台不适用） | E | test | M | 4 | 右键→长按菜单等价 |
+| OVL-015 | `onMouseDown/Enter/Leave/Move/Up` | component/Overlay.ts | 无 | E | test | M | 4 | 指针语义映射 |
+| OVL-016 | `onTouchStart/Move/End` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
+| OVL-017 | `onPressedMove` | component/Overlay.ts | DRAGGING 状态 | B | test | S | 4 | |
+| OVL-018 | `extendData` | component/Overlay.ts | extensionData | B | test | S | 4 | |
+| OVL-019 | 16 个内置模板元数据整体 | extension/overlay/*.ts | pointCount 已核 | E | diff | S | 4 | F1 自动 diff |
+| OVL-020 | `groupId` | component/Overlay.ts | 无（filter 用） | E | test | S | 2b | |
+### Overlay 实例接口字段（24，v3 补盘点）
 
+| ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
+|---|---|---|---|---|---|---|---|---|
+| OVL-021 | `id` | component/Overlay.ts | OverlayInstance.id | B | test | S | 2b |  |
+| OVL-022 | `groupId` | component/Overlay.ts | 无（OVL-020 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-023 | `paneId` | component/Overlay.ts | paneId 固定 main | B | test | S | 2b |  |
+| OVL-024 | `name` | component/Overlay.ts | templateName | B | test | S | 2b |  |
+| OVL-025 | `totalStep` | component/Overlay.ts | pointCount+1（OVL-002 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-026 | `currentStep` | component/Overlay.ts | phase/points.size 推导 | B | test | S | 2b | 由 phase 推导 getter |
+| OVL-027 | `drawingMode` | component/Overlay.ts | continuous 布尔 | B | test | S | 2b |  |
+| OVL-028 | `lock` | component/Overlay.ts | locked | B | test | S | 2b |  |
+| OVL-029 | `visible` | component/Overlay.ts | visible | B | test | S | 2b |  |
+| OVL-030 | `zLevel` | component/Overlay.ts | zIndex | B | test | S | 2b |  |
+| OVL-031 | `fixedZLevel` | component/Overlay.ts | 无 | E | test | S | 4 |  |
+| OVL-032 | `needDefaultPointFigure` | component/Overlay.ts | 无（OVL-003 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-033 | `needDefaultXAxisFigure` | component/Overlay.ts | 无（OVL-004 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-034 | `needDefaultYAxisFigure` | component/Overlay.ts | 无（OVL-005 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-035 | `mode` | component/Overlay.ts | magnetMode（MagnetMode） | B | test | S | 2b | OverlayMode 枚举 |
+| OVL-036 | `modeSensitivity` | component/Overlay.ts | 无 | E | test | S | 4 |  |
+| OVL-037 | `points` | component/Overlay.ts | points（时间锚点） | B | test | S | 2b | 锚点结构等价 |
+| OVL-038 | `extendData` | component/Overlay.ts | extensionData（OVL-018 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-039 | `styles` | component/Overlay.ts | 无 | E | test | S | 4 |  |
+| OVL-040 | `createPointFigures` | component/Overlay.ts | 内置渲染（OVL-006 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-041 | `createXAxisFigures` | component/Overlay.ts | 无（OVL-007 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-042 | `createYAxisFigures` | component/Overlay.ts | 无（OVL-008 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-043 | `performEventPressedMove` | component/Overlay.ts | 手势内置（OVL-011 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-044 | `performEventMoveForDrawing` | component/Overlay.ts | 手势内置（OVL-012 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 ## 7. Styles 接口（43，一接口一行；字段级见 ts-inventory §6）
 
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
@@ -290,6 +323,58 @@
 | NUM-006 | OHLC 输入校验 | — | 严于上游（定位错误） | D | existing | — | — | PRD R-01 |
 
 ---
+
+## 9. 批次依赖与执行顺序（v3）
+
+```
+2a（数据+事件+坐标转换+生命周期，44 行）
+ └─> 2b（指标/覆盖物 CRUD，9+10 行）── 无跨批依赖，可与 2c 并行
+ └─> 2c（视口+配置，48 行）
+       └─> 3（指标模板+注册 API）──依赖 2b 的实例管理
+             └─> 4（覆盖物模板+figure）
+                   └─> 5（Styles 树 57 行；多轴依赖 pane 基础；EVT-007~009 依赖本批 tooltip）
+                         └─> 6（示例对齐+人工验收，收口）
+```
+硬依赖仅两条：3 依赖 2b；5 依赖 2c（pane/轴基础）。2a/2b/2c 之间无阻塞，按人力可并行。
+
+## 10. 工作量与日历估算（v3：S=0.5d / M=1.5d / L=3d，单人折算）
+
+| 批次 | 行数 | S/M/L 分布 | 人日 | 说明 |
+|---|---|---|---|---|
+| 2a | 44 | S27/M8/L0 | 25.5 | DataLoader 适配与事件接线为主 |
+| 2b | 19 | S12/M5/L0 | 21.0 | 含 IND-024 与 OVL 实例字段行 |
+| 2c | 48 | S34/M12/L1 | 55.0 | 最大单批；多轴 createYAxis L 级滑入 5 的占位可减 |
+| 3 | 5 | S2/M3/L0 | 5.5 | 含 IND-023 元数据 diff（M） |
+| 4 | 10 | S6/M3/L1 | 12.0 | createPointFigures 为 L |
+| 5 | 57 | S12/M43/L2 | 76.0 | 最大总量；Styles 43 接口+tooltip+多轴 |
+| 6 | — | 人工验收 | 3.0 | demo-checklist 执行 |
+| **合计** | | | **≈198 人日（单人）** | 双人并行（2a/2b+2c 分线）日历约 4~4.5 个月 |
+
+> 估算口径：纯开发+自测；含每批 parity 用例编写，不含上游新版本变更（v10.1.0 后暂无）。
+
+## 11. parity 用例定义（v3 具体化，纳入常规测试）
+
+| 用例 | 上游文档来源 | 门面写法 | 断言 |
+|---|---|---|---|
+| parity-1（2a 出口） | docs/guide「快速上手/数据接入」getBars+subscribeBar 示例 | 同名 `setDataLoader(object : DataLoader{...})`，仅 init()→LKanvasChart 构造 | 100 根渲染就绪；update 推进末根；forward 触发 prepend |
+| parity-2（2b 出口） | docs/guide「指标」「覆盖物」createIndicator('MACD')/createOverlay({name:'segment',points:[...]}) | 同名调用 | 返回 instanceId；getIndicators/getOverlays 可查；removeIndicator 清理 |
+| parity-3（2c 出口） | docs API「视口控制」scrollToDataIndex/zoomAtCoordinate/setBarSpace 示例 | 同名调用 | 每项有单测断言（索引/缩放比/BarSpace 值） |
+
+实现位置：`lkanvas-compose/src/test/.../parity/Parity1DataLoader.kt` 等；上游片段以注释注明出处 URL。
+
+## 12. Definition of Done（本轮对齐完成判据）
+
+1. `python3 tools/alignment/check.py` 通过且矩阵 E 计数 = 0（全部转 A/B/C/D）
+2. parity-1/2/3 纳入 `./gradlew test` 常规回归且绿
+3. 既有 208 测试 + 27 指标 oracle diff 保持 0 失败（L1 防回归）
+4. 独立 consumer（tools/consumer-example）改用门面 API 重新编译通过
+5. 台账 compatibility.md 与 upstream-sync.md 同步更新；D 类差异均有 ID 与测试
+
+## 13. 发布判定（0.2.0）
+
+- 上述 DoD 全部满足；批次 2a+2b+2c+3 完成为最低发版面（WebView 迁移者可用数据/指标/覆盖物/视口主链路）
+- 批次 4/5 允许随后以 0.3.x 递进（样式树与高级模板不阻塞 0.2.0）
+- 版本号与制品：io.lkanvas:*:0.2.0 发布至本地 Maven；README 增加「从 KLineChart(WebView) 迁移」章节并引用 parity 用例为证
 
 ## 统计
 
