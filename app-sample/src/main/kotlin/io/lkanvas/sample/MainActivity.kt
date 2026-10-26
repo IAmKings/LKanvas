@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.lkanvas.compose.KLineChart
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
@@ -54,6 +56,22 @@ class MainActivity : ComponentActivity() {
                         state = state,
                         modifier = Modifier.fillMaxSize().weight(1f),
                         theme = ChartTheme.dark(),
+                        // T-24 legendSlot 演示：宿主自定义图例（时间 + 收盘 + MA5，英文）
+                        legendSlot = { data ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(androidx.compose.ui.graphics.Color(0xCC101020)),
+                            ) {
+                                androidx.compose.material3.Text(
+                                    "${data.timeText}  C ${"%.2f".format(data.candle.close)}" +
+                                        "  MA5 ${data.maValues["ma1"]?.let { "%.2f".format(it) } ?: "—"}",
+                                    color = androidx.compose.ui.graphics.Color(0xFFD0D0E0),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                )
+                            }
+                        },
                     )
                     Row(Modifier.fillMaxWidth().padding(8.dp)) {
                         // 画线工具循环（16 种，T-20/21/22）

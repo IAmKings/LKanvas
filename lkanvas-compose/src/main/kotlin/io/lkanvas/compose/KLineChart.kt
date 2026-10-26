@@ -32,13 +32,17 @@ fun KLineChart(
     modifier: Modifier = Modifier,
     theme: ChartTheme = ChartTheme(),
     config: ChartLayoutConfig = ChartLayoutConfig(),
+    /** 图例定制插槽（PRD R-11/T-24）：非空时替代内置 Canvas 图例，随选择/十字线重组。 */
+    legendSlot: (@Composable (io.lkanvas.compose.state.LegendData) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
 
     val subPaneH = with(density) { config.subPaneHeight.toPx() }
     val timeAxisH = with(density) { config.timeAxisHeight.toPx() }
-    val gutterW = with(density) { config.rightAxisGutter.toPx() }
+    // 右轴留白随系统字体缩放（A-41：字体放大后轴标签仍完整显示；1..2 倍钳制）
+    val fontScale = density.fontScale.coerceIn(1f, 2f)
+    val gutterW = with(density) { config.rightAxisGutter.toPx() * fontScale }
     val legendTextSizePx = with(density) { config.legendTextSize.toPx() }
     val textSizePx = with(density) { config.axisTextSize.toPx() }
 
@@ -56,36 +60,55 @@ fun KLineChart(
         state.accessibilityText { ts -> ChartText.timeLabel(ts, 60_000L) }
     }
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .then(layoutModifier)
-            .chartGestures(state)
-            .semantics {
-                contentDescription = a11yText
-                customActions = listOf(
-                    CustomAccessibilityAction("上一根") { state.selectPreviousCandle() },
-                    CustomAccessibilityAction("下一根") { state.selectNextCandle() },
-                    CustomAccessibilityAction("放大") { state.zoomIn() },
-                    CustomAccessibilityAction("缩小") { state.zoomOut() },
-                    CustomAccessibilityAction("删除选中画线") { state.removeSelectedOverlay() },
+    // 图例数据（插槽非空或模式变化时随 viewRevision 重组）
+    val useCustomLegend = legendSlot != null && state.legendMode == ChartState.LegendMode.VISIBLE
+    val legendData = if (useCustomLegend) {
+        val rev = state.viewRevision + state.overlayRevision + (state.accessibilitySelectedIndex ?: -1)
+        remember(rev) { state.legendData() }
+    } else {
+        null
+    }
+
+    androidx.compose.foundation.layout.Box(modifier = modifier.fillMaxSize()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(layoutModifier)
+                .chartGestures(state)
+                .semantics {
+                    contentDescription = a11yText
+                    customActions = listOf(
+                        CustomAccessibilityAction(state.locale.actionPrevCandle) { state.selectPreviousCandle() },
+                        CustomAccessibilityAction(state.locale.actionNextCandle) { state.selectNextCandle() },
+                        CustomAccessibilityAction(state.locale.actionZoomIn) { state.zoomIn() },
+                        CustomAccessibilityAction(state.locale.actionZoomOut) { state.zoomOut() },
+                        CustomAccessibilityAction(state.locale.actionDeleteOverlay) { state.removeSelectedOverlay() },
+                    )
+                },
+        ) {
+            with(ChartRenderer) {
+                render(
+                    state = state,
+                    theme = theme,
+                    params = ChartRenderer.Params(
+                        width = size.width,
+                        height = size.height,
+                        gutterWidth = gutterW,
+                        legendTextSizePx = legendTextSizePx,
+                        axisTextSizePx = textSizePx,
+                        includeCrosshair = true,
+                        drawLegend = legendSlot == null && state.legendMode == ChartState.LegendMode.VISIBLE,
+                    ),
+                    textMeasurer = textMeasurer,
                 )
-            },
-    ) {
-        with(ChartRenderer) {
-            render(
-                state = state,
-                theme = theme,
-                params = ChartRenderer.Params(
-                    width = size.width,
-                    height = size.height,
-                    gutterWidth = gutterW,
-                    legendTextSizePx = legendTextSizePx,
-                    axisTextSizePx = textSizePx,
-                    includeCrosshair = true,
-                ),
-                textMeasurer = textMeasurer,
-            )
+            }
+        }
+        // 宿主图例插槽（叠加在图表顶部；R-11「Compose slot 或事件实现宿主定制」）
+        if (useCustomLegend && legendData != null) {
+            androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
+                legendSlot.invoke(legendData)
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.fillMaxSize())
+            }
         }
     }
 }

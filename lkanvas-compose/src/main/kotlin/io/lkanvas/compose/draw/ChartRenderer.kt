@@ -26,6 +26,8 @@ object ChartRenderer {
         val axisTextSizePx: Float,
         /** false 时不绘制十字线/交互层（导出选项，PRD R-15）。 */
         val includeCrosshair: Boolean,
+        /** false 时跳过内置图例（宿主 legendSlot 定制或隐藏，PRD R-11/T-24）。 */
+        val drawLegend: Boolean = true,
     )
 
     fun DrawScope.render(
@@ -66,7 +68,9 @@ object ChartRenderer {
             drawOverlays(state, theme, contentRight, mainBottom, text)
         }
         drawTimeAxis(state, theme, text, 0f, contentRight, macdBottom, panes.timeAxis)
-        drawLegend(state, theme, text, params.legendTextSizePx, crosshair, params.gutterWidth, params.width)
+        if (params.drawLegend) {
+            drawLegend(state, theme, text, params.legendTextSizePx, crosshair, params.gutterWidth, params.width)
+        }
         if (crosshair != null) {
             drawCrosshairLabels(state, theme, text, crosshair, contentRight, legendHeight)
         }

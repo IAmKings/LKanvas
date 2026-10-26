@@ -87,6 +87,43 @@ class ChartState(
     var mainChartType: io.lkanvas.compose.theme.MainChartType =
         io.lkanvas.compose.theme.MainChartType.CANDLE_SOLID
 
+    /** 文案（R-11/T-24：中英文切换；默认中文）。 */
+    var locale: io.lkanvas.core.i18n.ChartLocale = io.lkanvas.core.i18n.ChartLocale.ZH_CN
+
+    /** 图例模式（PRD R-11：常显跟随 / 隐藏；宿主可用 legendSlot 全面定制）。 */
+    var legendMode: LegendMode = LegendMode.VISIBLE
+
+    enum class LegendMode { VISIBLE, HIDDEN }
+
+    /**
+     * 当前图例数据（十字线跟随或末根；R-11「常显、跟随十字线」）。
+     * 空数据返回 null。
+     */
+    fun legendData(timeText: (Long) -> String = { ts -> io.lkanvas.compose.draw.ChartText.timeLabel(ts, 60_000L) }): LegendData? {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val crosshair = crosshairPosition
+        val idx = if (crosshair != null) {
+            viewport.logicalIndexAt(crosshair.x.toDouble()).toInt().coerceIn(candles.indices)
+        } else {
+            accessibilitySelectedIndex ?: (candles.size - 1)
+        }
+        val ma = maResult
+        val maValues = if (ma != null && idx < ma.result.size()) {
+            ma.result.keys.associateWith { ma.result[it][idx] }
+        } else {
+            emptyMap()
+        }
+        return LegendData(
+            index = idx,
+            candle = candles[idx],
+            prevClose = candles.getOrNull(idx - 1)?.close,
+            isCrosshair = crosshair != null,
+            timeText = timeText(candles[idx].timestamp),
+            maValues = maValues,
+        )
+    }
+
     /** 生效规格：percentage 未指定基准时取首可见 candle close（上游口径）。 */
     fun effectiveMainAxisSpec(): io.lkanvas.core.axis.YAxisSpec {
         val spec = mainAxisSpec
@@ -315,18 +352,19 @@ class ChartState(
     /** 当前无障碍摘要文本（TalkBack contentDescription；供 semantics 层调用）。 */
     fun accessibilityText(timeText: (Long) -> String): String {
         val candles = dataSnapshot.candles
-        if (candles.isEmpty()) return "K线图，暂无数据"
+        if (candles.isEmpty()) return locale.noData
         val idx = accessibilitySelectedIndex ?: (candles.size - 1)
         val c = candles[idx]
         val prevClose = candles.getOrNull(idx - 1)?.close
         val candleText = io.lkanvas.core.accessibility.AccessibilitySummary.candleSummary(
-            c, prevClose, timeText(c.timestamp),
+            c, prevClose, timeText(c.timestamp), locale,
         ) { v -> String.format("%.2f", v) }
         val maText = maResult?.let { ma ->
             io.lkanvas.core.accessibility.AccessibilitySummary.indicatorSummary(
                 "MA",
                 ma.result.keys.toList(),
                 ma.result.keys.map { ma.result[it][idx] },
+                locale,
             ) { v -> String.format("%.2f", v) }
         }
         return buildString {
@@ -492,7 +530,9 @@ class ChartState(
 
     private fun relayout() {
         val usable = (containerHeightPx - timeAxisHeightPx).coerceAtLeast(minSubPanePx * 2)
-        val maxSub = usable / 2f
+        // 主 pane 保底 35% 可用高（A-41：横屏/大字体下关键绘图区不被挤没）
+        val mainMin = (usable * 0.35f).coerceAtLeast(minMainPanePx)
+        val maxSub = ((usable - mainMin) / 2f).coerceAtLeast(minSubPanePx)
         val vol = volPaneOverride.coerceIn(minSubPanePx, maxSub)
         val macd = macdPaneOverride.coerceIn(minSubPanePx, maxSub)
         val main = (usable - vol - macd).coerceAtLeast(minMainPanePx)
