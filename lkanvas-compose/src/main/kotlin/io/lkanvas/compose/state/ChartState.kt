@@ -119,9 +119,18 @@ class ChartState(
         overlayRevision++
     }
 
-    /** 进入 segment 创建模式（Alpha 工具入口）。 */
-    fun beginCreateSegment(): Boolean =
-        overlays.beginCreate(io.lkanvas.core.overlay.SegmentDefinition) != null
+    /** 当前画线工具（模板名；默认 segment）。 */
+    var currentTool: String by mutableStateOf("segment")
+
+    /** 进入当前工具的创建模式（16 种模板通用入口）。 */
+    fun beginCreateOverlay(): Boolean =
+        overlays.beginCreate(io.lkanvas.core.overlay.OverlayTemplates[currentTool] ?: io.lkanvas.core.overlay.SegmentDefinition) != null
+
+    /** 连续模板（brush）显式完成创建。 */
+    fun finishCreateOverlay(): Boolean {
+        val id = overlays.creatingId ?: return false
+        return overlays.finishCreate(id)
+    }
 
     fun cancelCreateOverlay() {
         overlays.cancelCreate()

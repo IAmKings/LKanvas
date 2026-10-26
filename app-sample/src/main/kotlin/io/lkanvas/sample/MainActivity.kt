@@ -55,8 +55,16 @@ class MainActivity : ComponentActivity() {
                         theme = ChartTheme.dark(),
                     )
                     Row(Modifier.fillMaxWidth().padding(8.dp)) {
-                        Button(onClick = { state.beginCreateSegment() }) { Text("画线") }
-                        Button(onClick = { state.cancelCreateOverlay() }, modifier = Modifier.padding(start = 8.dp)) { Text("取消") }
+                        // 画线工具循环（16 种，T-20/21/22）
+                        val tools = io.lkanvas.core.overlay.OverlayTemplates.all.keys.toList()
+                        Button(
+                            onClick = {
+                                val next = tools[(tools.indexOf(state.currentTool) + 1) % tools.size]
+                                state.currentTool = next
+                            },
+                        ) { Text(state.currentTool) }
+                        Button(onClick = { state.beginCreateOverlay() }, modifier = Modifier.padding(start = 8.dp)) { Text("画线") }
+                        Button(onClick = { if (!state.finishCreateOverlay()) state.cancelCreateOverlay() }, modifier = Modifier.padding(start = 8.dp)) { Text("完成/取消") }
                         Button(
                             onClick = {
                                 state.overlays.removeSelected()
@@ -64,6 +72,8 @@ class MainActivity : ComponentActivity() {
                             },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text("删除") }
+                    }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
                         // 主图类型循环切换（六形态，T-18）
                         val types = io.lkanvas.compose.theme.MainChartType.entries
                         Button(
@@ -72,7 +82,6 @@ class MainActivity : ComponentActivity() {
                                 state.mainChartType = next
                                 state.notifyViewportChanged()
                             },
-                            modifier = Modifier.padding(start = 8.dp),
                         ) { Text("图型") }
                         // 纵轴规格循环：normal → logarithm → percentage（T-16）
                         Button(

@@ -52,7 +52,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
             mode = GMode.CREATE
             state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
         } else {
-            val hit = OverlayRenderer.hitTest(state, down.position.x, down.position.y)
+            val hit = OverlayRenderer.hitTest(state, down.position.x, down.position.y, size.width.toFloat(), size.height.toFloat())
             if (hit != null) {
                 state.overlays.select(hit.instanceId)
                 state.notifyOverlayChanged()
