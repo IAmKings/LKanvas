@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// 发布约定（本地 Maven 仓库；PRD R-16/T-32）
+apply(from = rootProject.file("gradle/publishing.gradle.kts"))
+
 android {
     namespace = "io.lkanvas.compose"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
