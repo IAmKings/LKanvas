@@ -78,7 +78,7 @@
 |---|---|---|
 | 主图类型 6 种（candle_solid/stroke/up_stroke/down_stroke/ohlc/area） | common/Styles.ts、view/ | **已实现（M3/T-18）**：六形态 + 可见高低标记 + area 渐变；真机验证空心蜡烛/轴切换 |
 | 轴 3 种 + 自定义（normal/percentage/logarithm） | src/extension/y-axis/ | **已实现（M3/T-16、T-17）**：core `axis/YAxisSpec.kt` 统一规格；signed-log 负/零/小正值支持；percentage 零基准按 D-01；自定义轴 A-18 保护（非单调/超量/非有限降级） |
-| 基础图形 7 种（circle/line/polygon/rect/text/arc/path） | src/extension/figure/ | **line/point/text 已实现**（segment/斐波那契/文本覆盖物/brush 折线使用）；circle/polygon/rect/arc 待 1.0 前（当前无内置模板依赖，宿主自定义模板可先经 path 等价） |
+| 基础图形 7 种（circle/line/polygon/rect/text/arc/path） | src/extension/figure/ | **已实现（7/7）**：core `figure/Figures.kt` 七种不可变原语 + FigureHit 命中（圆环/边/面/角度/折线采样）+ 有限性/退化校验；compose `FigureRenderer.kt` 绘制映射，与命中同一几何 |
 | 存档/恢复 | — | **schema 与导出/恢复已实现（M4/T-25）**：core `archive/ChartArchive.kt`（schemaVersion=1、1MiB/500 覆盖物上限显式拒绝、损坏整次失败原文保留、未知模板保留、创建中不导出）；A-36/A-38 基础测试通过 |
 | 数据接入（loadMoreData/DataSource 语义） | Store.ts、docs/guide/ | **已实现已验收（Alpha）**（core `datasource/`：HistorySource/ChartLoader/确定性示例；原生等价而非逐字兼容） |
 | PatchHistory 显式历史纠正 | — | **已实现（M3/T-15）**：A-06 测试（最早/中间/末根纠正后与全量一致） |
@@ -88,7 +88,7 @@
 | setStyles/createIndicator 等 JS API | Chart.ts | **平台不适用**：JS 方法名/回调签名不逐字兼容（PRD 3.2），以 Kotlin 公开控制接口等价提供 |
 | DOM/CSS/CanvasRenderingContext2D/鼠标右键 | — | **平台不适用**：以 Compose 手势/无障碍等价 |
 | WebView/JS 桥/任意 JS 插件运行 | — | **平台不适用**（PRD 1.2 生产路径禁用） |
-| PNG 导出/诊断 | — | 明确延期（M5/T-29、T-30） |
+| PNG 导出/诊断 | — | **已实现（M5/T-29、T-30）**：compose `export/ChartSnapshotExporter.kt`（等比缩放三 pane 完整导出、4096 上限、可选十字线、单 revision；真机验证）；core `diagnostics/ChartDiagnostics.kt`（默认关闭零开销、环形缓冲、耗时定位） |
 | 存档/恢复 | — | 明确延期（M4/T-25、T-26） |
 | 无障碍完整适配 | — | 明确延期（M4/T-27；Alpha 未提供语义节点，已在已知问题登记） |
 | 多图联动/回放/撤销重做/云同步 | — | 明确延期（P2，PRD 3.3） |
@@ -103,11 +103,12 @@
 | 2026-10-26 | **M4 核心完成（Beta）**：16/16 覆盖物（几何约束/平行通道/斐波那契 D-02/brush 5000 点上限；真机验证斐波那契与 brush 连笔）；存档 schema 与导出/恢复（A-36/A-38 基础）；手势 brush 连笔采样 |
 | 2026-10-26 | **M4 收尾完成**：恢复门禁与保存事件抑制（A-37，含 compose 层接线测试）；无障碍摘要与五个替代动作（A-40 基础，真机 TalkBack content-desc 验证）；pane 分隔条拖动 + 轴区拖动缩放（A-33，真机验证）。**192 测试 0 失败** |
 | 2026-10-26 | **M5 启动**：PNG 导出（T-29，ChartRenderer 可重放渲染器 + 等比缩放三 pane 完整导出，真机验证 1080×1600）；诊断设施（T-30，可开关零开销 + B-01 JVM 初测 P95=0.270ms 优于 D1 目标 15 倍） |
+| 2026-10-26 | **M6 前置完成**：基础图形 7/7（core 原语+命中+compose 映射，修 arc 全圆取模坍缩 bug）；Maven 本地发布（core JAR+sources / compose AAR，Apache-2.0 POM）；app-sample R8 release（931KB）真机运行正常；独立 consumer 仅凭 Maven 制品编译通过（A-46）；上游同步演练 #1（T-33：v10.1.0 后唯一提交为文档类→不适用，见 upstream-sync.md） |
 
 ## 6. 已知问题与后续计划
 
 - 图例/tooltip 完整定制（slot/事件）与中英文资源扩展待 T-24 完整版。
-- 基础图形 circle/polygon/rect/arc 待 1.0 前（当前内置模板无依赖）。
+- 基础图形 circle/polygon/rect/arc 的宿主自定义模板样例待补（原语与命中已实现）。
 - 无障碍深度项：TalkBack 遍历覆盖物列表、字体缩放 2.0 矩阵（A-41）待补测。
 - 诊断可视化（宿主诊断入口 UI/导出）待 T-30 余量；当前经 ChartDiagnostics API 读取。
 - 性能门槛（B-02 容量/突发/泄漏/持续运行）尚未完成：B-01 增量路径 JVM 初测已达标（P95=0.270ms vs 4ms），Macrobenchmark 冻结设备测量（真机帧率/内存/启动）待 T-34。

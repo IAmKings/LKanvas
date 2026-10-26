@@ -14,14 +14,19 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 | `lkanvas-compose` | Android Compose 库：`KLineChart` 组件（六种主图类型、三 pane、明暗主题）、Canvas 绘制、手势状态机、segment 画线 |
 | `app-sample` | 示例应用：本地确定性行情、实时末根更新、分页、画线、图型/轴切换 |
 
-## 当前进度（M0–M3 完成）
+## 当前进度（M0–M4 完成，M5 启动，M6 前置就绪）
 
 - **27/27 内置指标**：全部与上游 v10.1.0 TS oracle 逐位对照通过（值与 Missing 位置），附手算样例与增量/全量一致性测试
-- **六种主图类型**：candle_solid / candle_stroke / candle_up_stroke / candle_down_stroke / ohlc / area
-- **三种纵轴 + 自定义**：normal / logarithm（带符号 log）/ percentage（零基准按 D-01）
+- **16/16 覆盖物**：共用生命周期状态机，brush 5000 点上限；斐波那契价格空间投影（D-02）
+- **六种主图类型 + 三种轴 + 自定义轴**；基础图形 **7/7** 原语（命中+绘制）
 - **数据链路**：Reset/Replace/Upsert/Append/Prepend/PatchHistory、会话门禁、分页加载状态机
-- **交互**：平移/双指缩放/长按十字线/点击/基础惯性；segment 画线（创建/拖点/整体拖/锁定/删除）
-- 待 M4–M6：其余 15 种覆盖物、存档恢复、无障碍、性能冻结、Maven 发布（见兼容台账）
+- **交互**：平移/双指缩放/长按十字线/点击/惯性/pane 分隔条/轴区缩放
+- **存档**：版本化 schema 导出/恢复、恢复门禁（防空状态覆盖）
+- **无障碍**：TalkBack 摘要（OHLCV+方向词+MA）与五个替代动作
+- **PNG 导出**：等比缩放三 pane 完整导出（真机验证）；**诊断**：可开关零开销收集器
+- **发布链路**：Maven 本地制品（core JAR+sources / compose AAR）、R8 release 真机验证、独立 consumer 仅凭制品编译通过（A-46）
+- **B-01 初测**：10k candle 三指标末根更新 P95=0.270ms（D1 目标 4ms 的 1/15）
+- 待 M5/M6 收尾：Macrobenchmark 冻结设备测量（B-02~B-06）、tooltip 完整定制、API 冻结材料（见兼容台账）
 
 ## 上游基线
 
