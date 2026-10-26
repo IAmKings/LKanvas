@@ -244,6 +244,23 @@ class OverlayManager {
         selectedId?.let { remove(it) }
     }
 
+    /**
+     * 从存档恢复已完成绘图（PRD R-12：恢复时机由宿主控制，本方法同步写回；
+     * 全部置为 COMPLETED，宿主自行决定未知模板条目的处置）。
+     */
+    fun restoreFrom(restored: List<OverlayInstance>) {
+        restored.forEach { inst ->
+            inst.phase = OverlayPhase.COMPLETED
+            instances[inst.id] = inst
+            // 保持 idSerial 前进避免后续创建冲突
+            inst.id.removePrefix("ov-").toLongOrNull()?.let { if (it > idSerial) idSerial = it }
+        }
+    }
+
+    /** 导出已完成绘图（CREATING/DRAGGING 不导出；不改变任何状态）。 */
+    fun exportCompleted(): List<OverlayInstance> =
+        instances.values.filter { it.phase == OverlayPhase.COMPLETED || it.phase == OverlayPhase.IDLE || it.phase == OverlayPhase.SELECTED }
+
     private fun creating(id: String): OverlayInstance? =
         instances[id]?.takeIf { it.phase == OverlayPhase.CREATING }
 

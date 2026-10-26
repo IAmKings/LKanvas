@@ -132,6 +132,24 @@ class Viewport(
         scrollToLatest(dataCount)
     }
 
+    /** 从存档锚点恢复视口（PRD R-12：锚点为滚动索引+间距，恢复时钳制）。 */
+    fun restoreAnchor(anchor: Anchor, dataCount: Int) {
+        barSpacing = anchor.barSpacing.coerceIn(minBarSpacing, maxBarSpacing)
+        scrollIndex = anchor.scrollIndex
+        clamp(dataCount)
+    }
+
+    /** 锚点恢复（兼容 ChartArchive.ViewportAnchor 值）。 */
+    fun restoreAnchor(scrollIndex: Double, barSpacing: Double, dataCount: Int) {
+        restoreAnchor(Anchor(scrollIndex, barSpacing), dataCount)
+    }
+
+    /** 当前视口锚点（导出用）。 */
+    fun currentAnchor(): Anchor = Anchor(scrollIndex = scrollIndex, barSpacing = barSpacing)
+
+    /** 视口锚点（存档 DTO）。 */
+    data class Anchor(val scrollIndex: Double, val barSpacing: Double)
+
     // ---------- 边界 ----------
 
     private fun minScroll(dataCount: Int): Double = -overscrollSlots
