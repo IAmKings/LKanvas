@@ -395,16 +395,37 @@ class ChartState(
         gestureOwner = GestureOwner.NONE
     }
 
+    /** 事件钩子（门面 LKanvasChart 注入；保持内核与门面解耦）。 */
+    internal var onScrolled: ((distancePx: Double) -> Unit)? = null
+    internal var onZoomed: ((scale: Double) -> Unit)? = null
+    internal var onVisibleRangeChanged: ((from: Int, to: Int, realFrom: Double, realTo: Double) -> Unit)? = null
+    internal var onCrosshairChanged: ((x: Double, y: Double, dataIndex: Int, timestamp: Long) -> Unit)? = null
+    internal var onPaneDragged: ((paneId: String) -> Unit)? = null
+
+    private var lastBarSpacing = 0.0
+
     /** 平移（px；手势层调用）。 */
     fun panBy(deltaX: Float) {
         viewport.scrollBy(deltaX.toDouble(), dataSnapshot.candles.size)
         viewRevision++
+        emitRangeChange()
+        onScrolled?.invoke(deltaX.toDouble())
     }
 
     /** 以触点为锚缩放。 */
     fun zoomAt(scale: Float, anchorX: Float) {
+        val prev = viewport.barSpacing
         viewport.zoomBy(scale.toDouble(), anchorX.toDouble(), dataSnapshot.candles.size)
         viewRevision++
+        emitRangeChange()
+        val realScale = viewport.barSpacing / prev
+        if (realScale != 1.0) onZoomed?.invoke(realScale)
+    }
+
+    private fun emitRangeChange() {
+        val from = kotlin.math.floor(viewport.scrollIndex).toInt().coerceAtLeast(0)
+        val to = kotlin.math.ceil(viewport.scrollIndex + viewport.visibleCount).toInt()
+        onVisibleRangeChanged?.invoke(from, to, viewport.scrollIndex, viewport.scrollIndex + viewport.visibleCount)
     }
 
     /** 长按进入十字线模式：x 吸附最近 candle 中心。 */
@@ -416,6 +437,12 @@ class ChartState(
         crosshairPosition = androidx.compose.ui.geometry.Offset(
             vp.candleCenterX(idx.toDouble()).toFloat(),
             y.coerceIn(0f, paneHeightsPx.main + paneHeightsPx.vol + paneHeightsPx.macd),
+        )
+        onCrosshairChanged?.invoke(
+            vp.candleCenterX(idx.toDouble()),
+            y.toDouble(),
+            idx,
+            candles[idx].timestamp,
         )
     }
 
@@ -562,6 +589,7 @@ class ChartState(
             macdPaneOverride = startValue + dyTotal
         }
         relayout()
+        onPaneDragged?.invoke(if (which == 0) "main" else "vol")
     }
 
     /** 轴区拖动缩放（右 gutter 垂直拖动；dy 累计，向下放大间距）。 */

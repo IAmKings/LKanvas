@@ -23,22 +23,22 @@
 
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
-| IDX-001 | `init` | index.ts | 门面工厂未建 | E | test+parity | S | 2a | Android 无 DOM：init(state) |
-| IDX-002 | `dispose` | index.ts | 未暴露销毁 | E | test | S | 2a | |
-| IDX-003 | `version` | index.ts | LKanvas.VERSION | B | compile | S | 2a | 门面静态同名 |
+| IDX-001 | `init` | index.ts | 门面 init() 已建（LKanvasChart.init(state)） | B | test+parity | S | 2a | Android 无 DOM：init(state) |
+| IDX-002 | `dispose` | index.ts | LKanvasChart.dispose 已建 | B | test | S | 2a |  |
+| IDX-003 | `version` | index.ts | LKanvasChart.version() 已建 | B | test | S | 2a | 门面静态同名 |
 | IDX-004 | `utils.clone` | utils | data class copy 等价 | B | compile | S | 2a | |
-| IDX-005 | `utils.merge` | utils | 未抽公共 DeepPartial merge | E | test | S | 2a | setStyles 语义基础 |
+| IDX-005 | `utils.merge` | utils | LkanvasUtils.merge 未建；setStyles 深合并批次 5 | E | test | S | 2a | setStyles 语义基础 |
 | IDX-006~012 | `utils.isString/isNumber/isValid/isObject/isArray/isFunction/isBoolean` | utils | Kotlin 类型系统等价 | C | compile | S | 2a | 提供 utils 对象占位 |
-| IDX-013 | `utils.formatValue` | utils/format | 分散 | E | test | S | 2a | |
-| IDX-014 | `utils.formatPrecision` | utils/format | ChartText.price 近似 | E | test | S | 2a | |
-| IDX-015 | `utils.formatBigNumber` | utils/format | ChartText.volume 近似 | E | test | S | 2a | |
-| IDX-016 | `utils.formatDate` | utils/format | ChartText.timeLabel 近似 | E | test | S | 2a | 模板化 |
-| IDX-017 | `utils.formatThousands` | utils/format | DecimalFormat 近似 | E | test | S | 2a | |
-| IDX-018 | `utils.formatFoldDecimal` | utils/format | 无 | E | test | S | 2a | |
-| IDX-019 | `utils.calcTextWidth` | utils/canvas | ChartText.measureWidth | B | test | S | 2a | |
-| IDX-020 | `utils.getLinearSlopeIntercept` | figure/line | OverlayGeometry 内联 | E | test | S | 2a | 抽公共 |
-| IDX-021 | `utils.getLinearYFromSlopeIntercept` | figure/line | 无独立函数 | E | test | S | 2a | |
-| IDX-022 | `utils.getLinearYFromCoordinates` | figure/line | 无独立函数 | E | test | S | 2a | |
+| IDX-013 | `utils.formatValue` | utils/format | LkanvasUtils 待建（分散于 ChartText/ChartLocale） | E | test | S | 2a |  |
+| IDX-014 | `utils.formatPrecision` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
+| IDX-015 | `utils.formatBigNumber` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
+| IDX-016 | `utils.formatDate` | utils/format | LkanvasUtils 待建 | E | test | S | 2a | 模板化 |
+| IDX-017 | `utils.formatThousands` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
+| IDX-018 | `utils.formatFoldDecimal` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
+| IDX-019 | `utils.calcTextWidth` | utils/canvas | ChartText.measureWidth（门面待包装） | B | test | S | 2a |  |
+| IDX-020 | `utils.getLinearSlopeIntercept` | figure/line | OverlayGeometry 内联（门面待包装） | B | test | S | 2a | 抽公共 |
+| IDX-021 | `utils.getLinearYFromSlopeIntercept` | figure/line | 门面待抽公共 | E | test | S | 2a |  |
+| IDX-022 | `utils.getLinearYFromCoordinates` | figure/line | 门面待抽公共 | E | test | S | 2a |  |
 | IDX-023 | `utils.checkCoordinateOnArc` | extension/figure/arc.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
 | IDX-024 | `utils.checkCoordinateOnCircle` | extension/figure/circle.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
 | IDX-025 | `utils.checkCoordinateOnLine` | extension/figure/line.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
@@ -150,12 +150,12 @@
 
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
-| EVT-001 | `onZoom`（payload `{scale}`） | Store.ts:1247 | 无 | E | test | S | 2a | |
-| EVT-002 | `onScroll`（`{distance}`） | Store.ts:946 | 无 | E | test | S | 2a | |
-| EVT-003 | `onVisibleRangeChange`（`VisibleRange`） | Store.ts:742 | viewRevision 近似 | E | test | S | 2a | |
-| EVT-004 | `onCrosshairChange`（`Crosshair`） | Store.ts:1309 | crosshairPosition（Offset） | E | test | S | 2a | payload 结构补 |
-| EVT-005 | `onCandleBarClick`（`VisibleRangeData`） | CandleBarView.ts:35 | onCandleClick（仅 Candle） | E | test | S | 2a | payload 补 prev/next |
-| EVT-006 | `onPaneDrag`（`{paneId}`） | SeparatorWidget.ts:149 | adjustPane 无回调 | E | test | S | 2a | |
+| EVT-001 | `onZoom`（payload `{scale}`） | Store.ts:1247 | onZoom{scale} 接线（缩放手势后 emit） | B | test | S | 2a |  |
+| EVT-002 | `onScroll`（`{distance}`） | Store.ts:946 | onScroll{distance} 接线 | B | test | S | 2a |  |
+| EVT-003 | `onVisibleRangeChange`（`VisibleRange`） | Store.ts:742 | onVisibleRangeChange 接线 | B | test | S | 2a |  |
+| EVT-004 | `onCrosshairChange`（`Crosshair`） | Store.ts:1309 | onCrosshairChange 接线（Crosshair payload） | B | test | S | 2a | payload 结构补 |
+| EVT-005 | `onCandleBarClick`（`VisibleRangeData`） | CandleBarView.ts:35 | onCandleBarClick 接线（VisibleRangeData payload） | B | test | S | 2a | payload 补 prev/next |
+| EVT-006 | `onPaneDrag`（`{paneId}`） | SeparatorWidget.ts:149 | onPaneDrag 接线（{paneId}） | B | test | S | 2a |  |
 | EVT-007 | `onCandleTooltipFeatureClick` | tooltip | 无（features 未实现） | E | test | M | 5 | 依赖批次 5 |
 | EVT-008 | `onIndicatorTooltipFeatureClick` | tooltip | 无 | E | test | M | 5 | 同上 |
 | EVT-009 | `onCrosshairFeatureClick` | crosshair | 无 | E | test | M | 5 | 同上 |
@@ -166,19 +166,19 @@
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
 | TYP-001 | `KLineData` | Data.ts | Candle 同名同义 | A | existing | — | — | |
-| TYP-002 | `Crosshair` | Crosshair.ts | Offset 十字线 | E | test | S | 2a | 字段级见 ts-inventory §5 |
+| TYP-002 | `Crosshair` | Crosshair.ts | Crosshair 类型已建（chart/ChartTypes.kt） | B | test | S | 2a | 字段级见 ts-inventory §5 |
 | TYP-003 | `BarSpace{bar,halfBar,gapBar,halfGapBar}` | BarSpace.ts | barSpacing 单值 | E | test | S | 2c | |
-| TYP-004 | `VisibleRange{from,to,realFrom,realTo}` | VisibleRange.ts | from/to | E | test | S | 2a | |
-| TYP-005 | `VisibleRangeData` | Data.ts:36 | 无 | E | test | S | 2a | 事件 payload 用 |
-| TYP-006 | `SymbolInfo` | SymbolInfo.ts | MarketKey 无精度 | E | test | S | 2a | |
-| TYP-007 | `Period` | Period.ts | 字符串 | E | test | S | 2a | |
-| TYP-008 | `DataLoader`（含 DataLoadMore 双向） | DataLoader.ts | HistorySource 单向 more | E | test+parity | M | 2a | 四 type 对齐 |
+| TYP-004 | `VisibleRange{from,to,realFrom,realTo}` | VisibleRange.ts | VisibleRange{from,to,realFrom,realTo} 已建 | B | test | S | 2a |  |
+| TYP-005 | `VisibleRangeData` | Data.ts:36 | VisibleRangeData 已建（prev/data/next） | B | test | S | 2a | 事件 payload 用 |
+| TYP-006 | `SymbolInfo` | SymbolInfo.ts | SymbolInfo 已建（ticker/precision 默认 2） | B | test | S | 2a |  |
+| TYP-007 | `Period` | Period.ts | Period 已建（type+milliseconds+toMillis） | B | test | S | 2a |  |
+| TYP-008 | `DataLoader`（含 DataLoadMore 双向） | DataLoader.ts | DataLoader 已建（init/forward/backward+subscribeBar；v10 无 update type） | B | test+parity | M | 2a | 四 type 对齐 |
 | TYP-009 | `CandleType` 六值 | Styles.ts:242 | MainChartType 同名 | A | existing | — | — | |
 | TYP-010 | `LineType/PolygonType/PathType/TooltipShowRule/TooltipShowType/TooltipFeaturePosition/FeatureType/FormatDateType/ZoomAnchorType` | Styles.ts 等 | 部分散落 | E | compile | S | 5 | 枚举同名化 |
 | TYP-011 | `IndicatorSeries` 三值 | Indicator.ts:34 | IndicatorSeries（PRICE/VOLUME/NORMAL） | A | existing | — | — | 字符串值对齐在批次 3 |
 | TYP-012 | `OverlayMode` 三值 | Overlay.ts:29 | MagnetMode | B | test | S | 2b | 门面同名枚举 |
 | TYP-013 | `OverlayDrawingMode` | Overlay.ts:44 | continuous 布尔 | B | test | S | 4 | |
-| TYP-014 | `ActionType` 九值 | Action.ts:19 | 分散回调 | E | test | S | 2a | |
+| TYP-014 | `ActionType` 九值 | Action.ts:19 | ActionType 九值枚举已建 + subscribe/execute | B | test | S | 2a |  |
 
 
 ## 5. 指标模板字段（22，逐字段）
