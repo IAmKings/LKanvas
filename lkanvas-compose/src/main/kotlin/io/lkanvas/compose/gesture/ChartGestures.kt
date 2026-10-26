@@ -15,7 +15,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.hypot
 
-private enum class GMode { IDLE, PAN, CROSSHAIR, PINCH, CREATE, POINT_DRAG, WHOLE_DRAG }
+private enum class GMode { IDLE, PAN, CROSSHAIR, PINCH, CREATE, POINT_DRAG, WHOLE_DRAG, PANE_ADJUST, AXIS_ZOOM }
 
 /**
  * 图表手势状态机（PRD R-10 Alpha 部分 + R-09 覆盖物）：
@@ -49,6 +49,11 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         // brush 连续采样位置
         var lastBrushX = 0f
         var lastBrushY = 0f
+        // 分隔条拖动上下文
+        var paneWhich = 0
+        var paneStartValue = 0f
+        var paneStartY = 0f
+        var axisStartY = 0f
 
         // 创建模式优先接管本次手势
         if (state.overlays.creatingId != null) {
@@ -80,6 +85,21 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                     dragInstanceId = hit.instanceId
                     lastAnchor = state.overlayPointFromPx(down.position.x, down.position.y)
                     state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
+                }
+            }
+            // 分隔条与轴区（未命中覆盖物时判定；同一时刻仅一个所有者，A-33）
+            if (mode == GMode.IDLE) {
+                val sep = state.paneSeparatorAt(down.position.y, tolerancePx = 14f)
+                if (sep != null) {
+                    paneWhich = sep
+                    paneStartValue = if (sep == 0) state.paneHeightsPx.vol else state.paneHeightsPx.macd
+                    paneStartY = down.position.y
+                    mode = GMode.PANE_ADJUST
+                    state.setGestureOwner(GestureOwner.PANE_ADJUST)
+                } else if (state.isInAxisGutter(down.position.x)) {
+                    axisStartY = down.position.y
+                    mode = GMode.AXIS_ZOOM
+                    state.setGestureOwner(GestureOwner.AXIS_ZOOM)
                 }
             }
         }
@@ -211,6 +231,18 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                             }
                             event.changes.forEach { if (it.positionChanged()) it.consume() }
                         }
+
+                        GMode.PANE_ADJUST -> {
+                            val c = event.changes.firstOrNull() ?: continue
+                            state.adjustPane(paneWhich, paneStartValue, c.position.y - paneStartY)
+                            event.changes.forEach { it.consume() }
+                        }
+
+                        GMode.AXIS_ZOOM -> {
+                            val c = event.changes.firstOrNull() ?: continue
+                            state.axisZoomBy(c.position.y - axisStartY)
+                            event.changes.forEach { it.consume() }
+                        }
                     }
                 }
 
@@ -229,6 +261,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                         GMode.PAN -> state.fling(velocity.calculateVelocity().x)
                         GMode.IDLE -> if (!moved) state.tapCandle(down.position.x)
                         GMode.PINCH -> Unit
+
                         GMode.CREATE -> {
                             // brush 已在按下/移动中采样，抬起只结束本次手势（宿主按完成/取消收尾）
                             if (state.currentTool != "brush") {
@@ -247,6 +280,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                             state.overlays.endDrag(dragInstanceId, dragPointIndex)
                             state.notifyOverlayChanged()
                         }
+                        GMode.PANE_ADJUST, GMode.AXIS_ZOOM -> Unit
                     }
                     break
                 }

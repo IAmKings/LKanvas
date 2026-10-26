@@ -460,12 +460,72 @@ class ChartState(
 
     // ---------- 布局回填 ----------
 
+    /** 容器与子 pane 尺寸状态（分隔条拖动调整，T-23/A-33）。 */
+    private var containerHeightPx = 0f
+    private var timeAxisHeightPx = 0f
+    private var defaultSubPanePx = 0f
+    private var volPaneOverride = 0f
+    private var macdPaneOverride = 0f
+
+    /** 最小 pane 高度（避免绘图区为负，PRD R-06）。 */
+    private val minSubPanePx = 40f
+    private val minMainPanePx = 60f
+
     fun onLayout(widthPx: Float, panes: PaneHeights) {
         contentWidthPx = widthPx
-        paneHeightsPx = panes
-        viewport.layout(widthPx.toDouble(), dataSnapshot.candles.size)
+        containerHeightPx = panes.main + panes.vol + panes.macd + panes.timeAxis
+        timeAxisHeightPx = panes.timeAxis
+        if (defaultSubPanePx == 0f) {
+            defaultSubPanePx = panes.vol
+            volPaneOverride = panes.vol
+            macdPaneOverride = panes.macd
+        }
+        relayout()
+    }
+
+    private fun relayout() {
+        val usable = (containerHeightPx - timeAxisHeightPx).coerceAtLeast(minSubPanePx * 2)
+        val maxSub = usable / 2f
+        val vol = volPaneOverride.coerceIn(minSubPanePx, maxSub)
+        val macd = macdPaneOverride.coerceIn(minSubPanePx, maxSub)
+        val main = (usable - vol - macd).coerceAtLeast(minMainPanePx)
+        paneHeightsPx = PaneHeights(main, vol, macd, timeAxisHeightPx)
+        viewport.layout(contentWidthPx.toDouble(), dataSnapshot.candles.size)
         viewRevision++
     }
+
+    /**
+     * 分隔条命中（A-33：手势层判定）；返回 0=主|VOL 分隔、1=VOL|MACD 分隔、null=未命中。
+     * @param tolerancePx 判定半径
+     */
+    fun paneSeparatorAt(y: Float, tolerancePx: Float): Int? {
+        val p = paneHeightsPx
+        return when {
+            kotlin.math.abs(y - p.main) <= tolerancePx -> 0
+            kotlin.math.abs(y - (p.main + p.vol)) <= tolerancePx -> 1
+            else -> null
+        }
+    }
+
+    /** 拖动分隔条：[which]=0 调整 VOL pane 高度，1 调整 MACD pane 高度（dy 累计）。 */
+    fun adjustPane(which: Int, startValue: Float, dyTotal: Float) {
+        if (which == 0) {
+            volPaneOverride = startValue + dyTotal
+        } else {
+            macdPaneOverride = startValue + dyTotal
+        }
+        relayout()
+    }
+
+    /** 轴区拖动缩放（右 gutter 垂直拖动；dy 累计，向下放大间距）。 */
+    fun axisZoomBy(dyTotal: Float) {
+        val scale = 1.0 + dyTotal / 200.0
+        viewport.zoomBy(scale, viewport.candleCenterX((dataSnapshot.candles.size - 1).coerceAtLeast(0).toDouble()), dataSnapshot.candles.size)
+        viewRevision++
+    }
+
+    /** 是否命中右轴 gutter 区（x > 内容右缘）。 */
+    fun isInAxisGutter(x: Float): Boolean = contentWidthPx > 0f && x > contentWidthPx
 
     fun notifyViewportChanged() {
         viewRevision++
@@ -499,4 +559,4 @@ class ChartState(
 }
 
 /** 手势所有者（PRD R-10：任一时刻只有一个明确操作所有者）。 */
-enum class GestureOwner { NONE, PAN, PINCH, CROSSHAIR, OVERLAY_EDIT }
+enum class GestureOwner { NONE, PAN, PINCH, CROSSHAIR, OVERLAY_EDIT, PANE_ADJUST, AXIS_ZOOM }
