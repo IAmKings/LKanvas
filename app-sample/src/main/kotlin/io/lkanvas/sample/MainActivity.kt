@@ -96,9 +96,9 @@ class MainActivity : ComponentActivity() {
                             },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text("轴") }
-                        // PNG 导出（T-29）：cacheDir/lkanvas-export.png
+                        // PNG 导出（T-29）：cacheDir/lkanvas-export.png（主题与屏幕一致）
                         Button(
-                            onClick = { exportPng(state, textMeasurer) },
+                            onClick = { exportPng(state, textMeasurer, io.lkanvas.compose.theme.ChartTheme.dark()) },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text("导出") }
                     }
@@ -108,7 +108,11 @@ class MainActivity : ComponentActivity() {
     }
 
     /** PNG 导出演示（T-29）：写 cacheDir，宿主自行决定分享/存储。 */
-    private fun exportPng(state: ChartState, textMeasurer: androidx.compose.ui.text.TextMeasurer) {
+    private fun exportPng(
+        state: ChartState,
+        textMeasurer: androidx.compose.ui.text.TextMeasurer,
+        theme: io.lkanvas.compose.theme.ChartTheme,
+    ) {
         val out = java.io.File(cacheDir, "lkanvas-export.png")
         runCatching {
             java.io.FileOutputStream(out).use { fos ->
@@ -116,6 +120,7 @@ class MainActivity : ComponentActivity() {
                     state = state,
                     textMeasurer = textMeasurer,
                     output = fos,
+                    theme = theme,
                     widthPx = 1080,
                     heightPx = 1600,
                 )

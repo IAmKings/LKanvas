@@ -35,8 +35,13 @@ object ChartSnapshotExporter {
 
     /**
      * 导出当前图表为位图。必须在主线程调用（单 revision 保证）。
+     *
+     * 内容为屏幕当前布局的**等比缩放**（三 pane 完整呈现，文本随之缩放）；
+     * 尚未布局（contentWidth=0）时按目标尺寸直接绘制（仅背景）。
+     *
      * @param widthPx/heightPx 输出尺寸（物理 px）
      * @param textMeasurer 由调用方在组合上下文创建（rememberTextMeasurer()）
+     * @param theme 须与屏幕显示主题一致（由宿主传入）
      */
     fun export(
         state: ChartState,
@@ -60,14 +65,31 @@ object ChartSnapshotExporter {
         val gutterPx = with(density) { config.rightAxisGutter.toPx() }
         val legendPx = with(density) { config.legendTextSize.toPx() }
         val axisPx = with(density) { config.axisTextSize.toPx() }
+
+        // 屏幕布局尺寸（已布局时等比缩放整个三 pane 布局）
+        val panes = state.paneHeightsPx
+        val layoutW = if (state.contentWidthPx > 0f) state.contentWidthPx + gutterPx else widthPx.toFloat()
+        val layoutH = if (state.contentWidthPx > 0f) {
+            panes.main + panes.vol + panes.macd + panes.timeAxis
+        } else {
+            heightPx.toFloat()
+        }
+        val scale = minOf(widthPx / layoutW, heightPx / layoutH)
+
+        // 铺满背景（等比缩放可能在宽或高方向留白，避免透明底）
         drawScope.draw(density, LayoutDirection.Ltr, canvas, Size(widthPx.toFloat(), heightPx.toFloat())) {
+            drawRect(theme.background, size = Size(widthPx.toFloat(), heightPx.toFloat()))
+        }
+        canvas.save()
+        canvas.scale(scale, scale)
+        drawScope.draw(density, LayoutDirection.Ltr, canvas, Size(layoutW, layoutH)) {
             with(ChartRenderer) {
                 render(
                     state = state,
                     theme = theme,
                     params = ChartRenderer.Params(
-                        width = widthPx.toFloat(),
-                        height = heightPx.toFloat(),
+                        width = layoutW,
+                        height = layoutH,
                         gutterWidth = gutterPx,
                         legendTextSizePx = legendPx,
                         axisTextSizePx = axisPx,
@@ -77,6 +99,7 @@ object ChartSnapshotExporter {
                 )
             }
         }
+        canvas.restore()
         return Result.Ok(bitmap, widthPx, heightPx)
     }
 
