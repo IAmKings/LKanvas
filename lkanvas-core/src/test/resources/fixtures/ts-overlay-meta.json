@@ -1,0 +1,178 @@
+{
+ "brush": {
+  "file": "brush.ts",
+  "totalStep": 2,
+  "needDefaultPointFigure": false,
+  "needDefaultXAxisFigure": false,
+  "needDefaultYAxisFigure": false,
+  "checkEventOn": false,
+  "drawingMode": "continuous",
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "fibonacciLine": {
+  "file": "fibonacciLine.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "horizontalRayLine": {
+  "file": "horizontalRayLine.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": true
+ },
+ "horizontalSegment": {
+  "file": "horizontalSegment.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": true
+ },
+ "horizontalStraightLine": {
+  "file": "horizontalStraightLine.ts",
+  "totalStep": 2,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "parallelStraightLine": {
+  "file": "parallelStraightLine.ts",
+  "totalStep": 4,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "priceChannelLine": {
+  "file": "priceChannelLine.ts",
+  "totalStep": 4,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "priceLine": {
+  "file": "priceLine.ts",
+  "totalStep": 2,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "rayLine": {
+  "file": "rayLine.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "segment": {
+  "file": "segment.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "simpleAnnotation": {
+  "file": "simpleAnnotation.ts",
+  "totalStep": 2,
+  "needDefaultPointFigure": false,
+  "needDefaultXAxisFigure": false,
+  "needDefaultYAxisFigure": false,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "simpleTag": {
+  "file": "simpleTag.ts",
+  "totalStep": 2,
+  "needDefaultPointFigure": false,
+  "needDefaultXAxisFigure": false,
+  "needDefaultYAxisFigure": false,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "straightLine": {
+  "file": "straightLine.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ },
+ "verticalRayLine": {
+  "file": "verticalRayLine.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": true
+ },
+ "verticalSegment": {
+  "file": "verticalSegment.ts",
+  "totalStep": 3,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": true
+ },
+ "verticalStraightLine": {
+  "file": "verticalStraightLine.ts",
+  "totalStep": 2,
+  "needDefaultPointFigure": true,
+  "needDefaultXAxisFigure": true,
+  "needDefaultYAxisFigure": true,
+  "checkEventOn": false,
+  "drawingMode": null,
+  "hasCreatePointFigures": true,
+  "hasPerformEventPressedMove": false
+ }
+}

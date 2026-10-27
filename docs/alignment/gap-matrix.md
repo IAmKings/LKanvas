@@ -39,20 +39,20 @@
 | IDX-020 | `utils.getLinearSlopeIntercept` | figure/line | OverlayGeometry 内联（门面待包装） | B | test | S | 2a | 抽公共 |
 | IDX-021 | `utils.getLinearYFromSlopeIntercept` | figure/line | 门面待抽公共 | E | test | S | 2a |  |
 | IDX-022 | `utils.getLinearYFromCoordinates` | figure/line | 门面待抽公共 | E | test | S | 2a |  |
-| IDX-023 | `utils.checkCoordinateOnArc` | extension/figure/arc.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
-| IDX-024 | `utils.checkCoordinateOnCircle` | extension/figure/circle.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
-| IDX-025 | `utils.checkCoordinateOnLine` | extension/figure/line.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
-| IDX-026 | `utils.checkCoordinateOnPolygon` | extension/figure/polygon.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
-| IDX-027 | `utils.checkCoordinateOnRect` | extension/figure/rect.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
-| IDX-028 | `utils.checkCoordinateOnText` | extension/figure/text.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
+| IDX-023 | `utils.checkCoordinateOnArc` | extension/figure/arc.ts | LkanvasFigures.checkCoordinateOnArc 已建 | B | test | S | 4 | 同名包装 |
+| IDX-024 | `utils.checkCoordinateOnCircle` | extension/figure/circle.ts | LkanvasFigures.checkCoordinateOnCircle 已建 | B | test | S | 4 | 同名包装 |
+| IDX-025 | `utils.checkCoordinateOnLine` | extension/figure/line.ts | LkanvasFigures.checkCoordinateOnLine 已建 | B | test | S | 4 | 同名包装 |
+| IDX-026 | `utils.checkCoordinateOnPolygon` | extension/figure/polygon.ts | LkanvasFigures.checkCoordinateOnPolygon 已建 | B | test | S | 4 | 同名包装 |
+| IDX-027 | `utils.checkCoordinateOnRect` | extension/figure/rect.ts | LkanvasFigures.checkCoordinateOnRect 已建 | B | test | S | 4 | 同名包装 |
+| IDX-028 | `utils.checkCoordinateOnText` | extension/figure/text.ts | LkanvasFigures.checkCoordinateOnText 已建 | B | test | S | 4 | 同名包装 |
 | IDX-029 | `registerIndicator` | ext/indicator | LkanvasRegistry.registerIndicator 已建（全局+27 预注册） | B | test | M | 3 | 全局注册表 |
 | IDX-030 | `getSupportedIndicators` | ext/indicator | LkanvasRegistry.getSupportedIndicators 已建 | B | test | S | 3 |  |
 | IDX-031 | `registerOverlay` | ext/overlay | LkanvasRegistry.registerOverlay 已建 | B | test | M | 4 |  |
 | IDX-032 | `getSupportedOverlays` | ext/overlay | LkanvasRegistry.getSupportedOverlays 已建（16） | B | test | S | 4 |  |
 | IDX-033 | `getOverlayClass` | ext/overlay | LkanvasRegistry.getOverlayDefinition 已建 | B | test | S | 4 |  |
-| IDX-034 | `registerFigure` | ext/figure | 无注册表 | E | test | S | 4 | |
-| IDX-035 | `getFigureClass` | ext/figure | 无 | B | compile | S | 4 | |
-| IDX-036 | `getSupportedFigures` | ext/figure | 无 | E | test | S | 4 | |
+| IDX-034 | `registerFigure` | ext/figure | LkanvasFigures.registerFigure 已建（7 内置预注册） | B | test | S | 4 |  |
+| IDX-035 | `getFigureClass` | ext/figure | LkanvasFigures.getFigureFactory 已建 | B | test | S | 4 |  |
+| IDX-036 | `getSupportedFigures` | ext/figure | LkanvasFigures.getSupportedFigures 已建 | B | test | S | 4 |  |
 | IDX-037 | `registerStyles` | ext/styles | ChartTheme.dark() 近似 | E | test | M | 5 | light/dark 注册 |
 | IDX-038 | `registerLocale` | ext/i18n | LkanvasRegistry.registerLocale 已建 | B | test | S | 3 |  |
 | IDX-039 | `getSupportedLocales` | ext/i18n | LkanvasRegistry.getSupportedLocales 已建 | B | test | S | 3 |  |
@@ -216,14 +216,14 @@
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
 | OVL-001 | `name` | component/Overlay.ts | 有 | A | existing | — | — | |
-| OVL-002 | `totalStep` | component/Overlay.ts | pointCount+1 | B | diff | S | 4 | 兼容读取 |
-| OVL-003 | `needDefaultPointFigure` | component/Overlay.ts | 无 | E | diff | S | 4 | |
-| OVL-004 | `needDefaultXAxisFigure` | component/Overlay.ts | 无 | E | diff | S | 4 | |
-| OVL-005 | `needDefaultYAxisFigure` | component/Overlay.ts | 无 | E | diff | S | 4 | |
+| OVL-002 | `totalStep` | component/Overlay.ts | 已建：Definition.totalStep（=pointCount+1，meta diff 16/16 断言） | B | diff | S | 4 | 兼容读取 |
+| OVL-003 | `needDefaultPointFigure` | component/Overlay.ts | 已建（meta diff 断言；simpleAnnotation/tag/brush=false） | B | diff | S | 4 |  |
+| OVL-004 | `needDefaultXAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 |  |
+| OVL-005 | `needDefaultYAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 |  |
 | OVL-006 | `createPointFigures` | component/Overlay.ts | 内置渲染器分支 | E | test | L | 4 | 返回 Figure 原语 |
 | OVL-007 | `createXAxisFigures` | component/Overlay.ts | 无 | E | test | M | 4 | |
 | OVL-008 | `createYAxisFigures` | component/Overlay.ts | 无 | E | test | M | 4 | |
-| OVL-009 | `checkEventOn` | component/Overlay.ts | hitTest | B | test | S | 4 | |
+| OVL-009 | `checkEventOn` | component/Overlay.ts | 已建：Definition.checkEventOn | B | test | S | 4 |  |
 | OVL-010 | `drawingMode(step/continuous)` | component/Overlay.ts | continuous 布尔 | B | diff | S | 4 | |
 | OVL-011 | `performEventPressedMove` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
 | OVL-012 | `performEventMoveForDrawing` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
@@ -243,16 +243,16 @@
 | OVL-022 | `groupId` | component/Overlay.ts | 无（OVL-020 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-023 | `paneId` | component/Overlay.ts | paneId 固定 main | B | test | S | 2b |  |
 | OVL-024 | `name` | component/Overlay.ts | templateName | B | test | S | 2b |  |
-| OVL-025 | `totalStep` | component/Overlay.ts | pointCount+1（OVL-002 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-025 | `totalStep` | component/Overlay.ts | 已建：Definition.totalStep（=pointCount+1，meta diff 16/16 断言） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-026 | `currentStep` | component/Overlay.ts | 由 phase/points.size 推导（getter 未暴露） | E | test | S | 2b | 由 phase 推导 getter |
-| OVL-027 | `drawingMode` | component/Overlay.ts | continuous 布尔 | B | test | S | 2b |  |
+| OVL-027 | `drawingMode` | component/Overlay.ts | 已建：continuous 布尔（meta diff 断言 brush=continuous） | B | diff | S | 2b |  |
 | OVL-028 | `lock` | component/Overlay.ts | OverlayInstance.locked 已建 | B | test | S | 2b |  |
 | OVL-029 | `visible` | component/Overlay.ts | 已建：Definition.visible + Instance.visible | B | test | S | 2b |  |
 | OVL-030 | `zLevel` | component/Overlay.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 2b |  |
 | OVL-031 | `fixedZLevel` | component/Overlay.ts | 无 | E | test | S | 4 |  |
-| OVL-032 | `needDefaultPointFigure` | component/Overlay.ts | 无（OVL-003 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-033 | `needDefaultXAxisFigure` | component/Overlay.ts | 无（OVL-004 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-034 | `needDefaultYAxisFigure` | component/Overlay.ts | 无（OVL-005 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-032 | `needDefaultPointFigure` | component/Overlay.ts | 已建（meta diff 断言；simpleAnnotation/tag/brush=false） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-033 | `needDefaultXAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-034 | `needDefaultYAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-035 | `mode` | component/Overlay.ts | magnetMode + 门面 OverlayMode 枚举已建 | B | test | S | 2b | OverlayMode 枚举 |
 | OVL-036 | `modeSensitivity` | component/Overlay.ts | 未实现（上游默认值等价） | E | diff | S | 4 |  |
 | OVL-037 | `points` | component/Overlay.ts | OverlayInstance.points（时间锚点）已建 | A | existing | S | 2b | 锚点结构等价 |

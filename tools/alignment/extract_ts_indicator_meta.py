@@ -98,5 +98,40 @@ def main():
     print('VOL figures 顺序:', [f[0] for f in vol['figures']])
 
 
+
+def extract_overlays():
+    """16 覆盖物模板元数据（批次 4）：totalStep/needDefault*/drawingMode。"""
+    up = Path(__file__).resolve().parents[2] / 'third_party/klinechart-v10.1.0/src/extension/overlay'
+    result = {}
+    for path in sorted(up.glob('*.ts')):
+        if path.name == 'index.ts':
+            continue
+        src = path.read_text()
+        name_m = re.search(r"name: '(\w+)'", src)
+        if not name_m:
+            continue
+        name = name_m.group(1)
+
+        def grab_int(key):
+            m = re.search(rf'{key}: (\d+)', src)
+            return int(m.group(1)) if m else None
+
+        result[name] = {
+            'file': path.name,
+            'totalStep': grab_int('totalStep'),
+            'needDefaultPointFigure': bool(re.search(r'needDefaultPointFigure:\s*true', src)),
+            'needDefaultXAxisFigure': bool(re.search(r'needDefaultXAxisFigure:\s*true', src)),
+            'needDefaultYAxisFigure': bool(re.search(r'needDefaultYAxisFigure:\s*true', src)),
+            'checkEventOn': 'checkEventOn' in src,
+            'drawingMode': (re.search(r"drawingMode:\s*'([^']*)'", src) or [None, None]) and (re.search(r"drawingMode:\s*'([^']*)'", src).group(1) if re.search(r"drawingMode:\s*'([^']*)'", src) else None),
+            'hasCreatePointFigures': 'createPointFigures' in src,
+            'hasPerformEventPressedMove': 'performEventPressedMove' in src,
+        }
+    out = Path(__file__).resolve().parents[2] / 'lkanvas-core/src/test/resources/fixtures/ts-overlay-meta.json'
+    out.write_text(json.dumps(result, indent=1, ensure_ascii=False))
+    print(f'提取 {len(result)} 个覆盖物模板 → {out}')
+
+
 if __name__ == '__main__':
     main()
+    extract_overlays()

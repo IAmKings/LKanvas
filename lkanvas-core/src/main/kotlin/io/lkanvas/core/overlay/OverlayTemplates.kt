@@ -10,18 +10,18 @@ package io.lkanvas.core.overlay
 enum class OverlayConstraint { NONE, HORIZONTAL, VERTICAL }
 
 /**
- * 覆盖物模板定义。
+ * 覆盖物模板定义（批次 4：补齐上游 OverlayTemplate 字段）。
  */
 interface OverlayDefinition {
     val name: String
 
-    /** 控制点数量（continuous 模板忽略）。 */
+    /** 控制点数量（continuous 模板忽略）；= 上游 totalStep - 1。 */
     val pointCount: Int
 
     /** 绘制约束族。 */
     val constraint: OverlayConstraint get() = OverlayConstraint.NONE
 
-    /** 是否连续采样（brush）。 */
+    /** 是否连续采样（上游 drawingMode = 'continuous'）。 */
     val continuous: Boolean get() = false
 
     /** 连续采样点数上限。 */
@@ -32,6 +32,26 @@ interface OverlayDefinition {
 
     /** 是否支持磁吸。 */
     val supportMagnet: Boolean get() = true
+
+    // ---- 上游 OverlayTemplate 字段对齐（批次 4；默认值对齐上游缺省） ----
+
+    /** 上游 totalStep：控制点数 + 1（交互步数）。 */
+    val totalStep: Int get() = pointCount + 1
+
+    /** 上游 needDefaultPointFigure：渲染默认控制点。 */
+    val needDefaultPointFigure: Boolean get() = true
+
+    /** 上游 needDefaultXAxisFigure：渲染 x 轴方向附加图形。 */
+    val needDefaultXAxisFigure: Boolean get() = true
+
+    /** 上游 needDefaultYAxisFigure：渲染 y 轴方向附加图形。 */
+    val needDefaultYAxisFigure: Boolean get() = true
+
+    /** 上游 checkEventOn：参与命中测试（自定义模板可关）。 */
+    val checkEventOn: Boolean get() = true
+
+    /** 上游 extendData：模板扩展数据（宿主自定义）。 */
+    val extendData: Any? get() = null
 }
 
 /** O-01 segment：两点线段（Alpha 已交付）。 */
@@ -132,12 +152,18 @@ object PriceLineDefinition : OverlayDefinition {
 object SimpleAnnotationDefinition : OverlayDefinition {
     override val name = "simpleAnnotation"
     override val pointCount = 1
+    override val needDefaultPointFigure = false
+    override val needDefaultXAxisFigure = false
+    override val needDefaultYAxisFigure = false
 }
 
 /** O-15 simpleTag：简单标签（1 点 + extendData["text"]；带底色标签）。 */
 object SimpleTagDefinition : OverlayDefinition {
     override val name = "simpleTag"
     override val pointCount = 1
+    override val needDefaultPointFigure = false
+    override val needDefaultXAxisFigure = false
+    override val needDefaultYAxisFigure = false
 }
 
 /** O-16 brush：毛笔（连续采样；上限 5000 点，超限终止采样并报告）。 */
@@ -147,6 +173,10 @@ object BrushDefinition : OverlayDefinition {
     override val continuous = true
     override val maxPoints = 5000
     override val supportMagnet = false
+    override val totalStep = 2
+    override val needDefaultPointFigure = false
+    override val needDefaultXAxisFigure = false
+    override val needDefaultYAxisFigure = false
 }
 
 /** 全部内置覆盖物模板（16 种，键=上游名）。 */
