@@ -31,6 +31,12 @@ class OverlayInstance(
     /** 所属 pane（Alpha: main）。 */
     val paneId: String = "main",
 ) {
+    /** 门面 paneId 覆写（createOverlay(paneId) 设置；读取优先于 [paneId]）。 */
+    var paneIdOverride: String? = null
+
+    /** 生效 paneId（override 优先）。 */
+    val effectivePaneId: String get() = paneIdOverride ?: paneId
+
     /** 生命周期阶段（公开只读；变更经 [OverlayManager]）。 */
     var phase: OverlayPhase = OverlayPhase.IDLE
         internal set

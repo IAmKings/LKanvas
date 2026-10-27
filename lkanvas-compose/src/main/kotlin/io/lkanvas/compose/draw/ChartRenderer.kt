@@ -148,18 +148,20 @@ object ChartRenderer {
             x += text.measureWidth(s) + 10f
         }
 
-        // MA 图例（列序 = 参数序）
-        state.maResult?.let { ma ->
-            var lx = 8f
-            val ly = y + textSizePx * 1.4f
-            for ((k, key) in ma.result.keys.withIndex()) {
-                val v = ma.result[key].getOrNull(idx) ?: Double.NaN
-                val color = theme.linePalette[k % theme.linePalette.size]
-                val period = ma.params.getOrNull(k)?.toInt() ?: (k + 1)
-                val s = "MA$period ${text.price(v)}"
+        // 主 pane 指标图例（遍历全部 price 系实例，批次 2b）
+        var li = 0
+        var lx = 8f
+        val ly = y + textSizePx * 1.4f
+        for (inst in state.mainPaneIndicatorResults()) {
+            val res = inst.state ?: continue
+            for ((k, key) in res.result.keys.withIndex()) {
+                val v = res.result[key].getOrNull(idx) ?: Double.NaN
+                val color = theme.linePalette[(li + k) % theme.linePalette.size]
+                val label = "${inst.definition.shortName} ${text.price(v)}"
                 if (lx > contentWidth - 40f) break
-                drawText(text, s, Offset(lx, ly), color)
-                lx += text.measureWidth(s) + 10f
+                drawText(text, label, Offset(lx, ly), color)
+                li++
+                lx += text.measureWidth(label) + 10f
             }
         }
     }

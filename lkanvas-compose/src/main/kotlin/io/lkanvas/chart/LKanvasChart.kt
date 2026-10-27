@@ -405,6 +405,134 @@ class LKanvasChart private constructor(
     }
 
     /** 触发一次全量重绘（等价上游 resize 的重绘部分；尺寸由 Compose onLayout 自适应）。 */
+    // ---------- 指标（对齐 Chart.ts 指标组） ----------
+
+    /**
+     * 上游 `createIndicator(value, isStack?)`：按模板名创建实例并全量计算，
+     * 返回 instanceId（未知模板返回 null）。
+     */
+    fun createIndicator(
+        name: String,
+        calcParams: List<Double>? = null,
+        paneId: String = "main",
+        isStack: Boolean = true,
+    ): String? = state.createIndicator(name, calcParams, paneId, isStack)
+
+    /** 上游 `overrideIndicator`：字段级覆盖（calcParams/visible）。 */
+    fun overrideIndicator(id: String, calcParams: List<Double>? = null, visible: Boolean? = null): Boolean =
+        state.overrideIndicator(id, calcParams, visible)
+
+    /** 上游 `getIndicators(filter?)`。 */
+    fun getIndicators(filter: ChartState.IndicatorFilter = ChartState.IndicatorFilter()) =
+        state.getIndicators(filter)
+
+    /** 上游 `getIndicatorByInstanceId(id)`。 */
+    fun getIndicatorByInstanceId(id: String) = state.getIndicatorByInstanceId(id)
+
+    /** 上游 `removeIndicator(filter)`。 */
+    fun removeIndicator(filter: ChartState.IndicatorFilter = ChartState.IndicatorFilter()): Boolean =
+        state.removeIndicator(filter)
+
+    // ---------- 覆盖物（对齐 Chart.ts 覆盖物组） ----------
+
+    /** 磁吸模式（上游 OverlayMode）。 */
+    var overlayMode: OverlayMode = OverlayMode.WEAK_MAGNET
+        set(value) {
+            field = value
+            state.overlays.magnetMode = when (value) {
+                OverlayMode.NORMAL -> io.lkanvas.core.overlay.MagnetMode.NORMAL
+                OverlayMode.WEAK_MAGNET -> io.lkanvas.core.overlay.MagnetMode.WEAK
+                OverlayMode.STRONG_MAGNET -> io.lkanvas.core.overlay.MagnetMode.STRONG
+            }
+        }
+
+    private fun overlayToInfo(id: String): OverlayInfo? {
+        val inst = state.overlays.get(id) ?: return null
+        return OverlayInfo(
+            id = inst.id,
+            groupId = null,
+            name = inst.templateName,
+            paneId = inst.effectivePaneId,
+            points = inst.points.toList(),
+            locked = inst.locked,
+            visible = inst.visible,
+            zLevel = inst.zIndex,
+            extendData = inst.extensionData.toMap(),
+        )
+    }
+
+    /**
+     * 上游 `createOverlay(value, paneId?)`：
+     * - name+points → 编程式直接创建（返回 id）；
+     * - 仅 name → 进入交互创建（返回 id，用户点选控制点）；
+     * - 数组 → 批量，逐一返回（失败位为 null）。
+     */
+    fun createOverlay(value: OverlayCreate, paneId: String = "main"): String? {
+        val template = io.lkanvas.core.overlay.OverlayTemplates[value.name] ?: return null
+        if (value.points.isEmpty()) {
+            // 交互式（同门面 currentTool 流程）
+            return state.overlays.beginCreate(template)
+        }
+        // 编程式：begin+逐点+显式完成（continuous）或自动完成（定步数）
+        val id = state.overlays.beginCreate(template) ?: return null
+        for (p in value.points) {
+            state.overlays.addCreatePoint(id, p)
+        }
+        if (template.continuous && state.overlays.get(id)?.phase == io.lkanvas.core.overlay.OverlayPhase.CREATING) {
+            state.overlays.finishCreate(id)
+        }
+        val inst = state.overlays.get(id) ?: return null
+        inst.paneIdOverride = paneId
+        value.extendData.forEach { (k, v) -> inst.extensionData[k] = v }
+        inst.locked = value.lock
+        inst.visible = value.visible
+        inst.zIndex = value.zLevel
+        state.notifyOverlayChanged()
+        return id
+    }
+
+    /** 数组重载：逐一创建。 */
+    fun createOverlay(values: List<OverlayCreate>, paneId: String = "main"): List<String?> =
+        values.map { createOverlay(it, paneId) }
+
+    /** 上游 `getOverlays(filter?)`。 */
+    fun getOverlays(filter: OverlayFilter? = null): List<OverlayInfo> =
+        state.overlays.all()
+            .mapNotNull { overlayToInfo(it.id) }
+            .filter { info ->
+                filter == null || filter.matches(info.id, info.name, info.paneId, hasGroup = info.groupId != null)
+            }
+
+    /** 上游 `overrideOverlay(override)`：以 `override.name+filter` 定位。 */
+    fun overrideOverlay(id: String, override: OverlayOverride): Boolean {
+        val inst = state.overlays.get(id) ?: return false
+        override.points?.let { pts ->
+            inst.points.clear()
+            inst.points.addAll(pts)
+        }
+        override.extendData?.let { ext -> inst.extensionData.putAll(ext) }
+        override.lock?.let { inst.locked = it }
+        override.visible?.let { inst.visible = it }
+        override.zLevel?.let { inst.zIndex = it }
+        state.notifyOverlayChanged()
+        return true
+    }
+
+    /** 上游 `removeOverlay(filter)`：按 filter 批量删除，返回是否有删除。 */
+    fun removeOverlay(filter: OverlayFilter): Boolean {
+        val targets = getOverlays(filter).map { it.id }
+        var removed = false
+        for (id in targets) {
+            state.overlays.remove(id)
+            removed = true
+        }
+        state.notifyOverlayChanged()
+        return removed
+    }
+
+    /** 上游 `removeOverlay(id)` 简写（filter=仅 id）。 */
+    fun removeOverlay(id: String): Boolean = removeOverlay(OverlayFilter(id = id))
+
     fun resize() {
         state.notifyViewportChanged()
     }

@@ -72,7 +72,13 @@ object PaneRenderers {
         }
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             drawCandles(state, theme, visible, range.first, y)
-            state.maResult?.let { drawLinePlots(it, state.viewport, range, y, theme.linePalette) }
+            // 主 pane 指标叠加：内置 MA + 用户 price 系实例（批次 2b）
+            var paletteIdx = 0
+            for (inst in state.mainPaneIndicatorResults()) {
+                val res = inst.state ?: continue
+                drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx)
+                paletteIdx += res.result.keys.size
+            }
             drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
             drawHighLowMarkers(state, theme, text, visible, range.first, y, contentRight)
             if (state.mainChartType == MainChartType.AREA) {
@@ -395,11 +401,12 @@ object PaneRenderers {
         palette: List<Color>,
         skipKeys: List<String> = emptyList(),
         keys: List<String>? = null,
+        paletteOffset: Int = 0,
     ) {
         val lineKeys = keys ?: result.result.keys.filterNot { it in skipKeys }
         for ((idx, key) in lineKeys.withIndex()) {
             val column = result.result[key]
-            val color = palette[idx % palette.size]
+            val color = palette[(idx + paletteOffset) % palette.size]
             val path = Path()
             var started = false
             for (i in range.first..range.last) {

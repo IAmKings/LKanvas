@@ -109,14 +109,14 @@
 | CH-041 | `resetData` | Chart.ts:789 | ChartDataStore.reset | B | test | S | 2a |  |
 | CH-042 | `getDataList` | Chart.ts:793 | dataSnapshot.candles | B | test | S | 2a |  |
 | CH-043 | `setDataLoader` | Chart.ts:797 | ChartLoader+HistorySource 构造注入 | B | test+parity | M | 2a | 运行时替换+四 type 适配（init/forward/backward/update） |
-| CH-044 | `createIndicator` | Chart.ts:802 | 内置 3 实例，无按名运行时创建 | E | test+parity | M | 2b | isStack 依赖 pane 模型（批次 5） |
-| CH-045 | `overrideIndicator` | Chart.ts:837 | updateParams（部分） | E | test | M | 2b | styles/visible/extendData… |
-| CH-046 | `getIndicators` | Chart.ts:863 | computeInstances 私有 | E | test | S | 2b | filter{id,name,paneId,isStack} |
-| CH-047 | `removeIndicator` | Chart.ts:867 | 内置实例不可移除 | E | test | M | 2b |  |
-| CH-048 | `createOverlay` | Chart.ts:903 | beginCreate 交互式；编程式不完整 | E | test+parity | M | 2b | 数组重载+直接完成 |
-| CH-049 | `getOverlays` | Chart.ts:939 | all() 无 filter | E | test | S | 2b | filter{id,groupId,name,paneId} |
-| CH-050 | `overrideOverlay` | Chart.ts:943 | 无 | E | test | M | 2b | points/styles/extendData |
-| CH-051 | `removeOverlay` | Chart.ts:947 | remove/removeSelected | E | test | S | 2b | 批量 |
+| CH-044 | `createIndicator` | Chart.ts:802 | 门面 createIndicator(name, calcParams, paneId, isStack) 已建 | B | test+parity | M | 2b | isStack 依赖 pane 模型（批次 5） |
+| CH-045 | `overrideIndicator` | Chart.ts:837 | 门面 overrideIndicator(id, calcParams, visible) 已建 | B | test | M | 2b | styles/visible/extendData… |
+| CH-046 | `getIndicators` | Chart.ts:863 | 门面 getIndicators(filter) 已建 | B | test | S | 2b | filter{id,name,paneId,isStack} |
+| CH-047 | `removeIndicator` | Chart.ts:867 | 门面 removeIndicator(filter) 已建 | B | test | M | 2b |  |
+| CH-048 | `createOverlay` | Chart.ts:903 | 门面 createOverlay(含数组/编程式+交互式) 已建 | B | test+parity | M | 2b | 数组重载+直接完成 |
+| CH-049 | `getOverlays` | Chart.ts:939 | 门面 getOverlays(filter) 已建 | B | test | S | 2b | filter{id,groupId,name,paneId} |
+| CH-050 | `overrideOverlay` | Chart.ts:943 | 门面 overrideOverlay(id, OverlayOverride) 已建 | B | test | M | 2b | points/styles/extendData |
+| CH-051 | `removeOverlay` | Chart.ts:947 | 门面 removeOverlay(filter/id) 已建 | B | test | S | 2b | 批量 |
 | CH-052 | `setPaneOptions` | Chart.ts:951 | adjustPane（拖动） | B | test | M | 2c | pane{id,height,axis?} |
 | CH-053 | `createYAxis` | Chart.ts:1003 | YAxisSpec 单主轴 | E | test | L | 5 | 多轴实例化 |
 | CH-054 | `removeYAxis` | Chart.ts:1025 | 无 | E | test | S | 5 |  |
@@ -194,9 +194,9 @@
 | IND-007 | `calcParams` | component/Indicator.ts | 有 | A | existing | — | — | |
 | IND-008 | `shouldOhlc` | component/Indicator.ts | 无 | E | diff | S | 3 | MA 等 5 个模板为 true |
 | IND-009 | `shouldFormatBigNumber` | component/Indicator.ts | 无 | E | diff | S | 3 | VOL 为 true |
-| IND-010 | `visible` | component/Indicator.ts | Instance.visible 近似 | B | test | S | 2b | |
-| IND-011 | `zLevel` | component/Indicator.ts | 无 | E | test | S | 3 | |
-| IND-012 | `extendData` | component/Indicator.ts | 无 | E | test | M | 3 | |
+| IND-010 | `visible` | component/Indicator.ts | Instance/OverlayInstance.visible 已建 | B | test | S | 2b |  |
+| IND-011 | `zLevel` | component/Indicator.ts | OverlayInstance.zIndex 已建；Indicator zLevel 批次 3 | B | test | S | 3 |  |
+| IND-012 | `extendData` | component/Indicator.ts | extensionData 已建 | B | test | M | 3 |  |
 | IND-013 | `series` | component/Indicator.ts | IndicatorSeries | A | diff | — | 3 | 值字符串化（price） |
 | IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef（无回调） | E | diff | M | 3 | |
 | IND-015 | `minValue` | component/Indicator.ts | 无 | E | diff | S | 3 | VOL=0 |
@@ -208,7 +208,7 @@
 | IND-021 | `createTooltipDataSource` | component/Indicator.ts | 无 | E | test | M | 5 | |
 | IND-022 | `draw` | component/Indicator.ts | 无 | E | test | M | 5 | 自定义绘制 |
 | IND-023 | 27 个内置模板元数据整体 | extension/indicator/*.ts | oracle 数值已对齐；元数据未 diff | E | diff | M | 3 | F1 自动 diff |
-| IND-024 | `result`（calc 输出数组，getIndicators 返回体） | component/Indicator.ts | IndicatorResult（列存） | B | test | S | 2b | 结构等价（行存↔列存），门面做视图转换 |
+| IND-024 | `result`（calc 输出数组，getIndicators 返回体） | component/Indicator.ts | IND-024 已落：IndicatorResult 列存（门面视图转换待 2c） | B | test | S | 2b | 结构等价（行存↔列存），门面做视图转换 |
 
 
 ## 6. 覆盖物模板字段（逐字段）
@@ -232,7 +232,7 @@
 | OVL-015 | `onMouseDown/Enter/Leave/Move/Up` | component/Overlay.ts | 无 | E | test | M | 4 | 指针语义映射 |
 | OVL-016 | `onTouchStart/Move/End` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
 | OVL-017 | `onPressedMove` | component/Overlay.ts | DRAGGING 状态 | B | test | S | 4 | |
-| OVL-018 | `extendData` | component/Overlay.ts | extensionData | B | test | S | 4 | |
+| OVL-018 | `extendData` | component/Overlay.ts | extensionData 已建 | B | test | S | 4 |  |
 | OVL-019 | 16 个内置模板元数据整体 | extension/overlay/*.ts | pointCount 已核 | E | diff | S | 4 | F1 自动 diff |
 | OVL-020 | `groupId` | component/Overlay.ts | 无（filter 用） | E | test | S | 2b | |
 ### Overlay 实例接口字段（24，v3 补盘点）
@@ -244,19 +244,19 @@
 | OVL-023 | `paneId` | component/Overlay.ts | paneId 固定 main | B | test | S | 2b |  |
 | OVL-024 | `name` | component/Overlay.ts | templateName | B | test | S | 2b |  |
 | OVL-025 | `totalStep` | component/Overlay.ts | pointCount+1（OVL-002 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-026 | `currentStep` | component/Overlay.ts | phase/points.size 推导 | B | test | S | 2b | 由 phase 推导 getter |
+| OVL-026 | `currentStep` | component/Overlay.ts | 由 phase/points.size 推导（getter 未暴露） | E | test | S | 2b | 由 phase 推导 getter |
 | OVL-027 | `drawingMode` | component/Overlay.ts | continuous 布尔 | B | test | S | 2b |  |
-| OVL-028 | `lock` | component/Overlay.ts | locked | B | test | S | 2b |  |
-| OVL-029 | `visible` | component/Overlay.ts | visible | B | test | S | 2b |  |
-| OVL-030 | `zLevel` | component/Overlay.ts | zIndex | B | test | S | 2b |  |
+| OVL-028 | `lock` | component/Overlay.ts | OverlayInstance.locked 已建 | B | test | S | 2b |  |
+| OVL-029 | `visible` | component/Overlay.ts | Instance/OverlayInstance.visible 已建 | B | test | S | 2b |  |
+| OVL-030 | `zLevel` | component/Overlay.ts | OverlayInstance.zIndex 已建；Indicator zLevel 批次 3 | B | test | S | 2b |  |
 | OVL-031 | `fixedZLevel` | component/Overlay.ts | 无 | E | test | S | 4 |  |
 | OVL-032 | `needDefaultPointFigure` | component/Overlay.ts | 无（OVL-003 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-033 | `needDefaultXAxisFigure` | component/Overlay.ts | 无（OVL-004 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-034 | `needDefaultYAxisFigure` | component/Overlay.ts | 无（OVL-005 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-035 | `mode` | component/Overlay.ts | magnetMode（MagnetMode） | B | test | S | 2b | OverlayMode 枚举 |
-| OVL-036 | `modeSensitivity` | component/Overlay.ts | 无 | E | test | S | 4 |  |
-| OVL-037 | `points` | component/Overlay.ts | points（时间锚点） | B | test | S | 2b | 锚点结构等价 |
-| OVL-038 | `extendData` | component/Overlay.ts | extensionData（OVL-018 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-035 | `mode` | component/Overlay.ts | magnetMode + 门面 OverlayMode 枚举已建 | B | test | S | 2b | OverlayMode 枚举 |
+| OVL-036 | `modeSensitivity` | component/Overlay.ts | 未实现（上游默认值等价） | E | diff | S | 4 |  |
+| OVL-037 | `points` | component/Overlay.ts | OverlayInstance.points（时间锚点）已建 | A | existing | S | 2b | 锚点结构等价 |
+| OVL-038 | `extendData` | component/Overlay.ts | extensionData 已建 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-039 | `styles` | component/Overlay.ts | 无 | E | test | S | 4 |  |
 | OVL-040 | `createPointFigures` | component/Overlay.ts | 内置渲染（OVL-006 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-041 | `createXAxisFigures` | component/Overlay.ts | 无（OVL-007 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |

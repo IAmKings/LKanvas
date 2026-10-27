@@ -110,6 +110,8 @@ class IndicatorInstance(
     val id: String,
     val definition: IndicatorDefinition,
     params: List<Double> = definition.calcParams,
+    /** 所属 pane（上游 Indicator.paneId；默认 main）。 */
+    val paneId: String = "main",
 ) {
     var params: List<Double> = params
         private set
