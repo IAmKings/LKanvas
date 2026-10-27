@@ -81,6 +81,32 @@ interface IndicatorDefinition {
     /** 增量能力声明（能力清单记录，PRD R-08）。 */
     val incremental: IncrementalCapability get() = IncrementalCapability.FULL_ONLY
 
+    // ---- 上游 Indicator 模板字段对齐（批次 3；默认值与上游 undefined 语义一致） ----
+
+    /** 上游 minValue：固定轴下界（如 VOL=0）；null=自由。 */
+    val minValue: Double? get() = null
+
+    /** 上游 maxValue：固定轴上界；null=自由。 */
+    val maxValue: Double? get() = null
+
+    /** 上游 shouldOhlc：figures 使用 OHLC 数据源（主图叠加类）。 */
+    val shouldOhlc: Boolean get() = false
+
+    /** 上游 shouldFormatBigNumber：数值显示万/亿缩写（如 VOL）。 */
+    val shouldFormatBigNumber: Boolean get() = false
+
+    /** 上游 visible：模板默认可见性。 */
+    val visible: Boolean get() = true
+
+    /** 上游 zLevel：绘制层级（默认 0）。 */
+    val zLevel: Int get() = 0
+
+    /** 上游 extendData：模板扩展数据（宿主自定义）。 */
+    val extendData: Any? get() = null
+
+    /** 上游 shouldUpdate：增量是否推进（默认每次已接受变更推进，PRD R-08 禁止“仅收盘更新”规避）。 */
+    val shouldUpdate: Boolean get() = true
+
     /** 空数据的初始私有状态。 */
     fun initScratch(params: List<Double>): Any?
 

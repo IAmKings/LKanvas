@@ -28,6 +28,7 @@ class ExponentialMovingAverageIndicator : IndicatorDefinition {
     override val precision = 2
     override val series = IndicatorSeries.PRICE
     override val incremental = IncrementalCapability.REPLACE_APPEND
+    override val shouldOhlc = true
 
     override val plots: List<PlotDef> = plotsFor(calcParams)
 
@@ -74,6 +75,7 @@ class SimpleMovingAverageIndicator : IndicatorDefinition {
     override val precision = 2
     override val series = IndicatorSeries.PRICE
     override val incremental = IncrementalCapability.REPLACE_APPEND
+    override val shouldOhlc = true
 
     override val plots = listOf(PlotDef("sma", "SMA: ", PlotType.LINE))
 
@@ -109,6 +111,7 @@ class BollingerBandsIndicator : IndicatorDefinition {
     override val precision = 2
     override val series = IndicatorSeries.PRICE
     override val incremental = IncrementalCapability.REPLACE_APPEND
+    override val shouldOhlc = true
 
     override val plots = listOf(
         PlotDef("up", "UP: ", PlotType.LINE),
@@ -156,6 +159,7 @@ class BullAndBearIndexIndicator : IndicatorDefinition {
     override val precision = 2
     override val series = IndicatorSeries.PRICE
     override val incremental = IncrementalCapability.REPLACE_APPEND
+    override val shouldOhlc = true
 
     override val plots = listOf(PlotDef("bbi", "BBI: ", PlotType.LINE))
 

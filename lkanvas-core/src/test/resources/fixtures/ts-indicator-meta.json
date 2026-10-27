@@ -1,0 +1,720 @@
+{
+ "AVP": {
+  "file": "averagePrice.ts",
+  "shortName": "AVP",
+  "series": "price",
+  "calcParams": null,
+  "precision": 2.0,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "avp",
+    "AVP: "
+   ]
+  ]
+ },
+ "AO": {
+  "file": "awesomeOscillator.ts",
+  "shortName": "AO",
+  "series": null,
+  "calcParams": [
+   5.0,
+   34.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "ao",
+    "AO: "
+   ]
+  ]
+ },
+ "BIAS": {
+  "file": "bias.ts",
+  "shortName": "BIAS",
+  "series": null,
+  "calcParams": [
+   6.0,
+   12.0,
+   24.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "bias1",
+    "BIAS6: "
+   ],
+   [
+    "bias2",
+    "BIAS12: "
+   ],
+   [
+    "bias3",
+    "BIAS24: "
+   ]
+  ]
+ },
+ "BOLL": {
+  "file": "bollingerBands.ts",
+  "shortName": "BOLL",
+  "series": "price",
+  "calcParams": [
+   20.0,
+   2.0
+  ],
+  "precision": 2.0,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": true,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "up",
+    "UP: "
+   ],
+   [
+    "mid",
+    "MID: "
+   ],
+   [
+    "dn",
+    "DN: "
+   ]
+  ]
+ },
+ "BRAR": {
+  "file": "brar.ts",
+  "shortName": "BRAR",
+  "series": null,
+  "calcParams": [
+   26.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "br",
+    "BR: "
+   ],
+   [
+    "ar",
+    "AR: "
+   ]
+  ]
+ },
+ "BBI": {
+  "file": "bullAndBearIndex.ts",
+  "shortName": "BBI",
+  "series": "price",
+  "calcParams": [
+   3.0,
+   6.0,
+   12.0,
+   24.0
+  ],
+  "precision": 2.0,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": true,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "bbi",
+    "BBI: "
+   ]
+  ]
+ },
+ "CCI": {
+  "file": "commodityChannelIndex.ts",
+  "shortName": "CCI",
+  "series": null,
+  "calcParams": [
+   20.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "cci",
+    "CCI: "
+   ]
+  ]
+ },
+ "CR": {
+  "file": "currentRatio.ts",
+  "shortName": "CR",
+  "series": null,
+  "calcParams": [
+   26.0,
+   10.0,
+   20.0,
+   40.0,
+   60.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "cr",
+    "CR: "
+   ],
+   [
+    "ma1",
+    "MA1: "
+   ],
+   [
+    "ma2",
+    "MA2: "
+   ],
+   [
+    "ma3",
+    "MA3: "
+   ],
+   [
+    "ma4",
+    "MA4: "
+   ]
+  ]
+ },
+ "DMA": {
+  "file": "differentOfMovingAverage.ts",
+  "shortName": "DMA",
+  "series": null,
+  "calcParams": [
+   10.0,
+   50.0,
+   10.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "dma",
+    "DMA: "
+   ],
+   [
+    "ama",
+    "AMA: "
+   ]
+  ]
+ },
+ "DMI": {
+  "file": "directionalMovementIndex.ts",
+  "shortName": "DMI",
+  "series": null,
+  "calcParams": [
+   14.0,
+   6.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "pdi",
+    "PDI: "
+   ],
+   [
+    "mdi",
+    "MDI: "
+   ],
+   [
+    "adx",
+    "ADX: "
+   ],
+   [
+    "adxr",
+    "ADXR: "
+   ]
+  ]
+ },
+ "EMV": {
+  "file": "easeOfMovementValue.ts",
+  "shortName": "EMV",
+  "series": null,
+  "calcParams": [
+   14.0,
+   9.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "emv",
+    "EMV: "
+   ],
+   [
+    "maEmv",
+    "MAEMV: "
+   ]
+  ]
+ },
+ "EMA": {
+  "file": "exponentialMovingAverage.ts",
+  "shortName": "EMA",
+  "series": "price",
+  "calcParams": [
+   6.0,
+   12.0,
+   20.0
+  ],
+  "precision": 2.0,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": true,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "ema1",
+    "EMA6: "
+   ],
+   [
+    "ema2",
+    "EMA12: "
+   ],
+   [
+    "ema3",
+    "EMA20: "
+   ]
+  ]
+ },
+ "MTM": {
+  "file": "momentum.ts",
+  "shortName": "MTM",
+  "series": null,
+  "calcParams": [
+   12.0,
+   6.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "mtm",
+    "MTM: "
+   ],
+   [
+    "maMtm",
+    "MAMTM: "
+   ]
+  ]
+ },
+ "MA": {
+  "file": "movingAverage.ts",
+  "shortName": "MA",
+  "series": "price",
+  "calcParams": [
+   5.0,
+   10.0,
+   30.0,
+   60.0
+  ],
+  "precision": 2.0,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": true,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "ma1",
+    "MA5: "
+   ],
+   [
+    "ma2",
+    "MA10: "
+   ],
+   [
+    "ma3",
+    "MA30: "
+   ],
+   [
+    "ma4",
+    "MA60: "
+   ]
+  ]
+ },
+ "MACD": {
+  "file": "movingAverageConvergenceDivergence.ts",
+  "shortName": "MACD",
+  "series": null,
+  "calcParams": [
+   12.0,
+   26.0,
+   9.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "dif",
+    "DIF: "
+   ],
+   [
+    "dea",
+    "DEA: "
+   ],
+   [
+    "macd",
+    "MACD: "
+   ]
+  ]
+ },
+ "OBV": {
+  "file": "onBalanceVolume.ts",
+  "shortName": "OBV",
+  "series": null,
+  "calcParams": [
+   30.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "obv",
+    "OBV: "
+   ],
+   [
+    "maObv",
+    "MAOBV: "
+   ]
+  ]
+ },
+ "PVT": {
+  "file": "priceAndVolumeTrend.ts",
+  "shortName": "PVT",
+  "series": null,
+  "calcParams": null,
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "pvt",
+    "PVT: "
+   ]
+  ]
+ },
+ "PSY": {
+  "file": "psychologicalLine.ts",
+  "shortName": "PSY",
+  "series": null,
+  "calcParams": [
+   12.0,
+   6.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "psy",
+    "PSY: "
+   ],
+   [
+    "maPsy",
+    "MAPSY: "
+   ]
+  ]
+ },
+ "ROC": {
+  "file": "rateOfChange.ts",
+  "shortName": "ROC",
+  "series": null,
+  "calcParams": [
+   12.0,
+   6.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "roc",
+    "ROC: "
+   ],
+   [
+    "maRoc",
+    "MAROC: "
+   ]
+  ]
+ },
+ "RSI": {
+  "file": "relativeStrengthIndex.ts",
+  "shortName": "RSI",
+  "series": null,
+  "calcParams": [
+   6.0,
+   12.0,
+   24.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "rsi1",
+    "RSI1: "
+   ],
+   [
+    "rsi2",
+    "RSI2: "
+   ],
+   [
+    "rsi3",
+    "RSI3: "
+   ]
+  ]
+ },
+ "SMA": {
+  "file": "simpleMovingAverage.ts",
+  "shortName": "SMA",
+  "series": "price",
+  "calcParams": [
+   12.0,
+   2.0
+  ],
+  "precision": 2.0,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": true,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "sma",
+    "SMA: "
+   ]
+  ]
+ },
+ "KDJ": {
+  "file": "stoch.ts",
+  "shortName": "KDJ",
+  "series": null,
+  "calcParams": [
+   9.0,
+   3.0,
+   3.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "k",
+    "K: "
+   ],
+   [
+    "d",
+    "D: "
+   ],
+   [
+    "j",
+    "J: "
+   ]
+  ]
+ },
+ "SAR": {
+  "file": "stopAndReverse.ts",
+  "shortName": "SAR",
+  "series": "price",
+  "calcParams": [
+   2.0,
+   2.0,
+   20.0
+  ],
+  "precision": 2.0,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": true,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "sar",
+    "SAR: "
+   ]
+  ]
+ },
+ "TRIX": {
+  "file": "tripleExponentiallySmoothedAverage.ts",
+  "shortName": "TRIX",
+  "series": null,
+  "calcParams": [
+   12.0,
+   9.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "trix",
+    "TRIX: "
+   ],
+   [
+    "maTrix",
+    "MATRIX: "
+   ]
+  ]
+ },
+ "VOL": {
+  "file": "volume.ts",
+  "shortName": "VOL",
+  "series": "volume",
+  "calcParams": [
+   5.0,
+   10.0,
+   20.0
+  ],
+  "precision": 0.0,
+  "minValue": 0.0,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": true,
+  "hasFigureFunctionCall": true,
+  "figures": [
+   [
+    "ma1",
+    "MA5: "
+   ],
+   [
+    "ma2",
+    "MA10: "
+   ],
+   [
+    "ma3",
+    "MA20: "
+   ],
+   [
+    "volume",
+    "VOLUME: "
+   ]
+  ]
+ },
+ "VR": {
+  "file": "volumeRatio.ts",
+  "shortName": "VR",
+  "series": null,
+  "calcParams": [
+   26.0,
+   6.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "vr",
+    "VR: "
+   ],
+   [
+    "maVr",
+    "MAVR: "
+   ]
+  ]
+ },
+ "WR": {
+  "file": "williamsR.ts",
+  "shortName": "WR",
+  "series": null,
+  "calcParams": [
+   6.0,
+   10.0,
+   14.0
+  ],
+  "precision": null,
+  "minValue": null,
+  "maxValue": null,
+  "shouldOhlc": false,
+  "shouldFormatBigNumber": false,
+  "hasFigureFunctionCall": false,
+  "figures": [
+   [
+    "wr1",
+    "WR1: "
+   ],
+   [
+    "wr2",
+    "WR2: "
+   ],
+   [
+    "wr3",
+    "WR3: "
+   ]
+  ]
+ }
+}

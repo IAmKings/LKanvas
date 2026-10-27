@@ -23,6 +23,7 @@ class StopAndReverseIndicator : IndicatorDefinition {
     override val precision = 2
     override val series = IndicatorSeries.PRICE
     override val incremental = IncrementalCapability.REPLACE_APPEND
+    override val shouldOhlc = true
 
     override val plots = listOf(PlotDef("sar", "SAR: ", PlotType.LINE))
 

@@ -20,6 +20,7 @@ class MovingAverageIndicator : IndicatorDefinition {
     override val precision = 2
     override val series = IndicatorSeries.PRICE
     override val incremental = IncrementalCapability.REPLACE_APPEND
+    override val shouldOhlc = true
 
     override val plots: List<PlotDef> = plotsFor(calcParams)
 
@@ -67,6 +68,9 @@ class VolumeIndicator : IndicatorDefinition {
     override val precision = 0
     override val series = IndicatorSeries.VOLUME
     override val incremental = IncrementalCapability.REPLACE_APPEND
+    // 上游元数据对齐（F1 diff）：minValue=0、shouldFormatBigNumber=true
+    override val minValue: Double = 0.0
+    override val shouldFormatBigNumber = true
 
     override val plots: List<PlotDef> = plotsFor(calcParams)
 
