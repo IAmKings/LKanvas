@@ -352,6 +352,30 @@ class LKanvasChartTest {
         LKanvasChart.dispose(chart)
     }
 
+
+    @Test
+    fun `setStyles字符串主题与getStyles往返`() {
+        val chart = newChart()
+        assertEquals(io.lkanvas.chart.styles.StylesThemes.light, chart.getStyles(), "默认 light")
+        chart.setStyles("dark")
+        assertEquals(io.lkanvas.chart.styles.StylesThemes.dark, chart.getStyles())
+        chart.setStyles("light")
+        assertEquals(io.lkanvas.chart.styles.StylesThemes.light, chart.getStyles())
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `setStylesDeepPartial深合并`() {
+        val chart = newChart()
+        val patch = io.lkanvas.chart.styles.Styles(candle = io.lkanvas.chart.styles.CandleStyle(bar = io.lkanvas.chart.styles.CandleBarColor(upColor = "#FF0000")))
+        chart.setStyles(patch)
+        val bar = (chart.getStyles().candle.bar as io.lkanvas.chart.styles.CandleBarColor)
+        assertEquals("#FF0000", bar.upColor, "patch 值生效")
+        assertEquals("#F92855", bar.downColor, "未提供字段保留")
+        assertEquals("#EDEDED", chart.getStyles().grid.horizontal.color, "未触及节保留")
+        LKanvasChart.dispose(chart)
+    }
+
     @Test
     fun `offsetRight距离与槽位换算`() {
         val chart = newChart()

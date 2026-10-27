@@ -433,6 +433,23 @@ class LKanvasChart private constructor(
     fun removeIndicator(filter: ChartState.IndicatorFilter = ChartState.IndicatorFilter()): Boolean =
         state.removeIndicator(filter)
 
+    // ---------- 样式（对齐 setStyles/getStyles，批次 5） ----------
+
+    /** 当前样式（getStyles 返回值）。 */
+    internal var styles: io.lkanvas.chart.styles.Styles = io.lkanvas.chart.styles.StylesThemes.light
+
+    /** 上游 `setStyles(value: string | DeepPartial<Styles>)`。 */
+    fun setStyles(value: String) {
+        styles = io.lkanvas.chart.styles.StylesMerge.resolveTheme(value)
+    }
+
+    fun setStyles(patch: io.lkanvas.chart.styles.Styles) {
+        styles = io.lkanvas.chart.styles.StylesMerge.merge(styles, patch) as io.lkanvas.chart.styles.Styles
+    }
+
+    /** 上游 `getStyles()`。 */
+    fun getStyles(): io.lkanvas.chart.styles.Styles = styles
+
     // ---------- 覆盖物（对齐 Chart.ts 覆盖物组） ----------
 
     /** 磁吸模式（上游 OverlayMode）。 */

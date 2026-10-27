@@ -267,49 +267,49 @@
 
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
-| STY-001 | `Margin` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-002 | `Padding` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-003 | `Offset` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-004 | `LineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-005 | `SmoothLineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-006 | `StateLineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-007 | `PathStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-008 | `PolygonStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-009 | `RectStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-010 | `TextStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-011 | `StateTextStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-012 | `ChangeColor` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-013 | `GradientColor` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-014 | `FeaturePathStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-015 | `FeatureIconFontStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-016 | `FeatureStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-017 | `GridStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-018 | `TooltipLegendChild` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-019 | `TooltipLegend` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-020 | `TooltipFeatureStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-021 | `TooltipStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-022 | `CandleAreaPointStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-023 | `CandleAreaStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-024 | `CandleHighLowPriceMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-025 | `CandleLastPriceMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-026 | `CandlePriceMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-027 | `CandleTooltipRectStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-028 | `CandleTooltipStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-029 | `CandleBarColor` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-030 | `CandleBarColorCallbackReturnStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-031 | `CandleStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-032 | `IndicatorLastValueMarkStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-033 | `IndicatorTooltipStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-034 | `IndicatorStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-035 | `AxisTickLineStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-036 | `AxisTickTextStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-037 | `AxisStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-038 | `CrosshairDirectionStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-039 | `CrosshairStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-040 | `OverlayPointStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-041 | `OverlayStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-042 | `SeparatorStyle` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | S | 5 | 批次 5 字段级展开+默认值对照 |
-| STY-043 | `Styles` | Styles.ts | ChartTheme 部分覆盖（字段级见 ts-inventory §6） | E | diff | M | 5 | 批次 5 字段级展开+默认值对照 |
+| STY-001 | `Margin` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-002 | `Padding` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-003 | `Offset` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-004 | `LineStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-005 | `SmoothLineStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-006 | `StateLineStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-007 | `PathStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-008 | `PolygonStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-009 | `RectStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-010 | `TextStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-011 | `StateTextStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-012 | `ChangeColor` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-013 | `GradientColor` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-014 | `FeaturePathStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-015 | `FeatureIconFontStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-016 | `FeatureStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-017 | `GridStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-018 | `TooltipLegendChild` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-019 | `TooltipLegend` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-020 | `TooltipFeatureStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-021 | `TooltipStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-022 | `CandleAreaPointStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-023 | `CandleAreaStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-024 | `CandleHighLowPriceMarkStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-025 | `CandleLastPriceMarkStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-026 | `CandlePriceMarkStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-027 | `CandleTooltipRectStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-028 | `CandleTooltipStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-029 | `CandleBarColor` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-030 | `CandleBarColorCallbackReturnStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-031 | `CandleStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-032 | `IndicatorLastValueMarkStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-033 | `IndicatorTooltipStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-034 | `IndicatorStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-035 | `AxisTickLineStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-036 | `AxisTickTextStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-037 | `AxisStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-038 | `CrosshairDirectionStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-039 | `CrosshairStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-040 | `OverlayPointStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-041 | `OverlayStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-042 | `SeparatorStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | S | 5（已完成） | 批次 5 字段级展开+默认值对照 |
+| STY-043 | `Styles` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5（已完成） | 批次 5 字段级展开+默认值对照 |
 
 ## 8. 数值语义（L1，防回归项）
 
