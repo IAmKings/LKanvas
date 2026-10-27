@@ -84,23 +84,23 @@
 | CH-016 | `getStyles` | Chart.ts:612 | 同上 | B | test | S | 5 |  |
 | CH-017 | `setLayoutOptions` | Chart.ts:616 | ChartLayoutConfig 部分 | B | compile | M | 5 | barSpaceLimit/pane/yAxis |
 | CH-018 | `getLayoutOptions` | Chart.ts:620 | 同上 | B | compile | S | 5 |  |
-| CH-019 | `setFormatter` | Chart.ts:624 | lambda 分散（ChartText/locale） | B | test | S | 2c | Formatter 接口对齐 |
-| CH-020 | `getFormatter` | Chart.ts:630 | 同上 | B | compile | S | 2c |  |
-| CH-021 | `setLocale` | Chart.ts:634 | ChartLocale（T-24 已有） | B | test | S | 2c | setLocale('en-US')→EN_US |
-| CH-022 | `getLocale` | Chart.ts:640 | state.locale | B | test | S | 2c |  |
-| CH-023 | `setTimezone` | Chart.ts:644 | 默认系统时区，无注入 | E | test | S | 2c |  |
-| CH-024 | `getTimezone` | Chart.ts:650 | 无 | E | test | S | 2c |  |
-| CH-025 | `setThousandsSeparator` | Chart.ts:654 | DecimalFormat 内建千分位 | E | test | S | 2c | {sign} 可配 |
-| CH-026 | `getThousandsSeparator` | Chart.ts:660 | 无 | E | compile | S | 2c |  |
-| CH-027 | `setDecimalFold` | Chart.ts:664 | 无小数折叠 | E | test | S | 2c | {threshold:3} 默认 |
-| CH-028 | `getDecimalFold` | Chart.ts:670 | 无 | E | compile | S | 2c |  |
+| CH-019 | `setFormatter` | Chart.ts:624 | 门面 set/get 已建（Formatter 类型） | B | test | S | 2c | Formatter 接口对齐 |
+| CH-020 | `getFormatter` | Chart.ts:630 | 已建 | B | test | S | 2c |  |
+| CH-021 | `setLocale` | Chart.ts:634 | 门面 setLocale/getLocale 已建（zh-CN/en-US 映射 ChartLocale） | B | test | S | 2c | setLocale('en-US')→EN_US |
+| CH-022 | `getLocale` | Chart.ts:640 | 已建 | B | test | S | 2c |  |
+| CH-023 | `setTimezone` | Chart.ts:644 | 门面 set/getTimezone 已建（存储；时间标签接线待 5） | B | test | S | 2c |  |
+| CH-024 | `getTimezone` | Chart.ts:650 | 已建 | B | test | S | 2c |  |
+| CH-025 | `setThousandsSeparator` | Chart.ts:654 | 门面 set/get 已建（ThousandsSeparator 类型） | B | test | S | 2c | {sign} 可配 |
+| CH-026 | `getThousandsSeparator` | Chart.ts:660 | 已建 | B | test | S | 2c |  |
+| CH-027 | `setDecimalFold` | Chart.ts:664 | 门面 set/get 已建（DecimalFold 类型） | B | test | S | 2c | {threshold:3} 默认 |
+| CH-028 | `getDecimalFold` | Chart.ts:670 | 已建 | B | test | S | 2c |  |
 | CH-029 | `setHotkey` | Chart.ts:674 | 浏览器键鼠 | C | compile | S | 2c | Android 外接键鼠 P2 |
 | CH-030 | `getHotkey` | Chart.ts:678 | 无 | C | compile | S | 2c |  |
 | CH-031 | `getHotKey` | Chart.ts:682 | 无（旧拼写别名） | C | compile | S | 2c |  |
-| CH-032 | `setOffsetRightDistance` | Chart.ts:697 | rightOffsetSlots（槽位非 px） | B | test | S | 2c | px↔槽位换算 |
-| CH-033 | `getOffsetRightDistance` | Chart.ts:701 | 无 getter | E | test | S | 2c |  |
-| CH-034 | `setMaxOffsetLeftDistance` | Chart.ts:705 | overscrollSlots=0 | E | test | S | 2c |  |
-| CH-035 | `setMaxOffsetRightDistance` | Chart.ts:713 | 无 | E | test | S | 2c |  |
+| CH-032 | `setOffsetRightDistance` | Chart.ts:697 | 门面 set/get 已建（px↔槽位） | B | test | S | 2c | px↔槽位换算 |
+| CH-033 | `getOffsetRightDistance` | Chart.ts:701 | 已建 | B | test | S | 2c |  |
+| CH-034 | `setMaxOffsetLeftDistance` | Chart.ts:705 | 门面 set 已建（overscroll） | B | test | S | 2c |  |
+| CH-035 | `setMaxOffsetRightDistance` | Chart.ts:713 | 门面 set 已建 | B | test | S | 2c |  |
 | CH-036 | `setLeftMinVisibleBarCount` | Chart.ts:721 | 无 | E | test | S | 2c | clamp 语义 |
 | CH-037 | `setRightMinVisibleBarCount` | Chart.ts:729 | 无 | E | test | S | 2c |  |
 | CH-038 | `setBarSpace` | Chart.ts:737 | barSpacing 直改 | B | test | S | 2c | BarSpace{bar,halfBar,gapBar,halfGapBar} |
@@ -117,20 +117,20 @@
 | CH-049 | `getOverlays` | Chart.ts:939 | 门面 getOverlays(filter) 已建 | B | test | S | 2b | filter{id,groupId,name,paneId} |
 | CH-050 | `overrideOverlay` | Chart.ts:943 | 门面 overrideOverlay(id, OverlayOverride) 已建 | B | test | M | 2b | points/styles/extendData |
 | CH-051 | `removeOverlay` | Chart.ts:947 | 门面 removeOverlay(filter/id) 已建 | B | test | S | 2b | 批量 |
-| CH-052 | `setPaneOptions` | Chart.ts:951 | adjustPane（拖动） | B | test | M | 2c | pane{id,height,axis?} |
+| CH-052 | `setPaneOptions` | Chart.ts:951 | 门面 setPaneOptions 已建（main/vol/macd 高度，35% 保底钳制） | B | test | M | 2c | pane{id,height,axis?} |
 | CH-053 | `createYAxis` | Chart.ts:1003 | YAxisSpec 单主轴 | E | test | L | 5 | 多轴实例化 |
 | CH-054 | `removeYAxis` | Chart.ts:1025 | 无 | E | test | S | 5 |  |
 | CH-055 | `getYAxes` | Chart.ts:1057 | 无 | E | compile | S | 5 |  |
 | CH-056 | `overrideYAxis` | Chart.ts:1079 | 无 | E | test | S | 5 |  |
 | CH-057 | `overrideXAxis` | Chart.ts:1096 | 无 | E | test | S | 5 |  |
-| CH-058 | `getPaneOptions` | Chart.ts:1106 | PaneHeights 只读 | B | test | S | 2c |  |
-| CH-059 | `setZoomEnabled` | Chart.ts:1114 | 无开关 | E | test | S | 2c | 手势层 |
-| CH-060 | `isZoomEnabled` | Chart.ts:1118 | 无 | E | test | S | 2c |  |
-| CH-061 | `setZoomAnchor` | Chart.ts:1122 | 手势固定触点锚 | D | test | S | 2c | cursor/last_bar 语义等价 |
-| CH-062 | `getZoomAnchor` | Chart.ts:1126 | 无 | E | compile | S | 2c |  |
-| CH-063 | `setScrollEnabled` | Chart.ts:1130 | 无开关 | E | test | S | 2c |  |
-| CH-064 | `isScrollEnabled` | Chart.ts:1134 | 无 | E | test | S | 2c |  |
-| CH-065 | `scrollByDistance` | Chart.ts:1138 | scrollBy（无动画） | B | test | M | 2c | Animatable 动画 |
+| CH-058 | `getPaneOptions` | Chart.ts:1106 | 门面 getPaneOptions 已建 | B | test | S | 2c |  |
+| CH-059 | `setZoomEnabled` | Chart.ts:1114 | 门面 set/is 已建 | B | test | S | 2c | 手势层 |
+| CH-060 | `isZoomEnabled` | Chart.ts:1118 | 已建 | B | test | S | 2c |  |
+| CH-061 | `setZoomAnchor` | Chart.ts:1122 | 门面 set/get 已建（ZoomAnchor 类型） | B | test | S | 2c | cursor/last_bar 语义等价 |
+| CH-062 | `getZoomAnchor` | Chart.ts:1126 | 已建 | B | test | S | 2c |  |
+| CH-063 | `setScrollEnabled` | Chart.ts:1130 | 门面 set/is 已建 | B | test | S | 2c |  |
+| CH-064 | `isScrollEnabled` | Chart.ts:1134 | 已建 | B | test | S | 2c |  |
+| CH-065 | `scrollByDistance` | Chart.ts:1138 | 门面 scrollByDistance 已建（动画待） | B | test | M | 2c | Animatable 动画 |
 | CH-066 | `scrollToRealTime` | Chart.ts:1154 | scrollToLatest | B | test | S | 2c |  |
 | CH-067 | `scrollToDataIndex` | Chart.ts:1161 | scrollToIndex | B | test | S | 2c |  |
 | CH-068 | `scrollToTimestamp` | Chart.ts:1166 | scrollToTimestamp | A | test | S | 2c |  |

@@ -683,6 +683,19 @@ class ChartState(
         }
     }
 
+    /** 绝对值设置 pane 高度（setPaneOptions 门面入口）：同时接受 VOL/MACD 目标值。 */
+    fun adjustPaneByAbsolute(id: String, vol: Float, macd: Float) {
+        if (id == "vol") volPaneOverride = vol else macdPaneOverride = macd
+        relayout()
+    }
+
+    /** 同时设置 VOL/MACD 绝对高度（main = 剩余）。 */
+    fun setSubPaneHeights(vol: Float, macd: Float) {
+        volPaneOverride = vol
+        macdPaneOverride = macd
+        relayout()
+    }
+
     /** 拖动分隔条：[which]=0 调整 VOL pane 高度，1 调整 MACD pane 高度（dy 累计）。 */
     fun adjustPane(which: Int, startValue: Float, dyTotal: Float) {
         if (which == 0) {

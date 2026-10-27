@@ -533,6 +533,110 @@ class LKanvasChart private constructor(
     /** 上游 `removeOverlay(id)` 简写（filter=仅 id）。 */
     fun removeOverlay(id: String): Boolean = removeOverlay(OverlayFilter(id = id))
 
+    // ---------- 配置组（对齐 Chart.ts 配置方法） ----------
+
+    /** 上游 `setLocale(locale)`：'zh-CN'/'en-US'（未知名回退 zh-CN，差异登记：上游回退 en-US）。 */
+    fun setLocale(locale: String) {
+        state.locale = when (locale) {
+            "en-US" -> io.lkanvas.core.i18n.ChartLocale.EN_US
+            else -> io.lkanvas.core.i18n.ChartLocale.ZH_CN
+        }
+    }
+
+    /** 上游 `getLocale()`。 */
+    fun getLocale(): String = when (state.locale) {
+        io.lkanvas.core.i18n.ChartLocale.EN_US -> "en-US"
+        else -> "zh-CN"
+    }
+
+    /** 上游 `setTimezone(tz)`：IANA 名（空=系统时区）。 */
+    fun setTimezone(timezone: String) {
+        this.timezone = timezone
+    }
+
+    /** 上游 `getTimezone()`：空字符串=系统时区（上游默认行为一致）。 */
+    fun getTimezone(): String = timezone
+
+    internal var timezone: String = ""
+
+    /** 上游 `setThousandsSeparator(o)` / `getThousandsSeparator()`。 */
+    internal var thousandsSeparator = ThousandsSeparator()
+
+    fun setThousandsSeparator(separator: ThousandsSeparator) {
+        thousandsSeparator = separator
+    }
+
+    fun getThousandsSeparator(): ThousandsSeparator = thousandsSeparator
+
+    /** 上游 `setDecimalFold(o)` / `getDecimalFold()`。 */
+    internal var decimalFold = DecimalFold()
+
+    fun setDecimalFold(fold: DecimalFold) {
+        decimalFold = fold
+    }
+
+    fun getDecimalFold(): DecimalFold = decimalFold
+
+    /** 上游 `setFormatter(f)` / `getFormatter()`。 */
+    internal var formatter: Formatter? = null
+
+    fun setFormatter(formatter: Formatter?) {
+        this.formatter = formatter
+    }
+
+    fun getFormatter(): Formatter? = formatter
+
+    /** 上游 `setHotkey(hotkey)` / `getHotkey()`（平台占位）。 */
+    internal var hotkey = Hotkey()
+
+    fun setHotkey(hotkey: Hotkey) {
+        this.hotkey = hotkey
+    }
+
+    fun getHotkey(): Hotkey = hotkey
+
+    /** 上游 `setPaneOptions(options)`：按 paneId 调整高度（main/vol/macd）。 */
+    fun setPaneOptions(options: PaneOptions) {
+        val cur = state.paneHeightsPx
+        val usable = cur.main + cur.vol + cur.macd
+        if (usable <= 0f) return // 无布局（Compose 未挂载）：无意义
+        when (options.id) {
+            "main" -> {
+                // 主 pane 高度变化：剩余空间按当前比例分给 VOL/MACD
+                val heightF = (options.height ?: cur.main).toFloat()
+                val mainTarget = heightF.coerceIn(60f, (usable * 0.65f))
+                val rest = (usable - mainTarget).coerceAtLeast(0f)
+                val ratio = if (cur.vol + cur.macd > 0) cur.vol / (cur.vol + cur.macd) else 0.5f
+                val vol = rest * ratio
+                val macd = rest - vol
+                state.setSubPaneHeights(vol, macd)
+            }
+
+            "vol" -> {
+                val vol = (options.height ?: cur.vol).toFloat()
+                state.setSubPaneHeights(vol, usable - vol)
+            }
+
+            "macd" -> {
+                val macd = (options.height ?: cur.macd).toFloat()
+                state.setSubPaneHeights(usable - macd, macd)
+            }
+        }
+    }
+
+    /** 上游 `getPaneOptions(id?)`：单 pane 或全列表。 */
+    fun getPaneOptions(id: String? = null): List<PaneOptions> {
+        val p = state.paneHeightsPx
+        val all = listOf(
+            PaneOptions("main", p.main.toDouble()),
+            PaneOptions("vol", p.vol.toDouble()),
+            PaneOptions("macd", p.macd.toDouble()),
+        )
+        return if (id == null) all else all.filter { it.id == id }
+    }
+
+    // ---------- 视口开关收尾（2c） ----------
+
     fun resize() {
         state.notifyViewportChanged()
     }
