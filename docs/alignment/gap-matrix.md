@@ -45,17 +45,17 @@
 | IDX-026 | `utils.checkCoordinateOnPolygon` | extension/figure/polygon.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
 | IDX-027 | `utils.checkCoordinateOnRect` | extension/figure/rect.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
 | IDX-028 | `utils.checkCoordinateOnText` | extension/figure/text.ts | FigureHit 命中 | B | test | S | 4 | 同名包装 |
-| IDX-029 | `registerIndicator` | ext/indicator | IndicatorRegistry（实例级） | E | test | M | 3 | 全局注册表 |
-| IDX-030 | `getSupportedIndicators` | ext/indicator | 无 | E | test | S | 3 | |
-| IDX-031 | `registerOverlay` | ext/overlay | OverlayTemplates（内置） | E | test | M | 4 | |
-| IDX-032 | `getSupportedOverlays` | ext/overlay | 无 | E | test | S | 4 | |
-| IDX-033 | `getOverlayClass` | ext/overlay | 无（模板即对象） | B | compile | S | 4 | |
+| IDX-029 | `registerIndicator` | ext/indicator | LkanvasRegistry.registerIndicator 已建（全局+27 预注册） | B | test | M | 3 | 全局注册表 |
+| IDX-030 | `getSupportedIndicators` | ext/indicator | LkanvasRegistry.getSupportedIndicators 已建 | B | test | S | 3 |  |
+| IDX-031 | `registerOverlay` | ext/overlay | LkanvasRegistry.registerOverlay 已建 | B | test | M | 4 |  |
+| IDX-032 | `getSupportedOverlays` | ext/overlay | LkanvasRegistry.getSupportedOverlays 已建（16） | B | test | S | 4 |  |
+| IDX-033 | `getOverlayClass` | ext/overlay | LkanvasRegistry.getOverlayDefinition 已建 | B | test | S | 4 |  |
 | IDX-034 | `registerFigure` | ext/figure | 无注册表 | E | test | S | 4 | |
 | IDX-035 | `getFigureClass` | ext/figure | 无 | B | compile | S | 4 | |
 | IDX-036 | `getSupportedFigures` | ext/figure | 无 | E | test | S | 4 | |
 | IDX-037 | `registerStyles` | ext/styles | ChartTheme.dark() 近似 | E | test | M | 5 | light/dark 注册 |
-| IDX-038 | `registerLocale` | ext/i18n | ChartLocale 常量 | E | test | S | 3 | |
-| IDX-039 | `getSupportedLocales` | ext/i18n | 无 | E | test | S | 3 | |
+| IDX-038 | `registerLocale` | ext/i18n | LkanvasRegistry.registerLocale 已建 | B | test | S | 3 |  |
+| IDX-039 | `getSupportedLocales` | ext/i18n | LkanvasRegistry.getSupportedLocales 已建 | B | test | S | 3 |  |
 | IDX-040 | `registerXAxis` | ext/x-axis | 无 | E | test | M | 4 | |
 | IDX-041 | `registerYAxis` | ext/y-axis | CustomYAxis 近似 | E | test | M | 4 | |
 | IDX-042 | `registerHotkey` | ext/hotkey | 无 | C | compile | S | 2c | 浏览器键鼠 |
@@ -192,23 +192,23 @@
 | IND-005 | `shortName` | component/Indicator.ts | 有 | A | existing | — | — | |
 | IND-006 | `precision` | component/Indicator.ts | 有 | A | existing | — | — | |
 | IND-007 | `calcParams` | component/Indicator.ts | 有 | A | existing | — | — | |
-| IND-008 | `shouldOhlc` | component/Indicator.ts | 无 | E | diff | S | 3 | MA 等 5 个模板为 true |
-| IND-009 | `shouldFormatBigNumber` | component/Indicator.ts | 无 | E | diff | S | 3 | VOL 为 true |
-| IND-010 | `visible` | component/Indicator.ts | Instance/OverlayInstance.visible 已建 | B | test | S | 2b |  |
-| IND-011 | `zLevel` | component/Indicator.ts | OverlayInstance.zIndex 已建；Indicator zLevel 批次 3 | B | test | S | 3 |  |
-| IND-012 | `extendData` | component/Indicator.ts | extensionData 已建 | B | test | M | 3 |  |
-| IND-013 | `series` | component/Indicator.ts | IndicatorSeries | A | diff | — | 3 | 值字符串化（price） |
+| IND-008 | `shouldOhlc` | component/Indicator.ts | 已建：IndicatorDefinition.shouldOhlc（6 模板覆写 true） | B | diff | S | 3 | MA 等 5 个模板为 true |
+| IND-009 | `shouldFormatBigNumber` | component/Indicator.ts | 已建：shouldFormatBigNumber（VOL=true） | B | diff | S | 3 | VOL 为 true |
+| IND-010 | `visible` | component/Indicator.ts | 已建：Definition.visible + Instance.visible | B | test | S | 2b |  |
+| IND-011 | `zLevel` | component/Indicator.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 3 |  |
+| IND-012 | `extendData` | component/Indicator.ts | 已建：Definition.extendData | B | test | M | 3 |  |
+| IND-013 | `series` | component/Indicator.ts | 已建：series 枚举（meta diff 断言值映射 undefined→normal） | B | diff | — | 3 | 值字符串化（price） |
 | IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef（无回调） | E | diff | M | 3 | |
-| IND-015 | `minValue` | component/Indicator.ts | 无 | E | diff | S | 3 | VOL=0 |
-| IND-016 | `maxValue` | component/Indicator.ts | 无 | E | diff | S | 3 | |
+| IND-015 | `minValue` | component/Indicator.ts | 已建：minValue（VOL=0 覆写） | B | diff | S | 3 | VOL=0 |
+| IND-016 | `maxValue` | component/Indicator.ts | 已建：maxValue（默认 null） | B | diff | S | 3 |  |
 | IND-017 | `styles` | component/Indicator.ts | 无 | E | test | M | 5 | |
-| IND-018 | `shouldUpdate` | component/Indicator.ts | 无 | E | test | S | 3 | |
+| IND-018 | `shouldUpdate` | component/Indicator.ts | 已建：shouldUpdate（默认 true；PRD R-08） | B | test | S | 3 |  |
 | IND-019 | `calc` | component/Indicator.ts | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 |
-| IND-020 | `regenerateFigures` | component/Indicator.ts | plotsFor | B | diff | S | 3 | 改名兼容 |
+| IND-020 | `regenerateFigures` | component/Indicator.ts | 已建：plotsFor（meta diff 断言 figures 顺序） | B | diff | S | 3 | 改名兼容 |
 | IND-021 | `createTooltipDataSource` | component/Indicator.ts | 无 | E | test | M | 5 | |
 | IND-022 | `draw` | component/Indicator.ts | 无 | E | test | M | 5 | 自定义绘制 |
 | IND-023 | 27 个内置模板元数据整体 | extension/indicator/*.ts | oracle 数值已对齐；元数据未 diff | E | diff | M | 3 | F1 自动 diff |
-| IND-024 | `result`（calc 输出数组，getIndicators 返回体） | component/Indicator.ts | IND-024 已落：IndicatorResult 列存（门面视图转换待 2c） | B | test | S | 2b | 结构等价（行存↔列存），门面做视图转换 |
+| IND-024 | `result`（calc 输出数组，getIndicators 返回体） | component/Indicator.ts | 已建：IndicatorResult 列存（门面视图转换待 2c） | B | test | S | 2b | 结构等价（行存↔列存），门面做视图转换 |
 
 
 ## 6. 覆盖物模板字段（逐字段）
@@ -232,7 +232,7 @@
 | OVL-015 | `onMouseDown/Enter/Leave/Move/Up` | component/Overlay.ts | 无 | E | test | M | 4 | 指针语义映射 |
 | OVL-016 | `onTouchStart/Move/End` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
 | OVL-017 | `onPressedMove` | component/Overlay.ts | DRAGGING 状态 | B | test | S | 4 | |
-| OVL-018 | `extendData` | component/Overlay.ts | extensionData 已建 | B | test | S | 4 |  |
+| OVL-018 | `extendData` | component/Overlay.ts | 已建：Definition.extendData | B | test | S | 4 |  |
 | OVL-019 | 16 个内置模板元数据整体 | extension/overlay/*.ts | pointCount 已核 | E | diff | S | 4 | F1 自动 diff |
 | OVL-020 | `groupId` | component/Overlay.ts | 无（filter 用） | E | test | S | 2b | |
 ### Overlay 实例接口字段（24，v3 补盘点）
@@ -247,8 +247,8 @@
 | OVL-026 | `currentStep` | component/Overlay.ts | 由 phase/points.size 推导（getter 未暴露） | E | test | S | 2b | 由 phase 推导 getter |
 | OVL-027 | `drawingMode` | component/Overlay.ts | continuous 布尔 | B | test | S | 2b |  |
 | OVL-028 | `lock` | component/Overlay.ts | OverlayInstance.locked 已建 | B | test | S | 2b |  |
-| OVL-029 | `visible` | component/Overlay.ts | Instance/OverlayInstance.visible 已建 | B | test | S | 2b |  |
-| OVL-030 | `zLevel` | component/Overlay.ts | OverlayInstance.zIndex 已建；Indicator zLevel 批次 3 | B | test | S | 2b |  |
+| OVL-029 | `visible` | component/Overlay.ts | 已建：Definition.visible + Instance.visible | B | test | S | 2b |  |
+| OVL-030 | `zLevel` | component/Overlay.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 2b |  |
 | OVL-031 | `fixedZLevel` | component/Overlay.ts | 无 | E | test | S | 4 |  |
 | OVL-032 | `needDefaultPointFigure` | component/Overlay.ts | 无（OVL-003 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-033 | `needDefaultXAxisFigure` | component/Overlay.ts | 无（OVL-004 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
@@ -256,7 +256,7 @@
 | OVL-035 | `mode` | component/Overlay.ts | magnetMode + 门面 OverlayMode 枚举已建 | B | test | S | 2b | OverlayMode 枚举 |
 | OVL-036 | `modeSensitivity` | component/Overlay.ts | 未实现（上游默认值等价） | E | diff | S | 4 |  |
 | OVL-037 | `points` | component/Overlay.ts | OverlayInstance.points（时间锚点）已建 | A | existing | S | 2b | 锚点结构等价 |
-| OVL-038 | `extendData` | component/Overlay.ts | extensionData 已建 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-038 | `extendData` | component/Overlay.ts | 已建：Definition.extendData | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-039 | `styles` | component/Overlay.ts | 无 | E | test | S | 4 |  |
 | OVL-040 | `createPointFigures` | component/Overlay.ts | 内置渲染（OVL-006 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-041 | `createXAxisFigures` | component/Overlay.ts | 无（OVL-007 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
