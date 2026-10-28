@@ -14,7 +14,7 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 | `lkanvas-compose` | Android Compose 库：`KLineChart` 组件（六种主图类型、三 pane、明暗主题）、Canvas 绘制、手势状态机、segment 画线 |
 | `app-sample` | 示例应用：本地确定性行情、实时末根更新、分页、画线、图型/轴切换 |
 
-## 当前进度（M0–M4 完成，M5 启动，M6 前置就绪）
+## 当前进度（对齐计划完成，0.2.0）
 
 - **27/27 内置指标**：全部与上游 v10.1.0 TS oracle 逐位对照通过（值与 Missing 位置），附手算样例与增量/全量一致性测试
 - **16/16 覆盖物**：共用生命周期状态机，brush 5000 点上限；斐波那契价格空间投影（D-02）
@@ -28,6 +28,36 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 - **B-01 初测**：10k candle 三指标末根更新 P95=0.270ms（D1 目标 4ms 的 1/15）
 - 待 M5/M6 收尾：Macrobenchmark 冻结设备测量（B-02~B-06）、tooltip 完整定制、API 冻结材料（见兼容台账）
 
+## 从 KLineChart (WebView) 迁移到 LKanvas
+
+WebView 迁移者按上游文档习惯调用同名 API，仅初始化方式不同：
+
+```kotlin
+// TS: const chart = init('container', { locale: 'zh-CN' })
+val chart = LKanvasChart.init()                    // 门面持有内核与 Compose 状态
+
+// TS: chart.setDataLoader({ getBars({type, timestamp, callback}) {...} })
+chart.setDataLoader(object : DataLoader {
+    override fun getBars(params: DataLoader.GetBarsParams) { /* init/forward/backward */ }
+    override fun subscribeBar(params: DataLoader.SubscribeBarParams) { /* 实时推送 */ }
+})
+
+// TS: chart.createIndicator({ name: 'MA', calcParams: [5] })
+chart.createIndicator("MA", calcParams = listOf(5.0))
+
+// TS: chart.createOverlay({ name: 'segment', points: [...] })
+chart.createOverlay(OverlayCreate("segment", points = listOf(...)))
+
+// TS: chart.setStyles('dark') / subscribeAction('onCrosshairChange', cb)
+chart.setStyles("dark")
+chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE) { }
+```
+
+- 完整 API 面与上游对应关系：`docs/alignment/gap-matrix.md`（257 行，0 unknown）
+- parity 用例：上游文档示例的迁移测试见 `lkanvas-compose/src/test/.../parity/`
+- 迁移章节完整版随 0.2.0 发布
+
+## 上游基线
 ## 上游基线
 
 - 上游版本：KLineChart **v10.1.0**（快照见 `third_party/klinechart-v10.1.0/`，仅用于开发期 TS 对照 oracle，不进入发布制品）。
