@@ -52,18 +52,9 @@ object StylesMerge {
         return primary.callBy(args)
     }
 
-    /** 便捷：字符串主题名 → Styles（light/dark 内置；未知名回退 light）。 */
-    fun resolveTheme(name: String?): Styles = when (name) {
-        "dark" -> StylesThemes.dark
-        else -> StylesThemes.light
-    }
+    /** 便捷：字符串主题名 → Styles（注册表查询；未知名回退 light）。 */
+    fun resolveTheme(name: String?): Styles = StylesThemes.getStyles(name) ?: StylesThemes.light
 }
-
-    /** 便捷：字符串主题名 → Styles（light/dark 内置；未知名回退 light）。 */
-    fun resolveTheme(name: String?): Styles = when (name) {
-        "dark" -> StylesThemes.dark
-        else -> StylesThemes.light
-    }
 
 /** 上游 extension/styles：light/dark 主题注册表（默认样式之上的色板覆盖）。 */
 object StylesThemes {
@@ -111,7 +102,7 @@ object StylesThemes {
     }
 
     /** 上游 getStyles(name)。 */
-    fun getStyles(name: String): Styles? = registry[name]
+    fun getStyles(name: String?): Styles? = name?.let { registry[it] }
 
     fun registeredNames(): List<String> = registry.keys.toList()
 }

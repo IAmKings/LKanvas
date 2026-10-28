@@ -27,18 +27,18 @@
 | IDX-002 | `dispose` | index.ts | LKanvasChart.dispose 已建 | B | test | S | 2a |  |
 | IDX-003 | `version` | index.ts | LKanvasChart.version() 已建 | B | test | S | 2a | 门面静态同名 |
 | IDX-004 | `utils.clone` | utils | data class copy 等价 | B | compile | S | 2a | |
-| IDX-005 | `utils.merge` | utils | LkanvasUtils.merge 未建；setStyles 深合并批次 5 | E | test | S | 2a | setStyles 语义基础 |
+| IDX-005 | `utils.merge` | utils | LkanvasUtils.merge（浅）+ StylesMerge（深合并 skip-defaults） | B | test | S | 2a | 双轨：Map 浅合并/Styles 深合并 |
 | IDX-006~012 | `utils.isString/isNumber/isValid/isObject/isArray/isFunction/isBoolean` | utils | Kotlin 类型系统等价 | C | compile | S | 2a | 提供 utils 对象占位 |
-| IDX-013 | `utils.formatValue` | utils/format | LkanvasUtils 待建（分散于 ChartText/ChartLocale） | E | test | S | 2a |  |
-| IDX-014 | `utils.formatPrecision` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
-| IDX-015 | `utils.formatBigNumber` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
-| IDX-016 | `utils.formatDate` | utils/format | LkanvasUtils 待建 | E | test | S | 2a | 模板化 |
-| IDX-017 | `utils.formatThousands` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
-| IDX-018 | `utils.formatFoldDecimal` | utils/format | LkanvasUtils 待建 | E | test | S | 2a |  |
+| IDX-013 | `utils.formatValue` | utils/format | LkanvasUtils.formatValue（isValid 兜底「—」） | B | test | S | 2a | |
+| IDX-014 | `utils.formatPrecision` | utils/format | LkanvasUtils.formatPrecision（toFixed 语义，默认 2 位） | B | test | S | 2a | |
+| IDX-015 | `utils.formatBigNumber` | utils/format | LkanvasUtils.formatBigNumber（K/M/B 分档，对齐上游 format.ts） | B | test | S | 2a | |
+| IDX-016 | `utils.formatDate` | utils/format | LkanvasUtils.formatDate（模板占位替换，UTC） | B | test | S | 2a | 模板化 |
+| IDX-017 | `utils.formatThousands` | utils/format | LkanvasUtils.formatThousands（整数分组，小数原样） | B | test | S | 2a | |
+| IDX-018 | `utils.formatFoldDecimal` | utils/format | LkanvasUtils.formatFoldDecimal（0{count} 折叠标记） | B | test | S | 2a | |
 | IDX-019 | `utils.calcTextWidth` | utils/canvas | ChartText.measureWidth（门面待包装） | B | test | S | 2a |  |
 | IDX-020 | `utils.getLinearSlopeIntercept` | figure/line | OverlayGeometry 内联（门面待包装） | B | test | S | 2a | 抽公共 |
-| IDX-021 | `utils.getLinearYFromSlopeIntercept` | figure/line | 门面待抽公共 | E | test | S | 2a |  |
-| IDX-022 | `utils.getLinearYFromCoordinates` | figure/line | 门面待抽公共 | E | test | S | 2a |  |
+| IDX-021 | `utils.getLinearYFromSlopeIntercept` | figure/line | LkanvasUtils.getLinearYFromSlopeIntercept | B | test | S | 2a | |
+| IDX-022 | `utils.getLinearYFromCoordinates` | figure/line | LkanvasUtils.getLinearYFromCoordinates（垂直线 null） | B | test | S | 2a | |
 | IDX-023 | `utils.checkCoordinateOnArc` | extension/figure/arc.ts | LkanvasFigures.checkCoordinateOnArc 已建 | B | test | S | 4 | 同名包装 |
 | IDX-024 | `utils.checkCoordinateOnCircle` | extension/figure/circle.ts | LkanvasFigures.checkCoordinateOnCircle 已建 | B | test | S | 4 | 同名包装 |
 | IDX-025 | `utils.checkCoordinateOnLine` | extension/figure/line.ts | LkanvasFigures.checkCoordinateOnLine 已建 | B | test | S | 4 | 同名包装 |
@@ -53,11 +53,11 @@
 | IDX-034 | `registerFigure` | ext/figure | LkanvasFigures.registerFigure 已建（7 内置预注册） | B | test | S | 4 |  |
 | IDX-035 | `getFigureClass` | ext/figure | LkanvasFigures.getFigureFactory 已建 | B | test | S | 4 |  |
 | IDX-036 | `getSupportedFigures` | ext/figure | LkanvasFigures.getSupportedFigures 已建 | B | test | S | 4 |  |
-| IDX-037 | `registerStyles` | ext/styles | ChartTheme.dark() 近似 | E | test | M | 5 | light/dark 注册 |
+| IDX-037 | `registerStyles` | ext/styles | StylesThemes 注册表 + LkanvasRegistry.registerStyles/getSupportedStyles；setStyles(名) 查注册表 | B | test | M | 5 | light/dark 预注册 |
 | IDX-038 | `registerLocale` | ext/i18n | LkanvasRegistry.registerLocale 已建 | B | test | S | 3 |  |
 | IDX-039 | `getSupportedLocales` | ext/i18n | LkanvasRegistry.getSupportedLocales 已建 | B | test | S | 3 |  |
-| IDX-040 | `registerXAxis` | ext/x-axis | 无 | E | test | M | 4 | |
-| IDX-041 | `registerYAxis` | ext/y-axis | CustomYAxis 近似 | E | test | M | 4 | |
+| IDX-040 | `registerXAxis` | ext/x-axis | LkanvasRegistry.registerXAxis/getXAxisTemplate（AxisTemplate，normal 预注册） | B | test | M | 4 | |
+| IDX-041 | `registerYAxis` | ext/y-axis | LkanvasRegistry.registerYAxis（normal/percentage/logarithm 预注册） | B | test | M | 4 | |
 | IDX-042 | `registerHotkey` | ext/hotkey | 无 | C | compile | S | 2c | 浏览器键鼠 |
 | IDX-043 | `getHotkey` | ext/hotkey | 无 | C | compile | S | 2c | |
 | IDX-044 | `getSupportedHotkeys` | ext/hotkey | 无 | C | compile | S | 2c | |
@@ -101,10 +101,10 @@
 | CH-033 | `getOffsetRightDistance` | Chart.ts:701 | 已建 | B | test | S | 2c |  |
 | CH-034 | `setMaxOffsetLeftDistance` | Chart.ts:705 | 门面 set 已建（overscroll） | B | test | S | 2c |  |
 | CH-035 | `setMaxOffsetRightDistance` | Chart.ts:713 | 门面 set 已建 | B | test | S | 2c |  |
-| CH-036 | `setLeftMinVisibleBarCount` | Chart.ts:721 | 无 | E | test | S | 2c | clamp 语义 |
-| CH-037 | `setRightMinVisibleBarCount` | Chart.ts:729 | 无 | E | test | S | 2c |  |
+| CH-036 | `setLeftMinVisibleBarCount` | Chart.ts:721 | Viewport.leftMinVisibleBarCount + clamp 强制 + getLeftMinVisibleBarCount | B | test | S | 2c | 滚动下界钳制 |
+| CH-037 | `setRightMinVisibleBarCount` | Chart.ts:729 | Viewport.rightMinVisibleBarCount + clamp 强制 + getRightMinVisibleBarCount | B | test | S | 2c | |
 | CH-038 | `setBarSpace` | Chart.ts:737 | barSpacing 直改 | B | test | S | 2c | BarSpace{bar,halfBar,gapBar,halfGapBar} |
-| CH-039 | `getBarSpace` | Chart.ts:741 | 无结构 getter | E | test | S | 2c |  |
+| CH-039 | `getBarSpace` | Chart.ts:741 | 门面 getBarSpace 已建（BarSpace 四值） | B | test | S | 2c |  |
 | CH-040 | `getVisibleRange` | Chart.ts:745 | visibleRange 扩展（缺 realFrom/realTo） | B | test | S | 2a | 结构补 realFrom/realTo |
 | CH-041 | `resetData` | Chart.ts:789 | ChartDataStore.reset | B | test | S | 2a |  |
 | CH-042 | `getDataList` | Chart.ts:793 | dataSnapshot.candles | B | test | S | 2a |  |
@@ -118,11 +118,11 @@
 | CH-050 | `overrideOverlay` | Chart.ts:943 | 门面 overrideOverlay(id, OverlayOverride) 已建 | B | test | M | 2b | points/styles/extendData |
 | CH-051 | `removeOverlay` | Chart.ts:947 | 门面 removeOverlay(filter/id) 已建 | B | test | S | 2b | 批量 |
 | CH-052 | `setPaneOptions` | Chart.ts:951 | 门面 setPaneOptions 已建（main/vol/macd 高度，35% 保底钳制） | B | test | M | 2c | pane{id,height,axis?} |
-| CH-053 | `createYAxis` | Chart.ts:1003 | YAxisSpec 单主轴 | E | test | L | 5 | 多轴实例化 |
-| CH-054 | `removeYAxis` | Chart.ts:1025 | 无 | E | test | S | 5 |  |
-| CH-055 | `getYAxes` | Chart.ts:1057 | 无 | E | compile | S | 5 |  |
-| CH-056 | `overrideYAxis` | Chart.ts:1079 | 无 | E | test | S | 5 |  |
-| CH-057 | `overrideXAxis` | Chart.ts:1096 | 无 | E | test | S | 5 |  |
+| CH-053 | `createYAxis` | Chart.ts:1003 | 门面 createYAxis：YAxisInfo 记录层（id 生成/幂等/x 轴 pane 拒绝） | B | test | L | 5 | 绘制端单轴，多轴渲染随批次 5+ |
+| CH-054 | `removeYAxis` | Chart.ts:1025 | removeYAxis：主 pane 默认轴与指标绑定轴保护 | B | test | S | 5 | |
+| CH-055 | `getYAxes` | Chart.ts:1057 | getYAxes(filter: paneId/id/name) | B | compile | S | 5 | |
+| CH-056 | `overrideYAxis` | Chart.ts:1079 | overrideYAxis：paneId+id 定位非空字段覆盖 | B | test | S | 5 | |
+| CH-057 | `overrideXAxis` | Chart.ts:1096 | overrideXAxis：XAxisOverride 覆写记录 | B | test | S | 5 | 绘制端消费随批次 5+ |
 | CH-058 | `getPaneOptions` | Chart.ts:1106 | 门面 getPaneOptions 已建 | B | test | S | 2c |  |
 | CH-059 | `setZoomEnabled` | Chart.ts:1114 | 门面 set/is 已建 | B | test | S | 2c | 手势层 |
 | CH-060 | `isZoomEnabled` | Chart.ts:1118 | 已建 | B | test | S | 2c |  |
@@ -135,16 +135,16 @@
 | CH-067 | `scrollToDataIndex` | Chart.ts:1161 | scrollToIndex | B | test | S | 2c |  |
 | CH-068 | `scrollToTimestamp` | Chart.ts:1166 | scrollToTimestamp | A | test | S | 2c |  |
 | CH-069 | `zoomAtCoordinate` | Chart.ts:1171 | zoomBy(anchorX) | B | test | S | 2c |  |
-| CH-070 | `zoomAtDataIndex` | Chart.ts:1191 | 无索引重载 | E | test | S | 2c |  |
-| CH-071 | `zoomAtTimestamp` | Chart.ts:1196 | 无时间重载 | E | test | S | 2c |  |
+| CH-070 | `zoomAtDataIndex` | Chart.ts:1191 | 门面 zoomAtDataIndex 已建 | B | test | S | 2c |  |
+| CH-071 | `zoomAtTimestamp` | Chart.ts:1196 | 门面 zoomAtTimestamp 已建 | B | test | S | 2c |  |
 | CH-072 | `convertToPixel` | Chart.ts:1201 | overlayPointToPx（单点） | B | test+parity | M | 2a | 数组+ConvertFilter |
 | CH-073 | `convertFromPixel` | Chart.ts:1232 | overlayPointFromPx（单点） | B | test+parity | M | 2a |  |
-| CH-074 | `executeAction` | Chart.ts:1261 | 无统一入口 | E | test | S | 2a |  |
-| CH-075 | `subscribeAction` | Chart.ts:1278 | 分散回调（onCandleClick 等） | E | test+parity | M | 2a | 9 种 ActionType |
-| CH-076 | `unsubscribeAction` | Chart.ts:1282 | 无 | E | test | S | 2a |  |
+| CH-074 | `executeAction` | Chart.ts:1261 | 门面 executeAction 已建 | B | test | S | 2a |  |
+| CH-075 | `subscribeAction` | Chart.ts:1278 | 门面 subscribeAction 已建（9 种） | B | test+parity | M | 2a | 9 种 ActionType |
+| CH-076 | `unsubscribeAction` | Chart.ts:1282 | 门面 unsubscribeAction 已建 | B | test | S | 2a |  |
 | CH-077 | `getConvertPictureUrl` | Chart.ts:1286 | ChartSnapshotExporter（PNG only） | B | test | S | 2a | 补 jpeg/bmp+backgroundColor |
 | CH-078 | `resize` | Chart.ts:1315 | onLayout 自动 | A | test | — | — |  |
-| CH-079 | `destroy` | Chart.ts:1327 | scope 未暴露销毁 | E | test | S | 2a | engine.close+scope.cancel |
+| CH-079 | `destroy` | Chart.ts:1327 | 门面 destroy 已建（退订+scope.cancel） | B | test | S | 2a | engine.close+scope.cancel |
 
 ## 3. 事件 payload（9 种 ActionType）
 
@@ -156,9 +156,9 @@
 | EVT-004 | `onCrosshairChange`（`Crosshair`） | Store.ts:1309 | onCrosshairChange 接线（Crosshair payload） | B | test | S | 2a | payload 结构补 |
 | EVT-005 | `onCandleBarClick`（`VisibleRangeData`） | CandleBarView.ts:35 | onCandleBarClick 接线（VisibleRangeData payload） | B | test | S | 2a | payload 补 prev/next |
 | EVT-006 | `onPaneDrag`（`{paneId}`） | SeparatorWidget.ts:149 | onPaneDrag 接线（{paneId}） | B | test | S | 2a |  |
-| EVT-007 | `onCandleTooltipFeatureClick` | tooltip | 无（features 未实现） | E | test | M | 5 | 依赖批次 5 |
-| EVT-008 | `onIndicatorTooltipFeatureClick` | tooltip | 无 | E | test | M | 5 | 同上 |
-| EVT-009 | `onCrosshairFeatureClick` | crosshair | 无 | E | test | M | 5 | 同上 |
+| EVT-007 | `onCandleTooltipFeatureClick` | tooltip | executeTooltipFeatureClick 已建（main） | B | test | M | 5 | 依赖批次 5 |
+| EVT-008 | `onIndicatorTooltipFeatureClick` | tooltip | executeTooltipFeatureClick 已建（vol） | B | test | M | 5 | 同上 |
+| EVT-009 | `onCrosshairFeatureClick` | crosshair | executeTooltipFeatureClick 已建 | B | test | M | 5 | 同上 |
 
 
 ## 4. 公共类型
@@ -167,14 +167,14 @@
 |---|---|---|---|---|---|---|---|---|
 | TYP-001 | `KLineData` | Data.ts | Candle 同名同义 | A | existing | — | — | |
 | TYP-002 | `Crosshair` | Crosshair.ts | Crosshair 类型已建（chart/ChartTypes.kt） | B | test | S | 2a | 字段级见 ts-inventory §5 |
-| TYP-003 | `BarSpace{bar,halfBar,gapBar,halfGapBar}` | BarSpace.ts | barSpacing 单值 | E | test | S | 2c | |
+| TYP-003 | `BarSpace{bar,halfBar,gapBar,halfGapBar}` | BarSpace.ts | ChartTypes.BarSpace{bar,halfBar,gapBar,halfGapBar} | B | test | S | 2c | |
 | TYP-004 | `VisibleRange{from,to,realFrom,realTo}` | VisibleRange.ts | VisibleRange{from,to,realFrom,realTo} 已建 | B | test | S | 2a |  |
 | TYP-005 | `VisibleRangeData` | Data.ts:36 | VisibleRangeData 已建（prev/data/next） | B | test | S | 2a | 事件 payload 用 |
 | TYP-006 | `SymbolInfo` | SymbolInfo.ts | SymbolInfo 已建（ticker/precision 默认 2） | B | test | S | 2a |  |
 | TYP-007 | `Period` | Period.ts | Period 已建（type+milliseconds+toMillis） | B | test | S | 2a |  |
 | TYP-008 | `DataLoader`（含 DataLoadMore 双向） | DataLoader.ts | DataLoader 已建（init/forward/backward+subscribeBar；v10 无 update type） | B | test+parity | M | 2a | 四 type 对齐 |
 | TYP-009 | `CandleType` 六值 | Styles.ts:242 | MainChartType 同名 | A | existing | — | — | |
-| TYP-010 | `LineType/PolygonType/PathType/TooltipShowRule/TooltipShowType/TooltipFeaturePosition/FeatureType/FormatDateType/ZoomAnchorType` | Styles.ts 等 | 部分散落 | E | compile | S | 5 | 枚举同名化 |
+| TYP-010 | `LineType/PolygonType/PathType/TooltipShowRule/TooltipShowType/TooltipFeaturePosition/FeatureType/FormatDateType/ZoomAnchorType` | Styles.ts 等 | 同名枚举 11 个（LineType/PolygonType/PathType/TooltipShowRule/ShowType/FeatureType/FeaturePosition/CandleType/FormatDateType/ZoomAnchorType/DataLoadType），带 value 字段 | B | compile | S | 5 | 树内字段沿用 String 常量，枚举迁移随批次 5+ |
 | TYP-011 | `IndicatorSeries` 三值 | Indicator.ts:34 | IndicatorSeries（PRICE/VOLUME/NORMAL） | A | existing | — | — | 字符串值对齐在批次 3 |
 | TYP-012 | `OverlayMode` 三值 | Overlay.ts:29 | MagnetMode | B | test | S | 2b | 门面同名枚举 |
 | TYP-013 | `OverlayDrawingMode` | Overlay.ts:44 | continuous 布尔 | B | test | S | 4 | |
@@ -186,8 +186,8 @@
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
 | IND-001 | `id` | component/Indicator.ts | IndicatorInstance.id | A | existing | — | — | |
-| IND-002 | `paneId` | component/Indicator.ts | 无 | E | test | S | 3 | |
-| IND-003 | `yAxisId` | component/Indicator.ts | 无 | E | test | S | 5 | 依赖多轴 |
+| IND-002 | `paneId` | component/Indicator.ts | IndicatorInstance.paneId + createIndicator(paneId) | B | test | S | 3 | |
+| IND-003 | `yAxisId` | component/Indicator.ts | IndicatorInstance.yAxisId + createIndicator(yAxisId)；removeYAxis 绑定检查消费 | B | test | S | 5 | 多轴 CH-053~057 |
 | IND-004 | `name` | component/Indicator.ts | 有 | A | existing | — | — | |
 | IND-005 | `shortName` | component/Indicator.ts | 有 | A | existing | — | — | |
 | IND-006 | `precision` | component/Indicator.ts | 有 | A | existing | — | — | |
@@ -198,16 +198,16 @@
 | IND-011 | `zLevel` | component/Indicator.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 3 |  |
 | IND-012 | `extendData` | component/Indicator.ts | 已建：Definition.extendData | B | test | M | 3 |  |
 | IND-013 | `series` | component/Indicator.ts | 已建：series 枚举（meta diff 断言值映射 undefined→normal） | B | diff | — | 3 | 值字符串化（price） |
-| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef（无回调） | E | diff | M | 3 | |
+| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef.styles/attrs 回调建模位（figures 顺序已 meta diff） | B | diff | M | 3 | 绘制端消费随批次 5+ |
 | IND-015 | `minValue` | component/Indicator.ts | 已建：minValue（VOL=0 覆写） | B | diff | S | 3 | VOL=0 |
 | IND-016 | `maxValue` | component/Indicator.ts | 已建：maxValue（默认 null） | B | diff | S | 3 |  |
-| IND-017 | `styles` | component/Indicator.ts | 无 | E | test | M | 5 | |
+| IND-017 | `styles` | component/Indicator.ts | IndicatorInstance.styles + createIndicator(styles) | B | test | M | 5 | |
 | IND-018 | `shouldUpdate` | component/Indicator.ts | 已建：shouldUpdate（默认 true；PRD R-08） | B | test | S | 3 |  |
 | IND-019 | `calc` | component/Indicator.ts | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 |
 | IND-020 | `regenerateFigures` | component/Indicator.ts | 已建：plotsFor（meta diff 断言 figures 顺序） | B | diff | S | 3 | 改名兼容 |
-| IND-021 | `createTooltipDataSource` | component/Indicator.ts | 无 | E | test | M | 5 | |
-| IND-022 | `draw` | component/Indicator.ts | 无 | E | test | M | 5 | 自定义绘制 |
-| IND-023 | 27 个内置模板元数据整体 | extension/indicator/*.ts | oracle 数值已对齐；元数据未 diff | E | diff | M | 3 | F1 自动 diff |
+| IND-021 | `createTooltipDataSource` | component/Indicator.ts | IndicatorDefinition.createTooltipDataSource 钩子（行级 Map） | B | test | M | 5 | |
+| IND-022 | `draw` | component/Indicator.ts | IndicatorDefinition.draw 钩子建模位 | B | test | M | 5 | 自定义绘制消费随批次 5+ |
+| IND-023 | 27 个内置模板元数据整体 | extension/indicator/*.ts | F1 自动 diff 已建 | B | diff | M | 3 | F1 自动 diff |
 | IND-024 | `result`（calc 输出数组，getIndicators 返回体） | component/Indicator.ts | 已建：IndicatorResult 列存（门面视图转换待 2c） | B | test | S | 2b | 结构等价（行存↔列存），门面做视图转换 |
 
 
@@ -220,47 +220,47 @@
 | OVL-003 | `needDefaultPointFigure` | component/Overlay.ts | 已建（meta diff 断言；simpleAnnotation/tag/brush=false） | B | diff | S | 4 |  |
 | OVL-004 | `needDefaultXAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 |  |
 | OVL-005 | `needDefaultYAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 |  |
-| OVL-006 | `createPointFigures` | component/Overlay.ts | 内置渲染器分支 | E | test | L | 4 | 返回 Figure 原语 |
-| OVL-007 | `createXAxisFigures` | component/Overlay.ts | 无 | E | test | M | 4 | |
-| OVL-008 | `createYAxisFigures` | component/Overlay.ts | 无 | E | test | M | 4 | |
+| OVL-006 | `createPointFigures` | component/Overlay.ts | OverlayDefinition.createPointFigures 钩子（Figure 原语 Triple 建模） | B | test | L | 4 | 内置仍走现渲染器 |
+| OVL-007 | `createXAxisFigures` | component/Overlay.ts | OverlayDefinition.createXAxisFigures 钩子 | B | test | M | 4 | |
+| OVL-008 | `createYAxisFigures` | component/Overlay.ts | OverlayDefinition.createYAxisFigures 钩子 | B | test | M | 4 | |
 | OVL-009 | `checkEventOn` | component/Overlay.ts | 已建：Definition.checkEventOn | B | test | S | 4 |  |
 | OVL-010 | `drawingMode(step/continuous)` | component/Overlay.ts | continuous 布尔 | B | diff | S | 4 | |
-| OVL-011 | `performEventPressedMove` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
-| OVL-012 | `performEventMoveForDrawing` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
+| OVL-011 | `performEventPressedMove` | component/Overlay.ts | OverlayDefinition.performEventPressedMove 建模位（默认 null 走内置手势） | B | test | M | 4 | |
+| OVL-012 | `performEventMoveForDrawing` | component/Overlay.ts | OverlayDefinition.performEventMoveForDrawing 建模位 | B | test | M | 4 | |
 | OVL-013 | `onRemoved` | component/Overlay.ts | OverlayEvent.Removed | B | test | S | 4 | |
-| OVL-014 | `onClick/onDoubleClick/onRightClick` | component/Overlay.ts | 无（右键平台不适用） | E | test | M | 4 | 右键→长按菜单等价 |
-| OVL-015 | `onMouseDown/Enter/Leave/Move/Up` | component/Overlay.ts | 无 | E | test | M | 4 | 指针语义映射 |
-| OVL-016 | `onTouchStart/Move/End` | component/Overlay.ts | 手势内置 | E | test | M | 4 | |
+| OVL-014 | `onClick/onDoubleClick/onRightClick` | component/Overlay.ts | Definition.onClick/onDoubleClick/onRightClick 回调族（右键→长按菜单映射） | B | test | M | 4 | 手势端分发随批次 5+ |
+| OVL-015 | `onMouseDown/Enter/Leave/Move/Up` | component/Overlay.ts | Definition.onMouse 系回调族（触控生命周期映射） | B | test | M | 4 | |
+| OVL-016 | `onTouchStart/Move/End` | component/Overlay.ts | Definition.onTouch 系回调族 | B | test | M | 4 | |
 | OVL-017 | `onPressedMove` | component/Overlay.ts | DRAGGING 状态 | B | test | S | 4 | |
 | OVL-018 | `extendData` | component/Overlay.ts | 已建：Definition.extendData | B | test | S | 4 |  |
-| OVL-019 | 16 个内置模板元数据整体 | extension/overlay/*.ts | pointCount 已核 | E | diff | S | 4 | F1 自动 diff |
-| OVL-020 | `groupId` | component/Overlay.ts | 无（filter 用） | E | test | S | 2b | |
+| OVL-019 | 16 个内置模板元数据整体 | extension/overlay/*.ts | F1 自动 diff 已建 | B | diff | S | 4 | F1 自动 diff |
+| OVL-020 | `groupId` | component/Overlay.ts | OverlayInstance.groupId + createOverlay/overrideOverlay/filter 全链 | B | test | S | 2b | |
 ### Overlay 实例接口字段（24，v3 补盘点）
 
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 |
 |---|---|---|---|---|---|---|---|---|
 | OVL-021 | `id` | component/Overlay.ts | OverlayInstance.id | B | test | S | 2b |  |
-| OVL-022 | `groupId` | component/Overlay.ts | 无（OVL-020 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-022 | `groupId` | component/Overlay.ts | 实例面 groupId 暴露（OverlayInfo.groupId + OverlayFilter(groupId) 命中） | B | test | S | 4 | 与 OVL-020 同实现 |
 | OVL-023 | `paneId` | component/Overlay.ts | paneId 固定 main | B | test | S | 2b |  |
 | OVL-024 | `name` | component/Overlay.ts | templateName | B | test | S | 2b |  |
 | OVL-025 | `totalStep` | component/Overlay.ts | 已建：Definition.totalStep（=pointCount+1，meta diff 16/16 断言） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-026 | `currentStep` | component/Overlay.ts | 由 phase/points.size 推导（getter 未暴露） | E | test | S | 2b | 由 phase 推导 getter |
+| OVL-026 | `currentStep` | component/Overlay.ts | OverlayInstance.currentStep getter + OverlayInfo.currentStep | B | test | S | 2b | points.size 推导 |
 | OVL-027 | `drawingMode` | component/Overlay.ts | 已建：continuous 布尔（meta diff 断言 brush=continuous） | B | diff | S | 2b |  |
 | OVL-028 | `lock` | component/Overlay.ts | OverlayInstance.locked 已建 | B | test | S | 2b |  |
 | OVL-029 | `visible` | component/Overlay.ts | 已建：Definition.visible + Instance.visible | B | test | S | 2b |  |
 | OVL-030 | `zLevel` | component/Overlay.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 2b |  |
-| OVL-031 | `fixedZLevel` | component/Overlay.ts | 无 | E | test | S | 4 |  |
+| OVL-031 | `fixedZLevel` | component/Overlay.ts | OverlayInstance.fixedZLevel + create/override/info 全链 | B | test | S | 4 | |
 | OVL-032 | `needDefaultPointFigure` | component/Overlay.ts | 已建（meta diff 断言；simpleAnnotation/tag/brush=false） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-033 | `needDefaultXAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-034 | `needDefaultYAxisFigure` | component/Overlay.ts | 已建（meta diff 断言） | B | diff | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-035 | `mode` | component/Overlay.ts | magnetMode + 门面 OverlayMode 枚举已建 | B | test | S | 2b | OverlayMode 枚举 |
-| OVL-036 | `modeSensitivity` | component/Overlay.ts | 未实现（上游默认值等价） | E | diff | S | 4 |  |
+| OVL-036 | `modeSensitivity` | component/Overlay.ts | OverlayInstance.modeSensitivity（默认 8）+ create/override/info 全链 | B | diff | S | 4 | 上游默认值等价 |
 | OVL-037 | `points` | component/Overlay.ts | OverlayInstance.points（时间锚点）已建 | A | existing | S | 2b | 锚点结构等价 |
 | OVL-038 | `extendData` | component/Overlay.ts | 已建：Definition.extendData | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-039 | `styles` | component/Overlay.ts | 无 | E | test | S | 4 |  |
+| OVL-039 | `styles` | component/Overlay.ts | OverlayInstance.styles + createOverlay/override/info 全链 | B | test | S | 4 | |
 | OVL-040 | `createPointFigures` | component/Overlay.ts | 内置渲染（OVL-006 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-041 | `createXAxisFigures` | component/Overlay.ts | 无（OVL-007 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
-| OVL-042 | `createYAxisFigures` | component/Overlay.ts | 无（OVL-008 | E | test | S | 4 | 已由模板行覆盖，实例面暴露 |
+| OVL-041 | `createXAxisFigures` | component/Overlay.ts | 实例面 createXAxisFigures（Definition 钩子 + 渲染查询位） | B | test | S | 4 | 与 OVL-007 同实现 |
+| OVL-042 | `createYAxisFigures` | component/Overlay.ts | 实例面 createYAxisFigures（Definition 钩子 + 渲染查询位） | B | test | S | 4 | 与 OVL-008 同实现 |
 | OVL-043 | `performEventPressedMove` | component/Overlay.ts | 手势内置（OVL-011 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 | OVL-044 | `performEventMoveForDrawing` | component/Overlay.ts | 手势内置（OVL-012 | B | test | S | 4 | 已由模板行覆盖，实例面暴露 |
 ## 7. Styles 接口（43，一接口一行；字段级见 ts-inventory §6）
@@ -343,7 +343,8 @@
 - 批次 3/4：✅（两 meta diff 0 差异）
 - 批次 5：✅（Styles 43 接口 + 默认值对照 + setStyles 语义；绘制端渐进消费继续）
 - 批次 6：✅（demo-checklist 人工验收无阻断；consumer 门面重编通过）
-- 最终：**E=55**（余量为绘制端接线与 DOM 等价物，均为 B 类已映射；unknown=0）
+- 批次 5 余量收口（0.2.0 发版前）：✅ —— utils 22 项落地（LkanvasUtils + 逐项测试，K/M/B 分档与 0{count} 折叠对齐上游 format.ts）；Viewport 双向 minVisible 钳制；多轴五方法（YAxisInfo 记录层 + 主轴/指标绑定删除保护）；registerStyles/XAxis/YAxis（样式名解析查注册表）；Indicator 实例 paneId/yAxisId/styles 全链 + PlotDef.styles/attrs 建模位；Overlay 实例 groupId/currentStep/fixedZLevel/modeSensitivity/styles 全链 + performEvent/on 事件回调族建模位；TYP-010 十一枚举同名化
+- 最终：**E=0**（A=15 / B=227 / C=9 / D=6；unknown=0；check.py 七面校验通过）
 
 ## 10. 工作量与日历估算（v3：S=0.5d / M=1.5d / L=3d，单人折算）
 

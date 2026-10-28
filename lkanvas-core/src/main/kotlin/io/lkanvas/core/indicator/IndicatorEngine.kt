@@ -18,13 +18,20 @@ class IndicatorResult(val columns: Map<String, DoubleArray>) {
     fun size(): Int = columns.values.firstOrNull()?.size ?: 0
 }
 
-/** 图形定义：每列的展示类型（PRD R-08 plots）。 */
+/**
+ * 图形定义：每列的展示类型（PRD R-08 plots；上游 figure {key,title,type,baseValue,styles,attrs}）。
+ * styles/attrs 为行级回调建模位（Alpha 接口位，绘制端消费随批次 5+）。
+ */
 data class PlotDef(
     val key: String,
     val title: String,
     val type: PlotType,
     /** bar 基准值（如 MACD 柱以 0 为基线） */
     val baseValue: Double? = null,
+    /** 上游 figure.styles：(row, params) -> 样式覆盖（宿主自定义结构）。 */
+    val styles: Any? = null,
+    /** 上游 figure.attrs：(row, params) -> 附加属性。 */
+    val attrs: Any? = null,
 )
 
 enum class PlotType { LINE, BAR }
@@ -107,6 +114,19 @@ interface IndicatorDefinition {
     /** 上游 shouldUpdate：增量是否推进（默认每次已接受变更推进，PRD R-08 禁止“仅收盘更新”规避）。 */
     val shouldUpdate: Boolean get() = true
 
+    /**
+     * 上游 createTooltipDataSource：自定义 tooltip 数据源回调。
+     * 签名：(dataList, crosshairDataIndex) -> Map<key, displayValue>；
+     * null=使用 figures 默认数据（绘制端消费）。
+     */
+    val createTooltipDataSource: (suspend (List<io.lkanvas.core.data.Candle>, Int) -> Map<String, String>)? get() = null
+
+    /**
+     * 上游 draw：完全自定义绘制回调（绕过 figures 渲染管线）。
+     * Alpha 阶段仅建模接口位，渲染端消费随批次 5+。
+     */
+    val draw: Any? get() = null
+
     /** 空数据的初始私有状态。 */
     fun initScratch(params: List<Double>): Any?
 
@@ -138,11 +158,15 @@ class IndicatorInstance(
     params: List<Double> = definition.calcParams,
     /** 所属 pane（上游 Indicator.paneId；默认 main）。 */
     val paneId: String = "main",
+    /** 绑定 Y 轴（上游 Indicator.yAxisId；默认主轴 main，依赖多轴 CH-053~057）。 */
+    val yAxisId: String = "main",
+    /** 上游 Indicator.styles：实例级样式覆盖（宿主自定义结构，绘制端消费）。 */
+    val styles: Any? = null,
 ) {
     var params: List<Double> = params
         private set
 
-    var visible: Boolean = true
+    var visible: Boolean = definition.visible
 
     /** 最近一次计算结果（版本由引擎外部的门禁管理）。 */
     var state: IndicatorResultState? = null

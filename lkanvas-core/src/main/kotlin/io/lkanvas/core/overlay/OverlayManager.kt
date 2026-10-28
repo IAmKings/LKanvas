@@ -34,6 +34,21 @@ class OverlayInstance(
     /** 门面 paneId 覆写（createOverlay(paneId) 设置；读取优先于 [paneId]）。 */
     var paneIdOverride: String? = null
 
+    /** 上游 groupId：分组 id（批量操作/filter 用）。 */
+    var groupId: String? = null
+
+    /** 上游 currentStep：当前交互步（创建中 = points.size）。 */
+    val currentStep: Int get() = points.size
+
+    /** 上游 fixedZLevel：层级是否固定（true=不随选中浮起）。 */
+    var fixedZLevel: Boolean = false
+
+    /** 上游 modeSensitivity：磁吸灵敏度像素（默认 8）。 */
+    var modeSensitivity: Double = 8.0
+
+    /** 上游 styles：实例级样式覆盖。 */
+    var styles: Any? = null
+
     /** 生效 paneId（override 优先）。 */
     val effectivePaneId: String get() = paneIdOverride ?: paneId
 

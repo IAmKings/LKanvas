@@ -95,10 +95,17 @@ class ChartState(
      * 创建指标实例（上游 createIndicator 语义）：返回 instanceId；同名注册冲突
      * 或未知模板返回 null。isStack=true 时加入主 pane 叠加（Alpha 全部叠加主 pane 语义）。
      */
-    fun createIndicator(name: String, params: List<Double>? = null, paneId: String = "main", isStack: Boolean = true): String? {
+    fun createIndicator(
+        name: String,
+        params: List<Double>? = null,
+        paneId: String = "main",
+        isStack: Boolean = true,
+        yAxisId: String = "main",
+        styles: Any? = null,
+    ): String? {
         val def = registry.get(name) ?: return null
         val id = "ind_${++indicatorIdSerial}_${name}"
-        val inst = IndicatorInstance(id, def, params ?: def.calcParams, paneId)
+        val inst = IndicatorInstance(id, def, params ?: def.calcParams, paneId, yAxisId, styles)
         indicatorInstances.add(inst)
         advanceIndicators(dataSnapshot, null)
         viewRevision++

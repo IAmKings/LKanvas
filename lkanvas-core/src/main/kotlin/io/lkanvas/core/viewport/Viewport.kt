@@ -161,8 +161,21 @@ class Viewport(
     private fun maxScroll(dataCount: Int): Double =
         (dataCount + effectiveRightSlots() - visibleCount).coerceAtLeast(minScroll(dataCount))
 
+    /** 左侧最小可见 bar 数（上游 setLeftMinVisibleBarCount；0=不限制）。 */
+    var leftMinVisibleBarCount: Int = 0
+
+    /** 右侧最小可见 bar 数（上游 setRightMinVisibleBarCount；0=不限制）。 */
+    var rightMinVisibleBarCount: Int = 0
+
     private fun clamp(dataCount: Int) {
         scrollIndex = scrollIndex.coerceIn(minScroll(dataCount), maxScroll(dataCount))
+        // 最小可见数：可见首/尾不得越过此界（上游 setLeft/RightMinVisibleBarCount 语义）
+        if (leftMinVisibleBarCount > 0) {
+            scrollIndex = scrollIndex.coerceAtLeast(leftMinVisibleBarCount.toDouble() - 1)
+        }
+        if (rightMinVisibleBarCount > 0) {
+            scrollIndex = scrollIndex.coerceAtMost(dataCount - rightMinVisibleBarCount.toDouble())
+        }
     }
 
     companion object {

@@ -120,7 +120,7 @@ class LKanvasChartCrudTest {
         val chart = newChartWithData()
         val ids = chart.createOverlay(
             listOf(
-                OverlayCreate("segment", listOf(OverlayPoint(1L, 100.0), OverlayPoint(2L, 101.0))),
+                OverlayCreate("segment", points = listOf(OverlayPoint(1L, 100.0), OverlayPoint(2L, 101.0))),
                 OverlayCreate("NOPE"),
             ),
         )
@@ -134,7 +134,7 @@ class LKanvasChartCrudTest {
     fun `overrideOverlay与removeOverlay`() {
         val chart = newChartWithData()
         val id = chart.createOverlay(
-            OverlayCreate("segment", listOf(OverlayPoint(1L, 100.0), OverlayPoint(2L, 101.0))),
+            OverlayCreate("segment", points = listOf(OverlayPoint(1L, 100.0), OverlayPoint(2L, 101.0))),
         )!!
         assertTrue(chart.overrideOverlay(id, OverlayOverride(visible = false, zLevel = 5)))
         val o = chart.getOverlays(OverlayFilter(id = id)).single()

@@ -179,15 +179,21 @@ class LKanvasChart private constructor(
         setMaxOffsetLeftDistance(distance)
     }
 
-    /** 上游 `setLeftMinVisibleBarCount(count)`：滚动下界（可见根数钳制）。 */
+    /** 上游 `setLeftMinVisibleBarCount(count)`：滚动下界（可见根数钳制，clamp 内强制）。 */
     fun setLeftMinVisibleBarCount(count: Int) {
-        state.viewport.overscrollSlots = 0.0 // 左侧不可再越界（可见首根 >= 0 等价）
+        state.viewport.leftMinVisibleBarCount = count.coerceAtLeast(0)
+        state.notifyViewportChanged()
     }
 
-    /** 上游 `setRightMinVisibleBarCount(count)`（批次 2c 接入右向钳制）。 */
+    /** 上游 `setRightMinVisibleBarCount(count)`：滚动上界（可见根数钳制，clamp 内强制）。 */
     fun setRightMinVisibleBarCount(count: Int) {
-        // 右向最小可见数：由 rightOffsetSlots 与 clamp 协同，暂登记语义
+        state.viewport.rightMinVisibleBarCount = count.coerceAtLeast(0)
+        state.notifyViewportChanged()
     }
+
+    /** 上游 `getLeftMinVisibleBarCount()` / `getRightMinVisibleBarCount()`。 */
+    fun getLeftMinVisibleBarCount(): Int = state.viewport.leftMinVisibleBarCount
+    fun getRightMinVisibleBarCount(): Int = state.viewport.rightMinVisibleBarCount
 
     /** 上游 `setZoomEnabled(enabled)` / `isZoomEnabled()`。 */
     internal var zoomEnabled: Boolean = true
@@ -431,7 +437,9 @@ class LKanvasChart private constructor(
         calcParams: List<Double>? = null,
         paneId: String = "main",
         isStack: Boolean = true,
-    ): String? = state.createIndicator(name, calcParams, paneId, isStack)
+        yAxisId: String = "main",
+        styles: Any? = null,
+    ): String? = state.createIndicator(name, calcParams, paneId, isStack, yAxisId, styles)
 
     /** 上游 `overrideIndicator`：字段级覆盖（calcParams/visible）。 */
     fun overrideIndicator(id: String, calcParams: List<Double>? = null, visible: Boolean? = null): Boolean =
@@ -489,7 +497,7 @@ class LKanvasChart private constructor(
         val inst = state.overlays.get(id) ?: return null
         return OverlayInfo(
             id = inst.id,
-            groupId = null,
+            groupId = inst.groupId,
             name = inst.templateName,
             paneId = inst.effectivePaneId,
             points = inst.points.toList(),
@@ -497,6 +505,10 @@ class LKanvasChart private constructor(
             visible = inst.visible,
             zLevel = inst.zIndex,
             extendData = inst.extensionData.toMap(),
+            currentStep = inst.currentStep,
+            fixedZLevel = inst.fixedZLevel,
+            modeSensitivity = inst.modeSensitivity,
+            styles = inst.styles,
         )
     }
 
@@ -522,10 +534,13 @@ class LKanvasChart private constructor(
         }
         val inst = state.overlays.get(id) ?: return null
         inst.paneIdOverride = paneId
+        value.groupId?.let { inst.groupId = it }
         value.extendData.forEach { (k, v) -> inst.extensionData[k] = v }
         inst.locked = value.lock
         inst.visible = value.visible
         inst.zIndex = value.zLevel
+        inst.modeSensitivity = value.modeSensitivity
+        value.styles?.let { inst.styles = it }
         state.notifyOverlayChanged()
         return id
     }
@@ -539,7 +554,7 @@ class LKanvasChart private constructor(
         state.overlays.all()
             .mapNotNull { overlayToInfo(it.id) }
             .filter { info ->
-                filter == null || filter.matches(info.id, info.name, info.paneId, hasGroup = info.groupId != null)
+                filter == null || filter.matches(info.id, info.name, info.paneId, info.groupId)
             }
 
     /** 上游 `overrideOverlay(override)`：以 `override.name+filter` 定位。 */
@@ -549,10 +564,14 @@ class LKanvasChart private constructor(
             inst.points.clear()
             inst.points.addAll(pts)
         }
+        override.groupId?.let { inst.groupId = it }
         override.extendData?.let { ext -> inst.extensionData.putAll(ext) }
         override.lock?.let { inst.locked = it }
         override.visible?.let { inst.visible = it }
         override.zLevel?.let { inst.zIndex = it }
+        override.fixedZLevel?.let { inst.fixedZLevel = it }
+        override.modeSensitivity?.let { inst.modeSensitivity = it }
+        override.styles?.let { inst.styles = it }
         state.notifyOverlayChanged()
         return true
     }
@@ -672,6 +691,110 @@ class LKanvasChart private constructor(
             PaneOptions("macd", p.macd.toDouble()),
         )
         return if (id == null) all else all.filter { it.id == id }
+    }
+
+    // ---------- 多轴（对齐 Chart.ts:1003~1104） ----------
+
+    /** 主轴默认视图（id 与 IndicatorInstance.yAxisId 默认一致）。 */
+    private val defaultMainYAxis = YAxisInfo(
+        id = "main",
+        name = null,
+        paneId = "main",
+        reverse = false,
+        inside = false,
+        position = AxisPosition.RIGHT,
+        scrollZoomEnabled = true,
+        gap = AxisGap(),
+        needWidget = true,
+        isDefault = true,
+    )
+
+    /** 轴实例表（主轴预置；含主轴）。 */
+    private val yAxes = java.util.concurrent.ConcurrentHashMap<String, YAxisInfo>().apply {
+        put("main", defaultMainYAxis)
+    }
+
+    private var yAxisSerial = 0
+
+    /** x 轴覆写记录（overrideXAxis 语义位；绘制端消费随批次 5+）。 */
+    internal var xAxisState = XAxisOverride()
+
+    /** 上游 `createYAxis(yAxis)`：登记轴实例，返回 id（重复 id 幂等返回）。 */
+    fun createYAxis(yAxis: YAxisOverride): String? {
+        val paneId = yAxis.paneId ?: "main"
+        if (paneId == "candle_x") return null // x 轴 pane 不支持 y 轴（上游 PaneIdConstants.X_AXIS）
+        val id = yAxis.id ?: "yAxis_${++yAxisSerial}"
+        if (yAxes.containsKey(id)) return id
+        yAxes[id] = YAxisInfo(
+            id = id,
+            name = yAxis.name,
+            paneId = paneId,
+            reverse = yAxis.reverse ?: false,
+            inside = yAxis.inside ?: false,
+            position = yAxis.position ?: AxisPosition.RIGHT,
+            scrollZoomEnabled = true,
+            gap = yAxis.gap ?: AxisGap(),
+            needWidget = yAxis.needWidget ?: true,
+            isDefault = false,
+        )
+        state.notifyViewportChanged()
+        return id
+    }
+
+    /**
+     * 上游 `removeYAxis(filter)`：主 pane 默认轴与有指标绑定的轴受保护
+     * （上游 isDefaultYAxis + indicator.yAxisId 检查语义）。
+     */
+    fun removeYAxis(filter: YAxisFilter): Boolean {
+        if (filter.id == null && filter.name == null) return false
+        var removed = false
+        for (axis in getYAxes(filter)) {
+            if (axis.isDefault && axis.paneId == "main") continue
+            val bound = state.getIndicators().any { it.yAxisId == axis.id }
+            if (bound) continue
+            yAxes.remove(axis.id)
+            removed = true
+        }
+        if (removed) state.notifyViewportChanged()
+        return removed
+    }
+
+    /** 上游 `getYAxes(filter)`。 */
+    fun getYAxes(filter: YAxisFilter): List<YAxisInfo> =
+        yAxes.values
+            .filter { filter.paneId == null || it.paneId == filter.paneId }
+            .filter { filter.id == null || it.id == filter.id }
+            .filter { filter.name == null || it.name == filter.name }
+            .sortedBy { it.id }
+
+    /** 上游 `overrideYAxis(yAxis)`：按 paneId+id 定位后非空字段覆盖。 */
+    fun overrideYAxis(yAxis: YAxisOverride) {
+        val targets = getYAxes(YAxisFilter(paneId = yAxis.paneId, id = yAxis.id))
+        for (axis in targets) {
+            yAxes[axis.id] = axis.copy(
+                name = yAxis.name ?: axis.name,
+                reverse = yAxis.reverse ?: axis.reverse,
+                inside = yAxis.inside ?: axis.inside,
+                position = yAxis.position ?: axis.position,
+                scrollZoomEnabled = yAxis.scrollZoomEnabled ?: axis.scrollZoomEnabled,
+                gap = yAxis.gap ?: axis.gap,
+                needWidget = yAxis.needWidget ?: axis.needWidget,
+            )
+        }
+        if (targets.isNotEmpty()) state.notifyViewportChanged()
+    }
+
+    /** 上游 `overrideXAxis(xAxis)`：时间轴覆写登记。 */
+    fun overrideXAxis(xAxis: XAxisOverride) {
+        xAxisState = xAxisState.copy(
+            name = xAxis.name ?: xAxisState.name,
+            reverse = xAxis.reverse ?: xAxisState.reverse,
+            inside = xAxis.inside ?: xAxisState.inside,
+            position = xAxis.position ?: xAxisState.position,
+            scrollZoomEnabled = xAxis.scrollZoomEnabled ?: xAxisState.scrollZoomEnabled,
+            gap = xAxis.gap ?: xAxisState.gap,
+        )
+        state.notifyViewportChanged()
     }
 
     // ---------- 视口开关收尾（2c） ----------

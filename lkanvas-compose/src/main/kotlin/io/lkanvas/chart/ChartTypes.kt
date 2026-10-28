@@ -62,3 +62,50 @@ data class ZoomAnchor(
 ) {
     enum class Anchor { CURSOR, LAST_BAR }
 }
+
+// ---------- 上游类型别名同名化（TYP-010；TS string literal → Kotlin 枚举） ----------
+// Styles 树内字段当前沿用字符串常量（"dashed"/"solid" 等），本组枚举提供
+// 同名 API 面与值域约束；树内字段迁移随批次 5+ 绘制端消费统一。
+
+/** 上游 `LineType = 'dashed' | 'solid'`。 */
+enum class LineType(val value: String) { DASHED("dashed"), SOLID("solid") }
+
+/** 上游 `PathType = 'stroke' | 'fill'`。 */
+enum class PathType(val value: String) { STROKE("stroke"), FILL("fill") }
+
+/** 上游 `PolygonType = PathType | 'stroke_fill'`。 */
+enum class PolygonType(val value: String) { STROKE("stroke"), FILL("fill"), STROKE_FILL("stroke_fill") }
+
+/** 上游 `TooltipShowRule = 'always' | 'follow_cross' | 'none'`。 */
+enum class TooltipShowRule(val value: String) { ALWAYS("always"), FOLLOW_CROSS("follow_cross"), NONE("none") }
+
+/** 上游 `TooltipShowType = 'standard' | 'rect'`。 */
+enum class TooltipShowType(val value: String) { STANDARD("standard"), RECT("rect") }
+
+/** 上游 `FeatureType = 'path' | 'icon_font'`。 */
+enum class FeatureType(val value: String) { PATH("path"), ICON_FONT("icon_font") }
+
+/** 上游 `TooltipFeaturePosition = 'left' | 'middle' | 'right'`。 */
+enum class TooltipFeaturePosition(val value: String) { LEFT("left"), MIDDLE("middle"), RIGHT("right") }
+
+/** 上游 `CandleType`：主图六形态。 */
+enum class CandleType(val value: String) {
+    CANDLE_SOLID("candle_solid"),
+    CANDLE_STROKE("candle_stroke"),
+    CANDLE_UP_STROKE("candle_up_stroke"),
+    CANDLE_DOWN_STROKE("candle_down_stroke"),
+    OHLC("ohlc"),
+    AREA("area"),
+}
+
+/** 上游 `FormatDateType = 'tooltip' | 'crosshair' | 'xAxis'`。 */
+enum class FormatDateType(val value: String) { TOOLTIP("tooltip"), CROSSHAIR("crosshair"), X_AXIS("xAxis") }
+
+/** 上游 `ZoomAnchorType = 'cursor' | 'last_bar'`。 */
+enum class ZoomAnchorType(val value: String) { CURSOR("cursor"), LAST_BAR("last_bar") }
+
+/** 上游 `OverlayDrawingMode = 'step' | 'continuous'`。 */
+enum class OverlayDrawingMode(val value: String) { STEP("step"), CONTINUOUS("continuous") }
+
+/** 上游 `DataLoadType = 'init' | 'forward' | 'backward' | 'update'`（DataLoader.kt 亦有同名）。 */
+enum class DataLoadType(val value: String) { INIT("init"), FORWARD("forward"), BACKWARD("backward"), UPDATE("update") }

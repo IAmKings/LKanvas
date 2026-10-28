@@ -94,4 +94,48 @@ object LkanvasRegistry {
 
     fun getLocale(name: String): ChartLocale? = locales[name]
 
+    // ---- 样式与轴模板注册（上游 extension/styles|x-axis|y-axis 同名） ----
+
+    /**
+     * 上游 `registerStyles(name, styles)` / `getStyles(name)`。
+     * light/dark 已预注册（[io.lkanvas.chart.styles.StylesThemes]）。
+     */
+    fun registerStyles(name: String, styles: io.lkanvas.chart.styles.Styles) =
+        io.lkanvas.chart.styles.StylesThemes.registerStyles(name, styles)
+
+    fun getStyleTheme(name: String): io.lkanvas.chart.styles.Styles? =
+        io.lkanvas.chart.styles.StylesThemes.getStyles(name)
+
+    /** 上游 `getSupportedStyles()` 等价：已注册主题名。 */
+    fun getSupportedStyles(): List<String> = io.lkanvas.chart.styles.StylesThemes.registeredNames()
+
+    /**
+     * 上游 `AxisTemplate` 门面建模（registerXAxis/registerYAxis 按 name 登记；
+     * 自定义变换回调走 [io.lkanvas.core.axis.CustomYAxis]）。
+     */
+    interface AxisTemplate {
+        val name: String
+        val reverse: Boolean get() = false
+        val inside: Boolean get() = false
+        val position: AxisPosition get() = AxisPosition.RIGHT
+        val scrollZoomEnabled: Boolean get() = true
+        val gap: AxisGap get() = AxisGap()
+    }
+
+    /** 轴模板注册表（x: normal 预注册；y: normal/percentage/logarithm 预注册）。 */
+    val xAxisTemplates = LinkedHashMap<String, AxisTemplate>()
+    val yAxisTemplates = LinkedHashMap<String, AxisTemplate>().apply {
+        put("normal", object : AxisTemplate { override val name = "normal" })
+        put("percentage", object : AxisTemplate { override val name = "percentage" })
+        put("logarithm", object : AxisTemplate { override val name = "logarithm" })
+    }.also { xAxisTemplates.put("normal", object : AxisTemplate { override val name = "normal" }) }
+
+    /** 上游 `registerXAxis(axis)` / `registerYAxis(axis)`。 */
+    fun registerXAxis(axis: AxisTemplate) { xAxisTemplates[axis.name] = axis }
+    fun registerYAxis(axis: AxisTemplate) { yAxisTemplates[axis.name] = axis }
+
+    /** 上游 `getXAxisClass(name)` / `getYAxisClass(name)` 等价：返回模板。 */
+    fun getXAxisTemplate(name: String): AxisTemplate? = xAxisTemplates[name]
+    fun getYAxisTemplate(name: String): AxisTemplate? = yAxisTemplates[name]
+
 }

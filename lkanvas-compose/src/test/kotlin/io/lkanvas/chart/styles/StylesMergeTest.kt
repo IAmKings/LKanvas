@@ -34,7 +34,7 @@ class StylesMergeTest {
         assertEquals(StylesThemes.dark, StylesMerge.resolveTheme("dark"))
         assertEquals(StylesThemes.light, StylesMerge.resolveTheme("unknown"), "未知名回退 light")
         // 注册表
-        assertEquals(listOf("light", "dark"), StylesThemes.registeredNames())
+        assertTrue(StylesThemes.registeredNames().containsAll(listOf("light", "dark")))
         val custom = Styles(separator = SeparatorStyle(color = "#123123"))
         StylesThemes.registerStyles("custom", custom)
         assertTrue(StylesThemes.registeredNames().contains("custom"))
