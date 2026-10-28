@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.lkanvas.chart.Period
 import io.lkanvas.compose.KLineChart
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
@@ -43,6 +45,7 @@ class MainActivity : ComponentActivity() {
             val feed = remember { LocalFeed() }
             val state = remember { ChartState() }
             val chartFacade = remember { io.lkanvas.chart.LKanvasChart.init(state) }
+            var showIndicatorPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
             LaunchedEffect(state) { feed.start(state) }
             // 左缘分页：滚动到边缘时补充更早历史（锚点保持由 core 保证）
@@ -56,6 +59,36 @@ class MainActivity : ComponentActivity() {
             }
             Surface(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.statusBarsPadding()) {
+                    // —— 批次 6 余量：周期 tab + 指标面板（对齐上游 demo 信息架构） ——
+                    val currentPeriod = remember { androidx.compose.runtime.mutableStateOf(Period(Period.PeriodType.MINUTE)) }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)) {
+                        val periods: List<Pair<String, Period>> = listOf(
+                            "1m" to Period(Period.PeriodType.MINUTE),
+                            "5m" to Period(Period.PeriodType.MINUTE, 5 * 60_000L),
+                            "15m" to Period(Period.PeriodType.MINUTE, 15 * 60_000L),
+                            "1h" to Period(Period.PeriodType.HOUR),
+                            "1d" to Period(Period.PeriodType.DAY),
+                        )
+                        periods.forEach { (label, period) ->
+                            val selected = currentPeriod.value == period
+                            Button(
+                                onClick = {
+                                    if (!selected) {
+                                        currentPeriod.value = period
+                                        chartFacade.setPeriod(period)
+                                    }
+                                },
+                                modifier = Modifier.padding(end = 4.dp),
+                            ) {
+                                Text(label, fontSize = 11.sp)
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Button(onClick = { showIndicatorPanel = !showIndicatorPanel }) { Text("指标") }
+                    }
+                    if (showIndicatorPanel) {
+                        IndicatorPanel(facade = chartFacade, onClose = { showIndicatorPanel = false })
+                    }
                     // 门面 Styles 消费：resolveTheme 从 styles 树推导主题快照
                     val facadeTheme = remember(chartFacade.getStyles()) { chartFacade.resolveTheme() }
                     KLineChart(
