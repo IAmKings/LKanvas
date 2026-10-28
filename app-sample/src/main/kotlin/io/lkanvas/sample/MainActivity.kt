@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,6 +48,7 @@ class MainActivity : ComponentActivity() {
             val state = remember { ChartState() }
             val chartFacade = remember { io.lkanvas.chart.LKanvasChart.init(state) }
             var showIndicatorPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
+            var showStylesPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
             LaunchedEffect(state) { feed.start(state) }
             // 左缘分页：滚动到边缘时补充更早历史（锚点保持由 core 保证）
@@ -89,6 +92,9 @@ class MainActivity : ComponentActivity() {
                     if (showIndicatorPanel) {
                         IndicatorPanel(facade = chartFacade, onClose = { showIndicatorPanel = false })
                     }
+                    if (showStylesPanel) {
+                        StylesPanel(facade = chartFacade, onClose = { showStylesPanel = false })
+                    }
                     // 门面 Styles 消费：resolveTheme 从 styles 树推导主题快照
                     val facadeTheme = remember(chartFacade.getStyles()) { chartFacade.resolveTheme() }
                     KLineChart(
@@ -112,7 +118,9 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                     )
-                    Row(Modifier.fillMaxWidth().padding(8.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                    ) {
                         // 画线工具循环（16 种，T-20/21/22）
                         val tools = io.lkanvas.core.overlay.OverlayTemplates.all.keys.toList()
                         Button(
@@ -131,7 +139,10 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text("删除") }
                     }
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                            .horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                    ) {
                         // 主图类型循环切换（六形态，T-18）
                         val types = io.lkanvas.compose.theme.MainChartType.entries
                         Button(
@@ -167,6 +178,10 @@ class MainActivity : ComponentActivity() {
                             },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text(if (stylesDark) "暗" else "亮") }
+                        Button(
+                            onClick = { showStylesPanel = !showStylesPanel },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text("样式") }
                     }
                 }
             }

@@ -376,6 +376,31 @@ class LKanvasChartTest {
         LKanvasChart.dispose(chart)
     }
 
+
+    @Test
+    fun `tooltip_features三事件分发`() {
+        val chart = newChart()
+        val candleFeature = mutableListOf<Any?>()
+        val indicatorFeature = mutableListOf<Any?>()
+        val crosshairFeature = mutableListOf<Any?>()
+        chart.subscribeAction(ActionType.ON_CANDLE_TOOLTIP_FEATURE_CLICK, ActionCallback { candleFeature.add(it) })
+        chart.subscribeAction(ActionType.ON_INDICATOR_TOOLTIP_FEATURE_CLICK, ActionCallback { indicatorFeature.add(it) })
+        chart.subscribeAction(ActionType.ON_CROSSHAIR_FEATURE_CLICK, ActionCallback { crosshairFeature.add(it) })
+
+        chart.executeTooltipFeatureClick("fullscreen", paneId = "main")
+        chart.executeTooltipFeatureClick("setting", paneId = "vol")
+        chart.executeTooltipFeatureClick("close", paneId = "crosshair")
+        drain()
+
+        assertEquals(1, candleFeature.size)
+        assertEquals(1, indicatorFeature.size)
+        assertEquals(1, crosshairFeature.size)
+        val payload = candleFeature[0] as Map<*, *>
+        assertEquals("fullscreen", payload["featureId"])
+        assertEquals("main", payload["paneId"])
+        LKanvasChart.dispose(chart)
+    }
+
     @Test
     fun `offsetRight距离与槽位换算`() {
         val chart = newChart()

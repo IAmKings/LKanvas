@@ -281,6 +281,19 @@ class LKanvasChart private constructor(
         actionCallbacks.getValue(type).add(callback)
     }
 
+    /**
+     * tooltip feature 点击（上游 onCandleTooltipFeatureClick/onIndicatorTooltipFeatureClick/
+     * onCrosshairFeatureClick 三种；由宿主 UI 图标点击时调用，映射上游 feature 点击语义）。
+     */
+    fun executeTooltipFeatureClick(featureId: String, paneId: String = "main") {
+        val type = when (paneId) {
+            "main" -> ActionType.ON_CANDLE_TOOLTIP_FEATURE_CLICK
+            "vol" -> ActionType.ON_INDICATOR_TOOLTIP_FEATURE_CLICK
+            else -> ActionType.ON_CROSSHAIR_FEATURE_CLICK
+        }
+        emit(type, mapOf("paneId" to paneId, "featureId" to featureId))
+    }
+
     /** 上游 `unsubscribeAction(type, callback?)`；callback 为 null 时清空该类型。 */
     fun unsubscribeAction(type: ActionType, callback: ActionCallback? = null) {
         val list = actionCallbacks.getValue(type)
