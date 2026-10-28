@@ -3,6 +3,8 @@ package io.lkanvas.chart
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.store.MarketKey
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -435,8 +437,11 @@ class LKanvasChart private constructor(
 
     // ---------- 样式（对齐 setStyles/getStyles，批次 5） ----------
 
-    /** 当前样式（getStyles 返回值）。 */
-    internal var styles: io.lkanvas.chart.styles.Styles = io.lkanvas.chart.styles.StylesThemes.light
+    /** 当前样式（getStyles 返回值）；Compose 可观察——组合期读取 resolveTheme 的宿主随变化重组。 */
+    internal var styles: io.lkanvas.chart.styles.Styles by androidx.compose.runtime.mutableStateOf(
+        io.lkanvas.chart.styles.StylesThemes.light,
+    )
+
 
     /** 上游 `setStyles(value: string | DeepPartial<Styles>)`。 */
     fun setStyles(value: String) {
@@ -449,6 +454,10 @@ class LKanvasChart private constructor(
 
     /** 上游 `getStyles()`。 */
     fun getStyles(): io.lkanvas.chart.styles.Styles = styles
+
+    /** Styles → ChartTheme 快照（KLineChart theme 参数可用此值消费 Styles）。 */
+    fun resolveTheme(): io.lkanvas.compose.theme.ChartTheme =
+        io.lkanvas.compose.theme.StylesThemeBridge.toTheme(styles)
 
     // ---------- 覆盖物（对齐 Chart.ts 覆盖物组） ----------
 

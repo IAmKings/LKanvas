@@ -80,8 +80,8 @@
 | CH-012 | `getSymbol` | Chart.ts:591 | 同上 | B | test | S | 2a |  |
 | CH-013 | `setPeriod` | Chart.ts:595 | MarketKey.period 字符串 | B | test | S | 2a | Period{type,milliseconds} 类型化 |
 | CH-014 | `getPeriod` | Chart.ts:602 | 同上 | B | test | S | 2a |  |
-| CH-015 | `setStyles` | Chart.ts:606 | ChartTheme（字段树不同） | B | test | M | 5 | 字符串主题+DeepPartial merge |
-| CH-016 | `getStyles` | Chart.ts:612 | 同上 | B | test | S | 5 |  |
+| CH-015 | `setStyles` | Chart.ts:606 | 门面 setStyles(String/Styles)+Styles→Theme 桥接已建（真机双向切换） | B | test | M | 5 | 字符串主题+DeepPartial merge |
+| CH-016 | `getStyles` | Chart.ts:612 | 已建（Styles 树全量返回） | B | test | S | 5 |  |
 | CH-017 | `setLayoutOptions` | Chart.ts:616 | ChartLayoutConfig 部分 | B | compile | M | 5 | barSpaceLimit/pane/yAxis |
 | CH-018 | `getLayoutOptions` | Chart.ts:620 | 同上 | B | compile | S | 5 |  |
 | CH-019 | `setFormatter` | Chart.ts:624 | 门面 set/get 已建（Formatter 类型） | B | test | S | 2c | Formatter 接口对齐 |

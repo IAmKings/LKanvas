@@ -317,6 +317,11 @@ data class CandleBarColor(
     val noChangeWickColor: String = "#76808F",
 )
 
+/** 上游 CandleBarColorCallback：按 candle 返回配色（支持 compareRule 自定义）。 */
+fun interface CandleBarColorCallback {
+    fun color(data: io.lkanvas.core.data.Candle, prev: io.lkanvas.core.data.Candle?): CandleBarColor
+}
+
 /** 上游 CandleStyle。 */
 data class CandleStyle(
     val type: String = "candle_solid",

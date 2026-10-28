@@ -16,7 +16,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -39,6 +42,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val feed = remember { LocalFeed() }
             val state = remember { ChartState() }
+            val chartFacade = remember { io.lkanvas.chart.LKanvasChart.init(state) }
             val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
             LaunchedEffect(state) { feed.start(state) }
             // 左缘分页：滚动到边缘时补充更早历史（锚点保持由 core 保证）
@@ -52,10 +56,12 @@ class MainActivity : ComponentActivity() {
             }
             Surface(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.statusBarsPadding()) {
+                    // 门面 Styles 消费：resolveTheme 从 styles 树推导主题快照
+                    val facadeTheme = remember(chartFacade.getStyles()) { chartFacade.resolveTheme() }
                     KLineChart(
                         state = state,
                         modifier = Modifier.fillMaxSize().weight(1f),
-                        theme = ChartTheme.dark(),
+                        theme = facadeTheme,
                         // T-24 legendSlot 演示：宿主自定义图例（时间 + 收盘 + MA5，英文）
                         legendSlot = { data ->
                             Column(
@@ -116,9 +122,18 @@ class MainActivity : ComponentActivity() {
                         ) { Text("轴") }
                         // PNG 导出（T-29）：cacheDir/lkanvas-export.png（主题与屏幕一致）
                         Button(
-                            onClick = { exportPng(state, textMeasurer, io.lkanvas.compose.theme.ChartTheme.dark()) },
+                            onClick = { exportPng(state, textMeasurer, chartFacade.resolveTheme()) },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text("导出") }
+                        // Styles 树演示（批次 5 余量）：dark/light 主题切换经 setStyles
+                        var stylesDark by remember { androidx.compose.runtime.mutableStateOf(false) }
+                        Button(
+                            onClick = {
+                                stylesDark = !stylesDark
+                                chartFacade.setStyles(if (stylesDark) "dark" else "light")
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text(if (stylesDark) "暗" else "亮") }
                     }
                 }
             }
