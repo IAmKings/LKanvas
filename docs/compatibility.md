@@ -107,6 +107,7 @@
 | 2026-10-26 | **T-24 完整版 + A-41**：ChartLocale 中英文词条（摘要/方向词/无障碍动作，宿主可整体替换）；LegendData + legendSlot 插槽与 LegendMode（R-11 slot 定制）；右轴留白随字体缩放 + 主 pane 35% 保底钳制（真机 font_scale=2.0 与横屏验证）。**208 测试 0 失败** |
 | 2026-10-28 | **对齐计划批次 2~6 全部完成（V3 判定文件执行）**：LKanvasChart 门面（数据 DataLoader/事件 6 种/视口/配置/覆盖物与指标 CRUD/坐标转换/生命周期）；27+16 模板全注册并元数据自动 diff 0 差异；Styles 树 43 接口+默认值对照+setStyles 深合并；figure 注册 API；demo-checklist 人工验收无阻断；consumer 改门面 API 重编通过。**E 156→55**（208+? 测试全绿） |
 | 2026-10-28 | **批次 5 余量完成**：StylesThemeBridge（Styles→ChartTheme 桥接+hex 解析）、CandleBarColorCallback 双支持、门面 styles Compose 可观察（修复不重组缺陷，真机双向验证）；consumer 重发制品 |
+| 2026-10-28 | **0.2.0 发版（对齐矩阵 E=0）**：批次 5 余量收口——utils 22 项落地（严格对齐上游 format.ts 的 K/M/B 分档与 0{count} 折叠）；Viewport 双向 minVisible 钳制（CH-036/037）；多轴五方法 createYAxis/removeYAxis/getYAxes/overrideYAxis/overrideXAxis（YAxisInfo 记录层，主 pane 默认轴与指标绑定删除保护，CH-053~057）；registerStyles/XAxis/YAxis + setStyles(名) 查注册表（IDX-037/040/041）；Indicator 实例 paneId/yAxisId/styles 全链 + PlotDef.styles/attrs 建模位（IND-002/003/014/017）；Overlay 实例 groupId/currentStep/fixedZLevel/modeSensitivity/styles 全链（OVL-020/022/026/031/036/039，修 OverlayFilter.groupId 命中方向）+ performEvent/on 事件回调族建模位（OVL-006~008/011/012/014~016）；TYP-010 十一枚举同名化。矩阵最终 **A=15/B=227/C=9/D=6，E=0，unknown=0**（check.py 七面校验）；compose 77+core 全部测试绿；app-sample assembleRelease 构建通过；**0.2.0 制品重发本地 Maven，consumer 仅凭制品重编通过（A-46 保持）** |
 
 ## 6. 已知问题与后续计划
 

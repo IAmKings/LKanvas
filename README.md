@@ -25,8 +25,9 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 - **无障碍**：TalkBack 摘要（OHLCV+方向词+MA）与五个替代动作
 - **PNG 导出**：等比缩放三 pane 完整导出（真机验证）；**诊断**：可开关零开销收集器
 - **发布链路**：Maven 本地制品（core JAR+sources / compose AAR）、R8 release 真机验证、独立 consumer 仅凭制品编译通过（A-46）
+- **对齐矩阵 E=0**（A=15/B=227/C=9/D=6，unknown=0）：门面 API 面/模板注册/Styles 树/多轴/utils 22 项全部落位，check.py 七面校验通过
 - **B-01 初测**：10k candle 三指标末根更新 P95=0.270ms（D1 目标 4ms 的 1/15）
-- 待 M5/M6 收尾：Macrobenchmark 冻结设备测量（B-02~B-06）、tooltip 完整定制、API 冻结材料（见兼容台账）
+- 待 0.3.x 收尾：Macrobenchmark 冻结设备测量（B-02~B-06）、绘制端 Styles 更细粒度消费、tooltip features 可视图标（见兼容台账）
 
 ## 从 KLineChart (WebView) 迁移到 LKanvas
 
@@ -53,9 +54,9 @@ chart.setStyles("dark")
 chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE) { }
 ```
 
-- 完整 API 面与上游对应关系：`docs/alignment/gap-matrix.md`（257 行，0 unknown）
+- 完整 API 面与上游对应关系：`docs/alignment/gap-matrix.md`（257 行，**E=0**，0 unknown）
 - parity 用例：上游文档示例的迁移测试见 `lkanvas-compose/src/test/.../parity/`
-- 迁移章节完整版随 0.2.0 发布
+- 迁移章节完整版随 0.2.0 发布（本文上方示例 + parity 用例即最小迁移面；多轴/事件回调族细节见 gap-matrix）
 
 ## 上游基线
 ## 上游基线
