@@ -14,7 +14,7 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 | `lkanvas-compose` | Android Compose 库：`KLineChart` 组件（六种主图类型、三 pane、明暗主题）、Canvas 绘制、手势状态机、segment 画线 |
 | `app-sample` | 示例应用：本地确定性行情、实时末根更新、分页、画线、图型/轴切换 |
 
-## 当前进度（对齐计划完成，0.2.0）
+## 当前进度（0.3.0：Tooltip 完整版 + 回调消费端）
 
 - **27/27 内置指标**：全部与上游 v10.1.0 TS oracle 逐位对照通过（值与 Missing 位置），附手算样例与增量/全量一致性测试
 - **16/16 覆盖物**：共用生命周期状态机，brush 5000 点上限；斐波那契价格空间投影（D-02）
@@ -26,8 +26,10 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 - **PNG 导出**：等比缩放三 pane 完整导出（真机验证）；**诊断**：可开关零开销收集器
 - **发布链路**：Maven 本地制品（core JAR+sources / compose AAR）、R8 release 真机验证、独立 consumer 仅凭制品编译通过（A-46）
 - **对齐矩阵 E=0**（A=15/B=227/C=9/D=6，unknown=0）：门面 API 面/模板注册/Styles 树/多轴/utils 22 项全部落位，check.py 七面校验通过
+- **Tooltip 渲染完整版（0.3.0）**：showRule/showType/features 全消费（对齐上游 CandleTooltipView），feature 图标命中→三种 ActionType；样式面板全部开关联动
+- **回调消费端（0.3.0）**：覆盖物 onClick/onDoubleClick/onRightClick(长按)/onTouch 系手势分发、performEventPressedMove 委托、indicator draw 钩子（IndicatorDrawContext）、时区接线；setStylesStrict 修复切回默认值边界
 - **B-01 初测**：10k candle 三指标末根更新 P95=0.270ms（D1 目标 4ms 的 1/15）
-- 待 0.3.x 收尾：Macrobenchmark 冻结设备测量（B-02~B-06）、绘制端 Styles 更细粒度消费、tooltip features 可视图标（见兼容台账）
+- 待 0.4.x：多轴渲染消费（YAxisInfo→多轴绘制）、动态 pane 模型/isStack、Macrobenchmark（B-02~B-06）性能线、诊断可视化 UI（见兼容台账）
 
 ## 从 KLineChart (WebView) 迁移到 LKanvas
 
