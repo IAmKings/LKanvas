@@ -24,6 +24,18 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
         }
+        // Macrobenchmark 目标变体（P1 性能线）：R8 压缩 + 非 debuggable + debug 签名
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            // perfetto 采集 RenderThread 帧切片需要 profileable（Macrobenchmark 官方模板标配）
+            isProfileable = true
+            // 诊断实验：隔离 R8 minify 对帧计量的影响（首轮 B-02 用非压缩口径，登记于 performance-baseline）
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     compileOptions {

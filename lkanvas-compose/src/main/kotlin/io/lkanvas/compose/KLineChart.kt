@@ -93,6 +93,9 @@ fun KLineChart(
                     )
                 },
         ) {
+            // 订阅视口/覆盖物版本（P1 修复）：纯 scrollIndex/barSpacing 变化
+            // 无任何 snapshot state 变化也必须触发重绘（静态数据下平移/缩放）
+            @Suppress("UNUSED_VARIABLE") val renderRevision = state.viewRevision + state.overlayRevision
             with(ChartRenderer) {
                 render(
                     state = state,

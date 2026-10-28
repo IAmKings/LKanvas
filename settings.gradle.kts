@@ -36,3 +36,4 @@ dependencyResolutionManagement {
 include(":lkanvas-core")
 include(":lkanvas-compose")
 include(":app-sample")
+include(":benchmark")

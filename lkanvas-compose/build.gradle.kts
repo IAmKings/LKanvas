@@ -20,6 +20,10 @@ android {
         release {
             isMinifyEnabled = false
         }
+        // Macrobenchmark 目标变体（P1 性能线）：回落到 release 实现
+        create("benchmark") {
+            matchingFallbacks += listOf("release")
+        }
     }
 
     compileOptions {

@@ -43,6 +43,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 性能线 P1（PRD 7.2）：stress 负载模式（Macrobenchmark B-02 扩展负载注入）
+        val stress = takeIf { intent?.getBooleanExtra("stress_mode", false) == true }?.let {
+            io.lkanvas.sample.StressConfig(
+                candles = intent?.getIntExtra("stress_candles", 50_000) ?: 50_000,
+                indicators = intent?.getIntExtra("stress_indicators", 10) ?: 10,
+                overlays = intent?.getIntExtra("stress_overlays", 100) ?: 100,
+            )
+        }
         setContent {
             val feed = remember { LocalFeed() }
             val state = remember { ChartState() }
@@ -50,7 +58,7 @@ class MainActivity : ComponentActivity() {
             var showIndicatorPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             var showStylesPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
-            LaunchedEffect(state) { feed.start(state) }
+            LaunchedEffect(state, stress) { feed.start(state, stress, chartFacade) }
             // 左缘分页：滚动到边缘时补充更早历史（锚点保持由 core 保证）
             LaunchedEffect(state) {
                 snapshotFlow { state.viewRevision }
@@ -245,6 +253,53 @@ class LocalFeed(private val seed: Int = 2026) {
         vol,
     )
 
+    /**
+     * stress 负载模式（B-02 扩展负载，PRD 7.2 固定负载纪律）：一次性注入
+     * N candle + K 个 MA 实例 + M 条 segment 覆盖物，静态不推 tick（压力来自
+     * 滚动/缩放交互而非数据流）；种子固定 2026 保证可复现。
+     */
+    suspend fun start(state: ChartState, stress: StressConfig?, facade: io.lkanvas.chart.LKanvasChart?) {
+        if (stress != null) {
+            val nowMin = System.currentTimeMillis() / 60_000L * 60_000L
+            val count = stress.candles
+            val initial = ArrayList<Candle>(count)
+            val startTs = nowMin - count * 60_000L
+            var p = 100.0
+            for (i in 0 until count) {
+                val open = p
+                val close = open + (rand.nextDouble() - 0.5) * 2
+                initial += candleAt(startTs + i * 60_000L, open, close, rand.nextDouble() * 5000 + 100)
+                p = close
+            }
+            state.reset(io.lkanvas.core.store.MarketKey("STRESS", "1m"), initial)
+            // K 个 MA 实例（参数各不同，随视口增量推进）
+            repeat(stress.indicators) { i ->
+                facade?.createIndicator("MA", calcParams = listOf((i + 2).toDouble()))
+            }
+            // M 条 segment（时间均分 + 价格在数据范围内固定模式取点）
+            val lo = initial.minOf { it.low }
+            val hi = initial.maxOf { it.high }
+            val ts0 = initial.first().timestamp
+            val ts1 = initial.last().timestamp
+            repeat(stress.overlays) { i ->
+                val t1 = ts0 + (ts1 - ts0) * i / stress.overlays
+                val t2 = ts0 + (ts1 - ts0) * (i + 1) / stress.overlays
+                facade?.createOverlay(
+                    io.lkanvas.chart.OverlayCreate(
+                        "segment",
+                        points = listOf(
+                            io.lkanvas.core.overlay.OverlayPoint(t1, lo + (hi - lo) * (i % 7) / 7.0),
+                            io.lkanvas.core.overlay.OverlayPoint(t2, lo + (hi - lo) * ((i + 3) % 7) / 7.0),
+                        ),
+                    ),
+                )
+            }
+            android.util.Log.i("LKanvas", "stress 注入完成：${stress.candles} candle / ${stress.indicators} 指标 / ${stress.overlays} 覆盖物")
+            return
+        }
+        start(state)
+    }
+
     suspend fun start(state: ChartState) {
         val nowMin = System.currentTimeMillis() / 60_000L * 60_000L
         nextTs = nowMin
@@ -302,3 +357,7 @@ class LocalFeed(private val seed: Int = 2026) {
         delay(400) // 防抖：分页后暂停触发
     }
 }
+
+
+/** B-02 扩展负载参数（Macrobenchmark intent extras 注入；PRD 7.2 固定负载）。 */
+data class StressConfig(val candles: Int, val indicators: Int, val overlays: Int)

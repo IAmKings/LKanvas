@@ -12,6 +12,9 @@ composeBom = "2026.06.01"
 kotlinx-coroutines = "1.10.2"
 kotlinxSerialization = "1.8.1"
 junit = "4.13.2"
+androidxBenchmark = "1.4.1"
+androidxTestRunner = "1.6.2"
+androidxTestRules = "1.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -29,8 +32,14 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 # 仅使用 Json DOM API（fixture 解析），不引入 @Serializable 编译插件
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-benchmark-macro = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "androidxBenchmark" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version = "1.2.1" }
+androidx-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version = "2.3.0" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidxTestRules" }
 
 [plugins]
+android-test = { id = "com.android.test", version.ref = "agp" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
