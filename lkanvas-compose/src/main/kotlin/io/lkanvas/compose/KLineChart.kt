@@ -41,7 +41,10 @@ fun KLineChart(
     styles: io.lkanvas.chart.styles.Styles? = null,
 ) {
     val density = LocalDensity.current
-    val textMeasurer = rememberTextMeasurer()
+    // T-34：tooltip/轴每帧大量文本测量，默认 TextMeasurer LRU(8) 全 miss 反复布局——放大缓存
+    val textMeasurer = rememberTextMeasurer(cacheSize = 256)
+    // T-34：tooltip DrawOp 缓存（静态内容录制一次回放，实测省 ~27ms/帧）
+    val tooltipCache = remember { ChartRenderer.TooltipKeyHolder() }
 
     val subPaneH = with(density) { config.subPaneHeight.toPx() }
     val timeAxisH = with(density) { config.timeAxisHeight.toPx() }
@@ -109,6 +112,7 @@ fun KLineChart(
                         includeCrosshair = true,
                         drawLegend = legendSlot == null && state.legendMode == ChartState.LegendMode.VISIBLE,
                         styles = styles,
+                        tooltipCache = tooltipCache,
                     ),
                     textMeasurer = textMeasurer,
                 )

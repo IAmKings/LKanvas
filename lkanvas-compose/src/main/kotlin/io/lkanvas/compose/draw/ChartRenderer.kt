@@ -1,8 +1,13 @@
 package io.lkanvas.compose.draw
 
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.drawText
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
 import io.lkanvas.core.axis.LinearYAxis
@@ -33,7 +38,19 @@ object ChartRenderer {
          * 消费 showRule/showType/features；null 时保持 ChartTheme 行式图例。
          */
         val styles: io.lkanvas.chart.styles.Styles? = null,
+        /**
+         * T-34 tooltip 缓存：非空时 tooltip 按 (revision, idx, styles) 录制
+         * DrawOp 列表并回放（静态数据下 tooltip 逐帧 130+ 行 measure+drawText
+         * 实测占 27ms/帧）。键与缓存的读写经 [TooltipKeyHolder]（调用方 remember）。
+         */
+        val tooltipCache: TooltipKeyHolder? = null,
     )
+
+    /** tooltip 缓存（KLineChart remember 持有，绘制阶段读写）。 */
+    class TooltipKeyHolder {
+        internal var key: Any? = null
+        internal var ops: List<io.lkanvas.compose.draw.TooltipRenderer.DrawOp>? = null
+    }
 
     fun DrawScope.render(
         state: ChartState,
@@ -76,18 +93,54 @@ object ChartRenderer {
         if (params.drawLegend) {
             val styles = params.styles
             if (styles != null) {
-                // 批次 7：tooltip 消费 Styles 树（showRule/showType/features）
-                with(io.lkanvas.compose.draw.TooltipRenderer) {
-                    drawCandleTooltip(
-                        state, styles, theme, textMeasurer,
-                        baseTextSizePx = params.legendTextSizePx,
-                        crosshair = crosshair,
-                        contentWidth = contentRight,
-                        paneBottom = mainBottom,
-                    )
+                val cache = params.tooltipCache
+                val candles = state.dataSnapshot.candles
+                val idx = crosshair
+                    ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) }
+                    ?: (candles.size - 1)
+                // tooltip 内容只依赖数据快照 + 锚点 idx + styles（位置固定在 pane 顶部，
+                // 不随视口平移变化）——平移帧走回放，这正是 B-02 滚动场景的收益来源
+                val key = Triple(
+                    System.identityHashCode(state.dataSnapshot),
+                    idx,
+                    System.identityHashCode(styles),
+                )
+                if (cache != null && cache.key == key && cache.ops != null) {
+                    // T-34：回放缓存的 DrawOp（文本 measure 命中 TextMeasurer 缓存）
+                    for (op in cache.ops!!) {
+                        when (op) {
+                            is io.lkanvas.compose.draw.TooltipRenderer.DrawOp.Text ->
+                                drawText(textMeasurer, op.text, topLeft = op.topLeft, style = io.lkanvas.compose.draw.TooltipRenderer.textStyle(op.sizePx, op.color))
+
+                            is io.lkanvas.compose.draw.TooltipRenderer.DrawOp.RoundRect ->
+                                if (op.strokeWidth > 0f) {
+                                    drawRoundRect(op.color, topLeft = op.topLeft, size = op.size, cornerRadius = CornerRadius(op.radius, op.radius), style = Stroke(width = op.strokeWidth))
+                                } else {
+                                    drawRoundRect(op.color, topLeft = op.topLeft, size = op.size, cornerRadius = CornerRadius(op.radius, op.radius))
+                                }
+
+                            is io.lkanvas.compose.draw.TooltipRenderer.DrawOp.StrokePath ->
+                                drawPath(op.path, op.color, style = Stroke(width = op.strokeWidth))
+                        }
+                    }
+                } else {
+                    val ops = if (cache != null) ArrayList<io.lkanvas.compose.draw.TooltipRenderer.DrawOp>() else null
+                    with(io.lkanvas.compose.draw.TooltipRenderer) {
+                        drawCandleTooltip(
+                            state, styles, theme, textMeasurer,
+                            baseTextSizePx = params.legendTextSizePx,
+                            crosshair = crosshair,
+                            contentWidth = contentRight,
+                            paneBottom = mainBottom,
+                            recorder = ops,
+                        )
+                    }
+                    drawSubPaneTooltips(state, styles, theme, textMeasurer, params.legendTextSizePx, crosshair, contentRight, mainBottom, volTop, volBottom, macdBottom, recorder = ops)
+                    if (cache != null) {
+                        cache.key = key
+                        cache.ops = ops
+                    }
                 }
-                // 副图指标 tooltip（VOL/MACD pane 顶部行）
-                drawSubPaneTooltips(state, styles, theme, textMeasurer, params.legendTextSizePx, crosshair, contentRight, mainBottom, volTop, volBottom, macdBottom)
             } else {
                 drawLegend(state, theme, text, params.legendTextSizePx, crosshair, params.gutterWidth, params.width)
             }
@@ -110,6 +163,7 @@ object ChartRenderer {
         volTop: Float,
         volBottom: Float,
         macdBottom: Float,
+        recorder: MutableList<io.lkanvas.compose.draw.TooltipRenderer.DrawOp>? = null,
     ) {
         val candles = state.dataSnapshot.candles
         if (candles.isEmpty()) return
@@ -127,6 +181,7 @@ object ChartRenderer {
                     name = "VOL",
                     legendKeys = keys.map { it to vol.result[it].getOrNull(idx) },
                     legendColors = keys.mapIndexed { i, _ -> theme.linePalette[i % theme.linePalette.size] },
+                    recorder = recorder,
                 )
             }
             // MACD：dif/dea/macd
@@ -142,6 +197,7 @@ object ChartRenderer {
                         theme.macdDif, theme.macdDea,
                         if ((macd.result["macd"]?.getOrNull(idx) ?: 0.0) >= 0) theme.macdBarUp else theme.macdBarDown,
                     ),
+                    recorder = recorder,
                 )
             }
         }

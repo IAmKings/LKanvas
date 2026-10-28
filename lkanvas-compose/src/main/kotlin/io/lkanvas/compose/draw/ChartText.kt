@@ -58,16 +58,29 @@ class ChartText(
 
     companion object {
         /** 时间标签（Alpha 基础规则：按 candle 间隔选择 日/时分 格式；UTC 存储，显示本地时区）。 */
-        fun timeLabel(timestamp: Long, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String {
+        // T-34：时间标签每帧对可见区每根 candle 生成（Calendar+format 昂贵），按 (ts,tz) 缓存
+        private const val LABEL_CACHE_MAX = 4096
+        private val labelCache = HashMap<String, String>()
+
+        private fun cachedLabel(key: String, compute: () -> String): String {
+            val hit = labelCache[key]
+            if (hit != null) return hit
+            val v = compute()
+            if (labelCache.size >= LABEL_CACHE_MAX) labelCache.clear()
+            labelCache[key] = v
+            return v
+        }
+
+        fun timeLabel(timestamp: Long, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String = cachedLabel("t$timestamp|$intervalMs|${tz.id}") {
             val cal = java.util.Calendar.getInstance(tz)
             cal.timeInMillis = timestamp
             val dayFmt = { "%02d-%02d".format(cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH)) }
             val timeFmt = { "%02d:%02d".format(cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)) }
-            return if (intervalMs >= 24 * 3600_000L) dayFmt() else timeFmt()
+            if (intervalMs >= 24 * 3600_000L) dayFmt() else timeFmt()
         }
 
         /** 跨日显示日期、同日显示时间（时间轴）。 */
-        fun timeAxisLabel(timestamp: Long, prevTimestamp: Long?, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String {
+        fun timeAxisLabel(timestamp: Long, prevTimestamp: Long?, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String = cachedLabel("a$timestamp|$tz.id") {
             val cal = java.util.Calendar.getInstance(tz)
             cal.timeInMillis = timestamp
             val sameDay = prevTimestamp != null && run {
@@ -78,7 +91,7 @@ class ChartText(
             }
             val day = "%02d-%02d".format(cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
             val time = "%02d:%02d".format(cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
-            return when {
+            when {
                 intervalMs >= 24 * 3600_000L -> "%d/%s".format(cal.get(java.util.Calendar.YEAR) % 100, day)
                 sameDay -> time
                 else -> day

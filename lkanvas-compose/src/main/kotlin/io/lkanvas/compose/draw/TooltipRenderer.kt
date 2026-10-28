@@ -33,6 +33,18 @@ import kotlin.math.max
  */
 object TooltipRenderer {
 
+    /**
+     * T-34：tooltip 绘制操作录制（静态内容录一次，每帧回放）。
+     * 实测 tooltip 逐帧 130+ 行文本（measure+draw）占 27ms/帧；录制回放后
+     * 仅剩 drawText（TextMeasurer 缓存命中）。零 API 风险（GraphicsLayer
+     * record/drawLayer 在 Compose 1.11 的 DrawScope 上下文存在自引用环，弃用）。
+     */
+    sealed class DrawOp {
+        class Text(val text: String, val topLeft: Offset, val sizePx: Float, val color: Color) : DrawOp()
+        class RoundRect(val color: Color, val topLeft: Offset, val size: Size, val radius: Float, val strokeWidth: Float) : DrawOp()
+        class StrokePath(val path: androidx.compose.ui.graphics.Path, val color: Color, val strokeWidth: Float) : DrawOp()
+    }
+
     /** 上游 isDrawTooltip：showRule 判定。 */
     fun shouldDraw(showRule: String, crosshairActive: Boolean): Boolean =
         showRule == "always" || (showRule == "follow_cross" && crosshairActive)
@@ -118,6 +130,7 @@ object TooltipRenderer {
         crosshair: Offset?,
         contentWidth: Float,
         paneBottom: Float,
+        recorder: MutableList<DrawOp>? = null,
     ) {
         val candleT = styles.candle.tooltip
         val indT = styles.indicator.tooltip
@@ -131,7 +144,7 @@ object TooltipRenderer {
         val drawInd = groups.any { it.name.isNotEmpty() || it.legends.any { r -> r.value != "—" } }
         state.tooltipFeatureHits = emptyList()
         if (!drawCandle && !drawInd) return
-        val session = Session(state, measurer, baseTextSizePx, candles)
+        val session = Session(state, measurer, baseTextSizePx, candles, recorder)
 
         val candleRows = if (drawCandle) buildCandleLegends(state, idx, styles, tooltipText) else emptyList()
         if (candleT.showType == "rect") {
@@ -165,11 +178,12 @@ object TooltipRenderer {
         name: String,
         legendKeys: List<Pair<String, Double?>>,
         legendColors: List<Color>,
+        recorder: MutableList<DrawOp>? = null,
     ) {
         val indT = styles.indicator.tooltip
         if (!indT.title.show && !indT.legend.show) return
         if (indT.features.isEmpty() && legendKeys.isEmpty()) return
-        val session = Session(state, measurer, baseTextSizePx, state.dataSnapshot.candles)
+        val session = Session(state, measurer, baseTextSizePx, state.dataSnapshot.candles, recorder)
         val titleColor = StylesThemeBridge.parse(indT.title.color)
         val legendColor = StylesThemeBridge.parse(indT.legend.color)
         var y = paneTop + 2f
@@ -191,12 +205,20 @@ object TooltipRenderer {
         session.drawFeatureRow(this, indT.features, paneId, Offset(8f, y + 2f), contentWidth, active = false)
     }
 
-    /** 会话封装（测量器 + 游标；DrawScope 经参数显式传入）。 */
+    /** 回放用样式构造（与 Session.style 同一语义）。 */
+    fun textStyle(sizePx: Float, color: Color): androidx.compose.ui.text.TextStyle =
+        androidx.compose.ui.text.TextStyle(
+            fontSize = androidx.compose.ui.unit.TextUnit(sizePx, androidx.compose.ui.unit.TextUnitType.Sp),
+            color = color,
+        )
+
+    /** 会话封装（测量器 + 游标；DrawScope 经参数显式传入）。recorder 非空=录制模式。 */
     private class Session(
         val state: ChartState,
         val measurer: TextMeasurer,
         val baseSizePx: Float,
         val candles: List<io.lkanvas.core.data.Candle>,
+        val recorder: MutableList<DrawOp>? = null,
     ) {
         // Styles size 语义按 sp 渲染（12 ≈ 上游 DPR3 的 36 物理像素）
         private fun style(sizePx: Float) = TextStyle(fontSize = TextUnit(sizePx, TextUnitType.Sp))
@@ -211,7 +233,9 @@ object TooltipRenderer {
 
         private fun DrawScope.drawAt(s: String, topLeft: Offset, sizePx: Float, color: Color) {
             if (s.isEmpty()) return
+            // 录制模式：录制 + 绘制并行（录制帧本身要呈现；否则「最后一帧无 tooltip」）
             drawText(measurer, s, topLeft = topLeft, style = style(sizePx).copy(color = color))
+            recorder?.add(DrawOp.Text(s, topLeft, sizePx, color))
         }
 
         /** 行式块：标题行 + candle 行 + 指标组行，返回块底 y。 */
@@ -333,12 +357,14 @@ object TooltipRenderer {
                     StylesThemeBridge.parse(rect.color),
                     topLeft = Offset(rectX, rectY), size = Size(rectW, rectH), cornerRadius = CornerRadius(radius, radius),
                 )
+                recorder?.add(DrawOp.RoundRect(StylesThemeBridge.parse(rect.color), Offset(rectX, rectY), Size(rectW, rectH), radius, 0f))
                 if (borderPx > 0f) {
                     drawRoundRect(
                         StylesThemeBridge.parse(rect.borderColor),
                         topLeft = Offset(rectX, rectY), size = Size(rectW, rectH), cornerRadius = CornerRadius(radius, radius),
                         style = Stroke(width = borderPx),
                     )
+                    recorder?.add(DrawOp.RoundRect(StylesThemeBridge.parse(rect.borderColor), Offset(rectX, rectY), Size(rectW, rectH), radius, borderPx))
                 }
             }
             var ty = rectY + borderPx + rect.paddingTop.toFloat()
@@ -378,6 +404,7 @@ object TooltipRenderer {
                 )
                 scope.run {
                     drawRoundRect(bg, topLeft = rect.topLeft, size = Size(size, size), cornerRadius = CornerRadius(f.borderRadius.toFloat(), f.borderRadius.toFloat()))
+                    recorder?.add(DrawOp.RoundRect(bg, rect.topLeft, Size(size, size), f.borderRadius.toFloat(), 0f))
                     val content = f.content
                     when {
                         f.type == "icon_font" && content is String ->
@@ -394,6 +421,7 @@ object TooltipRenderer {
                                 path.moveTo(pts.first().x, pts.first().y)
                                 pts.drop(1).forEach { path.lineTo(it.x, it.y) }
                                 drawPath(path, fg, style = Stroke(width = 1.5f))
+                                recorder?.add(DrawOp.StrokePath(path, fg, 1.5f))
                             }
                         }
                     }

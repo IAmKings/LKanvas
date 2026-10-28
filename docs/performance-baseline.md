@@ -86,13 +86,40 @@ PRD 7.3 全表在本项目冻结如下（D1 = 本项目目标档；校准前不�
 | P90 / P95 / P99 | 81 / **85** / 101 ms | 输入 P95 ≤100 ms | P95=85 达（但整体超帧） |
 | GPU P50 / P95 | 6 / 8 ms | — | **GPU 不是瓶颈** |
 
-**T-34 优化循环输入（按优先级）**：
-1. 帧耗时瓶颈在 UI 线程 CPU 侧（GPU 仅 8ms）——10 个 MA 实例每帧全可见区重绘
-   `drawLinePlots`（10×~200 线段）与 candle/覆盖物逐帧重算是首要嫌疑；
-   方向：覆盖物与指标线 **GraphicsLayer 缓存层**（静态内容不逐帧重放）、
-   视口变更时仅重绘脏区、指标线 LOD（缩小期间抽稀采样）
-2. 100 覆盖物逐帧遍历命中/绘制——按可见区裁剪（当前全量遍历）
-3. R8 压缩口径数据待 FrameTimingMetric 兼容后补采（非压缩口径偏乐观）
+### 4.4 T-34 优化循环第一轮（2026-10-29，同口径复测）
+
+**分段定位方法**（可复用）：临时 intent 开关逐项禁用绘制路径 + gfxinfo 对比——
+禁 tooltip 实测 53→26ms，锁定 tooltip 为最大热点（逐帧 130+ 行 measure+drawText）。
+
+**落地优化三项**（全部低风险纯 Kotlin，无新 API 依赖）：
+1. `rememberTextMeasurer(cacheSize = 256)`：tooltip/轴每帧大量文本测量，
+   TextMeasurer 默认 LRU(8) 全 miss 反复布局
+2. 时间标签缓存：`timeLabel/timeAxisLabel` 每帧对可见区每根 candle 做
+   Calendar+format，按 (ts,tz) 缓存（上限 4096 清空）
+3. **tooltip DrawOp 录制回放**：tooltip 内容只依赖 (数据快照, 锚点 idx, styles)，
+   位置固定 pane 顶部不随视口平移——录制帧绘制+收集 DrawOp（Text/RoundRect/
+   StrokePath），稳定帧逐条回放（仅 drawText，measure 全部命中缓存）。
+   注：曾尝试 Compose 1.11 GraphicsLayer record/drawLayer，在 DrawScope 上下文
+   存在自引用环（StackOverflowError），弃用；修正了初版 key 含 viewRevision
+   的语义错误（平移帧每帧变 key 导致永远处于录制态、tooltip 消失）
+
+**复测结果（20 次全宽滑动，同 §4.3 口径）**：
+
+| 指标 | 优化前 | 优化后 | 变化 |
+|---|---|---|---|
+| 帧数 | 262 | 507 | 帧吞吐 +94% |
+| 超帧截止比例 | 99.6% | **59.6%** | -40pp |
+| frameDurationCpuMs P50 | 69 ms | **27 ms** | **-61%** |
+| P90 / P95 | 81 / 85 ms | 40 / **44 ms** | -51% / -48% |
+| P99 | 101 ms | 48 ms | -52% |
+| GPU P50 / P95 | 6 / 8 ms | 6 / 8 ms | GPU 全程非瓶颈 |
+
+**余量与下一步**（T-34 第二轮输入）：P50=27ms 仍超 16.7ms 预算——
+剩余热点为 candle（180 根×3 rect）+ 65 列指标线（15k lineTo/帧，stress 合成
+负载 10 个 MA 参数 2..11）+ 100 覆盖物逐帧全量遍历。方向：可见区裁剪覆盖物、
+指标线抽稀/分层缓存（内容随视口平移需 tile 化或 GraphicsLayer 正确用法）、
+candle 同色合并 Path。**注意**：优化前后的 P50/P95 均为 UI 线程 CPU 口径
+（gfxinfo frameDurationCpuMs），与 PRD 7.3 的 D1 目标同一计量定义。
 
 ## 5. 后续动作（T-34 输入）
 
