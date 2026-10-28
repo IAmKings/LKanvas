@@ -5,37 +5,51 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import io.lkanvas.compose.KLineChart
-import io.lkanvas.compose.state.ChartState
+import io.lkanvas.chart.ActionCallback
+import io.lkanvas.chart.ActionType
+import io.lkanvas.chart.DataLoader
+import io.lkanvas.chart.LKanvasChart
+import io.lkanvas.chart.Period
+import io.lkanvas.chart.SymbolInfo
 import io.lkanvas.core.data.Candle
-import io.lkanvas.core.store.MarketKey
+import io.lkanvas.compose.KLineChart
 
 /**
- * 独立消费者接入示例（PRD A-46/T-31）：只使用发布制品的公开 API 完成
- * 基础图表 + 实时更新（PRD 1.3「可接入」验收的编译期证明）。
- *
+ * 独立消费者接入示例（PRD A-46/T-31 + 对齐批次 DoD-4）：
+ * 只使用发布制品的公开 API，**经 LKanvasChart 门面**（上游 KLineChart API 面）
+ * 完成数据接入 + 实时更新 + 指标创建 + 事件订阅。
  * 若此处引用了 internal/隐藏接口，编译将直接失败。
  */
 class ConsumerUsage {
 
-    fun createChartState(): ChartState = ChartState()
+    val chart: LKanvasChart = LKanvasChart.init()
 
-    suspend fun feedData(state: ChartState) {
-        state.reset(
-            MarketKey("EXAMPLE", "1m"),
-            (0 until 100).map {
-                Candle(
-                    it.toLong(), 100.0 + it, 101.0 + it, 99.0 + it, 100.5 + it, 1000.0,
-                )
-            },
-        )
-        state.upsertLatest(Candle(200L, 200.0, 201.0, 199.0, 200.5, 500.0))
+    init {
+        // 上游 quickstart DataLoader 模式
+        chart.setDataLoader(object : DataLoader {
+            override fun getBars(params: DataLoader.GetBarsParams) {
+                if (params.type == DataLoader.DataLoadType.INIT) {
+                    params.callback(
+                        (0 until 100).map {
+                            Candle(
+                                it.toLong(), 100.0 + it, 101.0 + it, 99.0 + it, 100.5 + it, 1000.0,
+                            )
+                        },
+                        DataLoader.DataLoadMore.NONE,
+                    )
+                }
+            }
+        })
+        chart.setSymbol(SymbolInfo("EXAMPLE"))
+        chart.setPeriod(Period(Period.PeriodType.MINUTE))
+        // 上游 createIndicator 语义
+        chart.createIndicator("MA")
+        // 上游 subscribeAction 语义
+        chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE, ActionCallback { })
     }
 
     @Composable
     fun Chart() {
-        val state = remember { ChartState() }
-        LaunchedEffect(state) { feedData(state) }
-        KLineChart(state = state, modifier = Modifier.fillMaxSize())
+        KLineChart(state = chart.state, modifier = Modifier.fillMaxSize())
     }
 }
