@@ -55,6 +55,29 @@ object StylesThemeBridge {
             overlayLine = parse(styles.overlay.line.color),
             overlayPoint = parse(styles.overlay.point.color),
             overlayText = parse(styles.overlay.text.color),
+            // Styles 细粒度消费（批次 5余-2）
+            gridShow = styles.grid.show,
+            gridVerticalLine = parse(styles.grid.vertical.color),
+            gridDashed = styles.grid.horizontal.style == "dashed",
+            separatorColor = parse(styles.separator.color),
+            // 上游 separator.size 为 pane 间隙（交互热区）语义，非线宽；当前布局无间隙，线宽固定细线
+            separatorSizePx = 1f,
+            priceMarkShow = styles.candle.priceMark.show,
+            highMarkerColor = parse(styles.candle.priceMark.high.color),
+            lowMarkerColor = parse(styles.candle.priceMark.low.color),
+            lastPriceShow = styles.candle.priceMark.last.show,
+            lastPriceLineShow = styles.candle.priceMark.last.line.show,
+            lastPriceLineDashed = styles.candle.priceMark.last.line.style == "dashed",
+            crosshairShow = styles.crosshair.show,
+            crosshairHorizontalShow = styles.crosshair.horizontal.show,
+            crosshairVerticalShow = styles.crosshair.vertical.show,
+            crosshairDashed = styles.crosshair.horizontal.line.style == "dashed",
+            crosshairLineSizePx = styles.crosshair.horizontal.line.size.toFloat().coerceAtLeast(0.5f),
+            areaLineColor = parse(styles.candle.area.lineColor),
+            areaLineSizePx = styles.candle.area.lineSize.toFloat(),
+            indicatorLineSizePx = (styles.indicator.lines.firstOrNull()?.size ?: 1.5).toFloat(),
+            indicatorLineDashed = (styles.indicator.lines.firstOrNull()?.style ?: "solid") == "dashed",
+            lastValueMarkShow = styles.indicator.lastValueMark.show,
         )
     }
 

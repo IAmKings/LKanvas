@@ -64,11 +64,25 @@ object PaneRenderers {
         val yReal: (Double) -> Double = { r -> LinearYAxis.valueToY(r, rf, rt, top.toDouble(), bottom.toDouble()) }
         val y: (Double) -> Double = { v -> yReal(YAxisMath.valueToReal(spec, v)) }
 
-        // 网格与刻度按轴规格生成
+        // 网格与刻度按轴规格生成（Styles grid.show/横向虚线开关）
         val axisTicks = YAxisMath.ticks(spec, lo, hi, 5)
-        for (t in axisTicks.ticks) {
-            val yy = yReal(t.real).toFloat()
-            drawLine(theme.gridLine, Offset(contentLeft, yy), Offset(contentRight, yy), 1f)
+        if (theme.gridShow) {
+            val hEff = if (theme.gridDashed) dashedEffect() else null
+            for (t in axisTicks.ticks) {
+                val yy = yReal(t.real).toFloat()
+                drawLine(theme.gridLine, Offset(contentLeft, yy), Offset(contentRight, yy), 1f, pathEffect = hEff)
+            }
+            // 竖向网格：可见区四等分（上游竖网格在固定 bar 间隔，此处取等分近似）
+            val step = maxOf(1.0, range.count / 4.0)
+            val vEff = if (theme.gridDashed) dashedEffect() else null
+            var gi = range.first + step.toInt()
+            while (gi <= range.last) {
+                val xx = state.viewport.candleCenterX(gi.toDouble()).toFloat()
+                if (xx >= contentLeft && xx <= contentRight) {
+                    drawLine(theme.gridVerticalLine, Offset(xx, top), Offset(xx, bottom), 1f, pathEffect = vEff)
+                }
+                gi += step.toInt()
+            }
         }
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             drawCandles(state, theme, visible, range.first, y)
@@ -76,17 +90,21 @@ object PaneRenderers {
             var paletteIdx = 0
             for (inst in state.mainPaneIndicatorResults()) {
                 val res = inst.state ?: continue
-                drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx)
+                drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
                 paletteIdx += res.result.keys.size
             }
-            drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
+            if (theme.lastPriceShow) {
+                drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
+            }
             drawHighLowMarkers(state, theme, text, visible, range.first, y, contentRight)
             if (state.mainChartType == MainChartType.AREA) {
                 drawAreaFill(state, theme, visible, range.first, y, bottom)
             }
         }
         drawAxisTicks(text, theme, axisTicks, yReal, contentRight, clipTop = legendHeight)
-        if (crosshair != null) drawCrosshair(theme, crosshair, contentLeft, contentRight, top, bottom)
+        if (crosshair != null && theme.crosshairShow) {
+            drawCrosshair(theme, crosshair, contentLeft, contentRight, top, bottom)
+        }
     }
 
     /** 轴规格刻度标签（文本已按规格格式化；垂直去重叠 + 顶部避让）。 */
@@ -136,7 +154,7 @@ object PaneRenderers {
         drawGrid(theme, text, 0.0, maxVol, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             drawVolumeBars(state, theme, result, range, y)
-            drawLinePlots(result, state.viewport, range, y, theme.linePalette, skipKeys = listOf("volume"))
+            drawLinePlots(result, state.viewport, range, y, theme.linePalette, skipKeys = listOf("volume"), lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = false)
         }
         drawYAxisLabels(text, theme, LinearYAxis.ticks(0.0, maxVol, 3), y, contentRight)
     }
@@ -168,7 +186,7 @@ object PaneRenderers {
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             drawMacdBars(state, theme, result, range, y)
-            drawLinePlots(result, state.viewport, range, y, listOf(theme.macdDif, theme.macdDea), keys = listOf("dif", "dea"))
+            drawLinePlots(result, state.viewport, range, y, listOf(theme.macdDif, theme.macdDea), keys = listOf("dif", "dea"), lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = false)
         }
         drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), y, contentRight)
     }
@@ -186,11 +204,17 @@ object PaneRenderers {
         bottom: Float,
         tickCount: Int = 5,
     ) {
+        if (!theme.gridShow) return
+        val eff = if (theme.gridDashed) dashedEffect() else null
         for (t in LinearYAxis.ticks(lo, hi, tickCount)) {
             val yy = LinearYAxis.valueToY(t, lo, hi, top.toDouble(), bottom.toDouble()).toFloat()
-            drawLine(theme.gridLine, Offset(left, yy), Offset(right, yy), 1f)
+            drawLine(theme.gridLine, Offset(left, yy), Offset(right, yy), 1f, pathEffect = eff)
         }
     }
+
+    /** Styles 虚线约定（dashedValue 2/2，px）。 */
+    private fun dashedEffect() =
+        androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(6f, 4f))
 
     private fun DrawScope.drawCandles(
         state: ChartState,
@@ -297,7 +321,7 @@ object PaneRenderers {
         path.lineTo(lastX, paneBottom)
         path.lineTo(firstX, paneBottom)
         path.close()
-        val lineColor = theme.linePalette.first()
+        val lineColor = theme.areaLineColor
         drawPath(
             path,
             androidx.compose.ui.graphics.Brush.verticalGradient(
@@ -306,10 +330,10 @@ object PaneRenderers {
                 endY = paneBottom,
             ),
         )
-        drawPath(closeLine, lineColor, style = Stroke(width = 1.5f))
+        drawPath(closeLine, lineColor, style = Stroke(width = theme.areaLineSizePx))
     }
 
-    /** 可见最高/最低标记（PRD R-07：可见最高最低标记）。 */
+    /** 可见最高/最低标记（PRD R-07；Styles priceMark.show + high/low.color 消费）。 */
     private fun DrawScope.drawHighLowMarkers(
         state: ChartState,
         theme: ChartTheme,
@@ -319,7 +343,7 @@ object PaneRenderers {
         y: (Double) -> Double,
         contentRight: Float,
     ) {
-        if (visible.size < 2) return
+        if (!theme.priceMarkShow || visible.size < 2) return
         var highIdx = 0
         var lowIdx = 0
         for (i in visible.indices) {
@@ -329,11 +353,11 @@ object PaneRenderers {
         val vp = state.viewport
         val hx = vp.candleCenterX((firstIndex + highIdx).toDouble()).toFloat()
         val hy = y(visible[highIdx].high).toFloat()
-        drawText(text, " ${text.price(visible[highIdx].high)}", Offset(hx + 6f, (hy - text.textHeight).coerceAtLeast(0f)), theme.upColor)
+        drawText(text, " ${text.price(visible[highIdx].high)}", Offset(hx + 6f, (hy - text.textHeight).coerceAtLeast(0f)), theme.highMarkerColor)
 
         val lx = vp.candleCenterX((firstIndex + lowIdx).toDouble()).toFloat()
         val ly = y(visible[lowIdx].low).toFloat()
-        drawText(text, "${text.price(visible[lowIdx].low)} ", Offset((lx - 6f - text.tagWidth).coerceAtLeast(0f), ly + 2f), theme.downColor)
+        drawText(text, "${text.price(visible[lowIdx].low)} ", Offset((lx - 6f - text.tagWidth).coerceAtLeast(0f), ly + 2f), theme.lowMarkerColor)
     }
 
     private fun DrawScope.drawVolumeBars(
@@ -402,13 +426,19 @@ object PaneRenderers {
         skipKeys: List<String> = emptyList(),
         keys: List<String>? = null,
         paletteOffset: Int = 0,
+        lineSizePx: Float = 1.5f,
+        dashed: Boolean = false,
+        lastValueMark: Boolean = true,
     ) {
         val lineKeys = keys ?: result.result.keys.filterNot { it in skipKeys }
+        val eff = if (dashed) dashedEffect() else null
         for ((idx, key) in lineKeys.withIndex()) {
             val column = result.result[key]
             val color = palette[(idx + paletteOffset) % palette.size]
             val path = Path()
             var started = false
+            var lastX = Float.NaN
+            var lastY = Float.NaN
             for (i in range.first..range.last) {
                 val v = column[i]
                 if (v.isNaN()) {
@@ -423,8 +453,14 @@ object PaneRenderers {
                 } else {
                     path.lineTo(x, yy)
                 }
+                lastX = x
+                lastY = yy
             }
-            drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5f))
+            drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = lineSizePx, pathEffect = eff))
+            // Styles indicator.lastValueMark.show：线末端值点
+            if (lastValueMark && !lastX.isNaN()) {
+                drawCircle(color, radius = 2.5f, center = Offset(lastX, lastY))
+            }
         }
     }
 
@@ -440,7 +476,10 @@ object PaneRenderers {
         val last = candles.lastOrNull() ?: return
         // 末价标签避让图例区
         val yy = y(last.close).toFloat().coerceIn(legendHeight + text.tagHeight, Float.MAX_VALUE)
-        drawLine(theme.lastPriceLine, Offset(left, yy), Offset(right, yy), 1f)
+        if (theme.lastPriceLineShow) {
+            val eff = if (theme.lastPriceLineDashed) dashedEffect() else null
+            drawLine(theme.lastPriceLine, Offset(left, yy), Offset(right, yy), 1f, pathEffect = eff)
+        }
         drawTag(text,
             last.close,
             yy,
@@ -457,8 +496,13 @@ object PaneRenderers {
         top: Float,
         bottom: Float,
     ) {
-        drawLine(theme.crosshairLine, Offset(crosshair.x, top), Offset(crosshair.x, bottom), 1f)
-        drawLine(theme.crosshairLine, Offset(left, crosshair.y), Offset(right, crosshair.y), 1f)
+        val eff = if (theme.crosshairDashed) dashedEffect() else null
+        if (theme.crosshairVerticalShow) {
+            drawLine(theme.crosshairLine, Offset(crosshair.x, top), Offset(crosshair.x, bottom), theme.crosshairLineSizePx, pathEffect = eff)
+        }
+        if (theme.crosshairHorizontalShow) {
+            drawLine(theme.crosshairLine, Offset(left, crosshair.y), Offset(right, crosshair.y), theme.crosshairLineSizePx, pathEffect = eff)
+        }
     }
 
     private fun DrawScope.drawYAxisLabels(

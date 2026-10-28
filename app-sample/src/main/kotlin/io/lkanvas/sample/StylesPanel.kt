@@ -94,10 +94,11 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
             )
         }
 
-        // 分隔线颜色演示
-        SettingRow("分隔线色", "#33353D↔#76808F") {
-            val curColor = facade.getStyles().separator.color
-            facade.setStyles(Styles(separator = io.lkanvas.chart.styles.SeparatorStyle(color = curColor)))
+        // 分隔线颜色演示：#76808F ↔ #33353D 循环
+        SettingRow("分隔线色", "#76808F↔#33353D") {
+            val cur = facade.getStyles().separator.color
+            val next = if (cur == "#76808F") "#33353D" else "#76808F"
+            facade.setStyles(Styles(separator = io.lkanvas.chart.styles.SeparatorStyle(color = next)))
         }
     }
 }

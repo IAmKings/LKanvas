@@ -68,4 +68,55 @@ class StylesThemeBridgeTest {
         assertEquals(androidx.compose.ui.graphics.Color.Black, StylesThemeBridge.parse("#ZZ"))
     }
 
+    @Test
+    fun `细粒度字段桥接_开关与颜色`() {
+        val theme = StylesThemeBridge.toTheme(StylesThemes.light)
+        // 默认值：全部可见 + 网格/十字线/末价线为虚线
+        assertTrue(theme.gridShow && theme.priceMarkShow && theme.lastPriceShow)
+        assertTrue(theme.crosshairShow && theme.crosshairHorizontalShow && theme.crosshairVerticalShow)
+        assertTrue(theme.gridDashed && theme.lastPriceLineDashed && theme.crosshairDashed)
+        assertTrue(!theme.indicatorLineDashed)
+        assertTrue(theme.lastValueMarkShow)
+        assertEquals(0xFF76808F.toInt(), theme.highMarkerColor.toArgb())
+        assertEquals(0xFF1677FF.toInt(), theme.areaLineColor.toArgb())
+        assertEquals(0xFFDDDDDD.toInt(), theme.separatorColor.toArgb())
+    }
+
+    @Test
+    fun `细粒度字段桥接_关闭与定制回显`() {
+        val styles = Styles(
+            grid = io.lkanvas.chart.styles.GridStyle(
+                show = false,
+                horizontal = io.lkanvas.chart.styles.LineStyle(color = "#111111", style = "solid"),
+                vertical = io.lkanvas.chart.styles.LineStyle(color = "#222222", style = "solid"),
+            ),
+            separator = io.lkanvas.chart.styles.SeparatorStyle(color = "#ABCDEF", size = 3.0),
+            crosshair = io.lkanvas.chart.styles.CrosshairStyle(
+                show = false,
+                horizontal = io.lkanvas.chart.styles.CrosshairDirectionStyle(
+                    show = false,
+                    line = io.lkanvas.chart.styles.StateLineStyle(color = "#333333", style = "solid", size = 2.0),
+                ),
+            ),
+            indicator = io.lkanvas.chart.styles.IndicatorStyle(
+                lines = listOf(io.lkanvas.chart.styles.SmoothLineStyle(color = "#444444", size = 2.5, style = "dashed")),
+                lastValueMark = io.lkanvas.chart.styles.IndicatorLastValueMarkStyle(show = false),
+            ),
+        )
+        val theme = StylesThemeBridge.toTheme(styles)
+        assertTrue(!theme.gridShow)
+        assertEquals(0xFF111111.toInt(), theme.gridLine.toArgb())
+        assertTrue(!theme.gridDashed, "style=solid → 实线")
+        assertEquals(0xFF222222.toInt(), theme.gridVerticalLine.toArgb())
+        assertEquals(0xFFABCDEF.toInt(), theme.separatorColor.toArgb())
+        assertEquals(1f, theme.separatorSizePx, "上游 size 为间隙语义，线宽固定细线")
+        assertTrue(!theme.crosshairShow)
+        assertTrue(!theme.crosshairHorizontalShow)
+        assertTrue(!theme.crosshairDashed)
+        assertEquals(2f, theme.crosshairLineSizePx)
+        assertTrue(theme.indicatorLineDashed)
+        assertEquals(2.5f, theme.indicatorLineSizePx)
+        assertTrue(!theme.lastValueMarkShow)
+    }
+
 }

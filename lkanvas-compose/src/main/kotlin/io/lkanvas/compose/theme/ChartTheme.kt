@@ -40,6 +40,28 @@ data class ChartTheme(
     val overlayLine: Color = Color(0xFF2196F3),
     val overlayPoint: Color = Color(0xFFE91E63),
     val overlayText: Color = Color(0xFF2196F3),
+    // Styles 细粒度消费（批次 5余-2：绘制端接线；默认值=上游 defaultStyles 行为）
+    val gridShow: Boolean = true,
+    val gridVerticalLine: Color = Color(0xFFF0F0F0),
+    val gridDashed: Boolean = true,
+    val separatorColor: Color = Color(0xFFE8E8E8),
+    val separatorSizePx: Float = 1f,
+    val priceMarkShow: Boolean = true,
+    val highMarkerColor: Color = Color(0xFF76808F),
+    val lowMarkerColor: Color = Color(0xFF76808F),
+    val lastPriceShow: Boolean = true,
+    val lastPriceLineShow: Boolean = true,
+    val lastPriceLineDashed: Boolean = true,
+    val crosshairShow: Boolean = true,
+    val crosshairHorizontalShow: Boolean = true,
+    val crosshairVerticalShow: Boolean = true,
+    val crosshairDashed: Boolean = true,
+    val crosshairLineSizePx: Float = 1f,
+    val areaLineColor: Color = Color(0xFF1677FF),
+    val areaLineSizePx: Float = 2f,
+    val indicatorLineSizePx: Float = 1.5f,
+    val indicatorLineDashed: Boolean = false,
+    val lastValueMarkShow: Boolean = true,
 ) {
     companion object {
         fun dark(): ChartTheme = ChartTheme(

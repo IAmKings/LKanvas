@@ -51,11 +51,11 @@ object ChartRenderer {
         val macdTop = volBottom + 1f
         val macdBottom = macdTop + panes.macd
 
-        // 分隔线
-        drawLine(theme.axisLine, Offset(0f, mainBottom), Offset(params.width, mainBottom), 1f)
-        drawLine(theme.axisLine, Offset(0f, volBottom), Offset(params.width, volBottom), 1f)
+        // 分隔线（Styles separator.color/size 消费）
+        drawLine(theme.separatorColor, Offset(0f, mainBottom), Offset(params.width, mainBottom), theme.separatorSizePx)
+        drawLine(theme.separatorColor, Offset(0f, volBottom), Offset(params.width, volBottom), theme.separatorSizePx)
 
-        val crosshair = if (params.includeCrosshair) state.crosshairPosition else null
+        val crosshair = if (params.includeCrosshair && theme.crosshairShow) state.crosshairPosition else null
         // 主 pane 顶部两行图例（OHLC + MA）的避让高度
         val legendHeight = params.legendTextSizePx * 3.2f
         with(PaneRenderers) {
