@@ -97,12 +97,21 @@ class MainActivity : ComponentActivity() {
                     }
                     // 门面 Styles 消费：resolveTheme 从 styles 树推导主题快照
                     val facadeTheme = remember(chartFacade.getStyles()) { chartFacade.resolveTheme() }
+                    // 批次 7c：feature 点击事件演示（logcat 观测）
+                    LaunchedEffect(chartFacade) {
+                        chartFacade.subscribeAction(io.lkanvas.chart.ActionType.ON_CANDLE_TOOLTIP_FEATURE_CLICK) { data ->
+                            android.util.Log.i("LKanvas", "feature click: $data")
+                        }
+                    }
+                    var customLegendOn by remember { androidx.compose.runtime.mutableStateOf(false) }
                     KLineChart(
                         state = state,
                         modifier = Modifier.fillMaxSize().weight(1f),
                         theme = facadeTheme,
+                        // 批次 7a：tooltip 消费 Styles 树（showRule/showType/features）
+                        styles = chartFacade.getStyles(),
                         // T-24 legendSlot 演示：宿主自定义图例（时间 + 收盘 + MA5，英文）
-                        legendSlot = { data ->
+                        legendSlot = if (customLegendOn) { { data ->
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -116,7 +125,7 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                 )
                             }
-                        },
+                        } } else null,
                     )
                     Row(
                         Modifier.fillMaxWidth().padding(8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
@@ -178,6 +187,10 @@ class MainActivity : ComponentActivity() {
                             },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text(if (stylesDark) "暗" else "亮") }
+                        Button(
+                            onClick = { customLegendOn = !customLegendOn },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text(if (customLegendOn) "槽" else "内") }
                         Button(
                             onClick = { showStylesPanel = !showStylesPanel },
                             modifier = Modifier.padding(start = 8.dp),

@@ -34,6 +34,11 @@ fun KLineChart(
     config: ChartLayoutConfig = ChartLayoutConfig(),
     /** 图例定制插槽（PRD R-11/T-24）：非空时替代内置 Canvas 图例，随选择/十字线重组。 */
     legendSlot: (@Composable (io.lkanvas.compose.state.LegendData) -> Unit)? = null,
+    /**
+     * Styles 树（0.3.0 批次 7）：非空时 tooltip 消费 showRule/showType/features
+     * （门面用户传 `facade.getStyles()` 保持 setStyles 即时生效）；null=ChartTheme 行式图例。
+     */
+    styles: io.lkanvas.chart.styles.Styles? = null,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
@@ -57,7 +62,7 @@ fun KLineChart(
     val a11yRevision = state.viewRevision + state.overlayRevision +
         (state.accessibilitySelectedIndex ?: -1)
     val a11yText = remember(a11yRevision, state.dataSnapshot.candles.size) {
-        state.accessibilityText { ts -> ChartText.timeLabel(ts, 60_000L) }
+        state.accessibilityText { ts -> ChartText.timeLabel(ts, 60_000L, state.effectiveTimeZone()) }
     }
 
     // 图例数据（插槽非空或模式变化时随 viewRevision 重组）
@@ -98,6 +103,7 @@ fun KLineChart(
                         axisTextSizePx = textSizePx,
                         includeCrosshair = true,
                         drawLegend = legendSlot == null && state.legendMode == ChartState.LegendMode.VISIBLE,
+                        styles = styles,
                     ),
                     textMeasurer = textMeasurer,
                 )

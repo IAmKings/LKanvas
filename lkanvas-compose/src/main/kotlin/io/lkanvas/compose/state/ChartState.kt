@@ -496,6 +496,31 @@ class ChartState(
     internal var onCrosshairChanged: ((x: Double, y: Double, dataIndex: Int, timestamp: Long) -> Unit)? = null
     internal var onPaneDragged: ((paneId: String) -> Unit)? = null
 
+    /** tooltip feature 点击钩子（手势命中图标后调用；门面映射三种 ActionType）。 */
+    var onTooltipFeatureClick: ((paneId: String, featureId: String, x: Double, y: Double) -> Unit)? = null
+
+    /** IANA 时区（0.3.0 批次 8e：门面 setTimezone 注入；空=系统时区）。 */
+    var timezoneId: String = ""
+
+    /** 生效时区（非法名回退系统时区；JVM getTimeZone 对无效 ID 返回 GMT，需显式校验）。 */
+    fun effectiveTimeZone(): java.util.TimeZone {
+        if (timezoneId.isBlank()) return java.util.TimeZone.getDefault()
+        val tz = java.util.TimeZone.getTimeZone(timezoneId)
+        val invalid = tz.id == "GMT" && timezoneId != "GMT" &&
+            !java.util.TimeZone.getAvailableIDs().contains(timezoneId)
+        return if (invalid) java.util.TimeZone.getDefault() else tz
+    }
+
+    /** 渲染端记录的 feature 图标命中区（paneId, featureId, rect）；每次重绘重置。 */
+    var tooltipFeatureHits: List<TooltipFeatureHit> = emptyList()
+
+    data class TooltipFeatureHit(val paneId: String, val featureId: String, val rect: androidx.compose.ui.geometry.Rect)
+
+    /** 手势端查询：命中 feature 返回 (paneId, featureId)，未命中 null。 */
+    fun tooltipFeatureAt(x: Float, y: Float): Pair<String, String>? =
+        tooltipFeatureHits.firstOrNull { it.rect.contains(androidx.compose.ui.geometry.Offset(x, y)) }
+            ?.let { it.paneId to it.featureId }
+
     private var lastBarSpacing = 0.0
 
     /** 平移（px；手势层调用）。 */

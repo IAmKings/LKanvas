@@ -341,6 +341,8 @@ data class IndicatorLastValueMarkStyle(
 data class IndicatorTooltipStyle(
     val title: TooltipTitleStyle = TooltipTitleStyle(),
     val legend: TooltipLegendStyle = TooltipLegendStyle(),
+    /** 上游 indicator.tooltip.features：tooltip 功能图标（默认空=不渲染；三事件命中源）。 */
+    val features: List<TooltipFeatureStyle> = emptyList(),
 )
 
 /** 上游 IndicatorStyle。 */

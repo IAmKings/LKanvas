@@ -90,7 +90,23 @@ object PaneRenderers {
             var paletteIdx = 0
             for (inst in state.mainPaneIndicatorResults()) {
                 val res = inst.state ?: continue
-                drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
+                // 批次 8c：模板 draw 钩子非空时绕过 figures 管线（IND-022 消费端）
+                val customDraw = inst.definition.draw
+                if (customDraw != null) {
+                    customDraw(
+                        io.lkanvas.core.indicator.IndicatorDrawContext(
+                            result = res.result,
+                            rangeFirst = range.first,
+                            rangeLast = range.last,
+                            yOf = y,
+                            xOf = { i -> state.viewport.candleCenterX(i.toDouble()) },
+                            palette = theme.linePalette,
+                            scope = this,
+                        ),
+                    )
+                } else {
+                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
+                }
                 paletteIdx += res.result.keys.size
             }
             if (theme.lastPriceShow) {
@@ -429,12 +445,24 @@ object PaneRenderers {
         lineSizePx: Float = 1.5f,
         dashed: Boolean = false,
         lastValueMark: Boolean = true,
+        styleOverrideOf: ((key: String, index: Int) -> Pair<Color?, Float?>)? = null,
     ) {
         val lineKeys = keys ?: result.result.keys.filterNot { it in skipKeys }
         val eff = if (dashed) dashedEffect() else null
         for ((idx, key) in lineKeys.withIndex()) {
             val column = result.result[key]
-            val color = palette[(idx + paletteOffset) % palette.size]
+            val baseColor = palette[(idx + paletteOffset) % palette.size]
+            // 批次 8d：PlotDef.styles 行级回调（(index, row) -> {"color":...,"lineWidth":...}）
+            var overrideColor: Color? = null
+            var overrideWidth: Float? = null
+            if (styleOverrideOf != null) {
+                val mid = (range.first + range.last) / 2
+                val (c0, w0) = styleOverrideOf(key, mid)
+                overrideColor = c0
+                overrideWidth = w0
+            }
+            val color = overrideColor ?: baseColor
+            val width = overrideWidth ?: lineSizePx
             val path = Path()
             var started = false
             var lastX = Float.NaN
@@ -456,7 +484,7 @@ object PaneRenderers {
                 lastX = x
                 lastY = yy
             }
-            drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = lineSizePx, pathEffect = eff))
+            drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = width, pathEffect = eff))
             // Styles indicator.lastValueMark.show：线末端值点
             if (lastValueMark && !lastX.isNaN()) {
                 drawCircle(color, radius = 2.5f, center = Offset(lastX, lastY))

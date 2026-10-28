@@ -249,9 +249,13 @@ class LKanvasChart private constructor(
     private val actionCallbacks = ActionType.entries.associateWith { CopyOnWriteArrayList<ActionCallback>() }
 
     init {
-        // 手势/状态钩子 → 上游事件语义接线（feature 点击 3 种留批次 5 tooltip）
+        // 手势/状态钩子 → 上游事件语义接线
         state.onScrolled = { distance -> emit(ActionType.ON_SCROLL, mapOf("distance" to distance)) }
         state.onZoomed = { scale -> emit(ActionType.ON_ZOOM, mapOf("scale" to scale)) }
+        // tooltip feature 点击（0.3.0 批次 7c：手势命中图标 → 三种 ActionType）
+        state.onTooltipFeatureClick = { paneId, featureId, _, _ ->
+            executeTooltipFeatureClick(featureId, paneId)
+        }
         state.onVisibleRangeChanged = { from, to, realFrom, realTo ->
             emit(ActionType.ON_VISIBLE_RANGE_CHANGE, VisibleRange(from, to, realFrom, realTo))
         }
@@ -473,6 +477,15 @@ class LKanvasChart private constructor(
         styles = io.lkanvas.chart.styles.StylesMerge.merge(styles, patch) as io.lkanvas.chart.styles.Styles
     }
 
+    /**
+     * 严格合并版 setStyles（0.3.0）：字段值非 null 即覆盖（无 skip-defaults 启发式）。
+     * 用于宿主把字段**切回默认值**的场景（skip-defaults 会把「==默认值」当未提供，
+     * 从 rect 切回 standard、隐藏切回显示会被吞；矩阵差异登记见 StylesMerge 注释）。
+     */
+    fun setStylesStrict(patch: io.lkanvas.chart.styles.Styles) {
+        styles = io.lkanvas.chart.styles.StylesMerge.mergeStrict(styles, patch) as io.lkanvas.chart.styles.Styles
+    }
+
     /** 上游 `getStyles()`。 */
     fun getStyles(): io.lkanvas.chart.styles.Styles = styles
 
@@ -610,6 +623,7 @@ class LKanvasChart private constructor(
     /** 上游 `setTimezone(tz)`：IANA 名（空=系统时区）。 */
     fun setTimezone(timezone: String) {
         this.timezone = timezone
+        state.timezoneId = timezone // 批次 8e：时间标签渲染消费
     }
 
     /** 上游 `getTimezone()`：空字符串=系统时区（上游默认行为一致）。 */

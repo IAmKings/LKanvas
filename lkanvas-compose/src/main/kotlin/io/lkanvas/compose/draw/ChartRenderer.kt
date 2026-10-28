@@ -28,6 +28,11 @@ object ChartRenderer {
         val includeCrosshair: Boolean,
         /** false 时跳过内置图例（宿主 legendSlot 定制或隐藏，PRD R-11/T-24）。 */
         val drawLegend: Boolean = true,
+        /**
+         * Styles 树（0.3.0 批次 7）：非空时主图/副图 tooltip 走 [TooltipRenderer]
+         * 消费 showRule/showType/features；null 时保持 ChartTheme 行式图例。
+         */
+        val styles: io.lkanvas.chart.styles.Styles? = null,
     )
 
     fun DrawScope.render(
@@ -69,10 +74,76 @@ object ChartRenderer {
         }
         drawTimeAxis(state, theme, text, 0f, contentRight, macdBottom, panes.timeAxis)
         if (params.drawLegend) {
-            drawLegend(state, theme, text, params.legendTextSizePx, crosshair, params.gutterWidth, params.width)
+            val styles = params.styles
+            if (styles != null) {
+                // 批次 7：tooltip 消费 Styles 树（showRule/showType/features）
+                with(io.lkanvas.compose.draw.TooltipRenderer) {
+                    drawCandleTooltip(
+                        state, styles, theme, textMeasurer,
+                        baseTextSizePx = params.legendTextSizePx,
+                        crosshair = crosshair,
+                        contentWidth = contentRight,
+                        paneBottom = mainBottom,
+                    )
+                }
+                // 副图指标 tooltip（VOL/MACD pane 顶部行）
+                drawSubPaneTooltips(state, styles, theme, textMeasurer, params.legendTextSizePx, crosshair, contentRight, mainBottom, volTop, volBottom, macdBottom)
+            } else {
+                drawLegend(state, theme, text, params.legendTextSizePx, crosshair, params.gutterWidth, params.width)
+            }
         }
         if (crosshair != null) {
             drawCrosshairLabels(state, theme, text, crosshair, contentRight, legendHeight)
+        }
+    }
+
+    /** 副图指标 tooltip（7b：VOL/MACD pane 顶部 name+legends 行）。 */
+    internal fun DrawScope.drawSubPaneTooltips(
+        state: ChartState,
+        styles: io.lkanvas.chart.styles.Styles,
+        theme: ChartTheme,
+        textMeasurer: androidx.compose.ui.text.TextMeasurer,
+        baseTextSizePx: Float,
+        crosshair: Offset?,
+        contentRight: Float,
+        mainBottom: Float,
+        volTop: Float,
+        volBottom: Float,
+        macdBottom: Float,
+    ) {
+        val candles = state.dataSnapshot.candles
+        if (candles.isEmpty()) return
+        val idx = crosshair
+            ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) }
+            ?: (candles.size - 1)
+        with(io.lkanvas.compose.draw.TooltipRenderer) {
+            // VOL：volume + 均量线
+            val vol = state.volResult
+            if (vol != null) {
+                val keys = vol.result.keys.toList()
+                drawPaneIndicatorTooltip(
+                    state, styles, theme, textMeasurer, baseTextSizePx, crosshair, contentRight,
+                    paneTop = mainBottom, paneId = "vol",
+                    name = "VOL",
+                    legendKeys = keys.map { it to vol.result[it].getOrNull(idx) },
+                    legendColors = keys.mapIndexed { i, _ -> theme.linePalette[i % theme.linePalette.size] },
+                )
+            }
+            // MACD：dif/dea/macd
+            val macd = state.macdResult
+            if (macd != null) {
+                val keys = listOf("dif", "dea", "macd")
+                drawPaneIndicatorTooltip(
+                    state, styles, theme, textMeasurer, baseTextSizePx, crosshair, contentRight,
+                    paneTop = volBottom, paneId = "macd",
+                    name = "MACD",
+                    legendKeys = keys.map { it to macd.result[it]?.getOrNull(idx) },
+                    legendColors = listOf(
+                        theme.macdDif, theme.macdDea,
+                        if ((macd.result["macd"]?.getOrNull(idx) ?: 0.0) >= 0) theme.macdBarUp else theme.macdBarDown,
+                    ),
+                )
+            }
         }
     }
 
@@ -95,7 +166,7 @@ object ChartRenderer {
         var i = range.first
         while (i <= range.last) {
             val c = candles[i]
-            val label = ChartText.timeAxisLabel(c.timestamp, prevTs, interval)
+            val label = ChartText.timeAxisLabel(c.timestamp, prevTs, interval, state.effectiveTimeZone())
             if (label.isNotEmpty()) {
                 val x = state.viewport.candleCenterX(i.toDouble()).toFloat()
                 val width = text.measureWidth(label)

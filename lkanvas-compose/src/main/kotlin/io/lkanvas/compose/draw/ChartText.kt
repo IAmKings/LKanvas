@@ -22,7 +22,7 @@ class ChartText(
     val pricePrecision: Int = 2,
     /** 成交量精度。 */
     val volumePrecision: Int = 2,
-) {
+) : io.lkanvas.compose.draw.TooltipRenderer.NumericText {
     private val priceFormat = createFormat(pricePrecision)
     private val volumeFormat = createFormat(volumePrecision)
     private val compactFormat = DecimalFormat("#,###.##")
@@ -31,8 +31,8 @@ class ChartText(
     val tagHeight: Float = textHeight + 6f
     val tagWidth: Float = textSizePx * (pricePrecision + 4)
 
-    fun price(v: Double): String = if (v.isFinite()) priceFormat.format(v) else "—"
-    fun volume(v: Double): String = when {
+    override fun price(v: Double): String = if (v.isFinite()) priceFormat.format(v) else "—"
+    override fun volume(v: Double): String = when {
         !v.isFinite() -> "—"
         v >= 1e8 -> String.format("%.2f亿", v / 1e8)
         v >= 1e4 -> String.format("%.2f万", v / 1e4)
@@ -58,8 +58,8 @@ class ChartText(
 
     companion object {
         /** 时间标签（Alpha 基础规则：按 candle 间隔选择 日/时分 格式；UTC 存储，显示本地时区）。 */
-        fun timeLabel(timestamp: Long, intervalMs: Long): String {
-            val cal = java.util.Calendar.getInstance(TimeZone.getDefault())
+        fun timeLabel(timestamp: Long, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String {
+            val cal = java.util.Calendar.getInstance(tz)
             cal.timeInMillis = timestamp
             val dayFmt = { "%02d-%02d".format(cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH)) }
             val timeFmt = { "%02d:%02d".format(cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)) }
@@ -67,11 +67,11 @@ class ChartText(
         }
 
         /** 跨日显示日期、同日显示时间（时间轴）。 */
-        fun timeAxisLabel(timestamp: Long, prevTimestamp: Long?, intervalMs: Long): String {
-            val cal = java.util.Calendar.getInstance(TimeZone.getDefault())
+        fun timeAxisLabel(timestamp: Long, prevTimestamp: Long?, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String {
+            val cal = java.util.Calendar.getInstance(tz)
             cal.timeInMillis = timestamp
             val sameDay = prevTimestamp != null && run {
-                val p = java.util.Calendar.getInstance(TimeZone.getDefault())
+                val p = java.util.Calendar.getInstance(tz)
                 p.timeInMillis = prevTimestamp
                 p.get(java.util.Calendar.DAY_OF_YEAR) == cal.get(java.util.Calendar.DAY_OF_YEAR) &&
                     p.get(java.util.Calendar.YEAR) == cal.get(java.util.Calendar.YEAR)

@@ -34,6 +34,8 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
     var gridOn by remember { androidx.compose.runtime.mutableStateOf(facade.getStyles().grid.show) }
     var crosshairOn by remember { androidx.compose.runtime.mutableStateOf(facade.getStyles().crosshair.show) }
     var tooltipRule by remember { androidx.compose.runtime.mutableStateOf(facade.getStyles().candle.tooltip.showRule) }
+    var tooltipType by remember { androidx.compose.runtime.mutableStateOf(facade.getStyles().candle.tooltip.showType) }
+    var featureOn by remember { androidx.compose.runtime.mutableStateOf(facade.getStyles().indicator.tooltip.features.isNotEmpty()) }
     var overlayPointBig by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     Column(
@@ -56,33 +58,59 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
         // grid 显隐
         SettingRow("网格", if (gridOn) "显示" else "隐藏") {
             gridOn = !gridOn
-            facade.setStyles(Styles(grid = GridStyle(show = gridOn)))
+            facade.setStylesStrict(Styles(grid = GridStyle(show = gridOn)))
         }
 
-        // tooltip 规则循环
-        val nextRule = when (tooltipRule) {
-            TooltipShowRule.ALWAYS.name -> TooltipShowRule.FOLLOW_CROSS.name
-            TooltipShowRule.FOLLOW_CROSS.name -> TooltipShowRule.NONE.name
-            else -> TooltipShowRule.ALWAYS.name
+        // tooltip 规则循环（0.3.0：库枚举；always→follow_cross→none，渲染端已消费）
+        val nextRule = when (io.lkanvas.chart.TooltipShowRule.entries.firstOrNull { it.value == tooltipRule }) {
+            io.lkanvas.chart.TooltipShowRule.ALWAYS -> io.lkanvas.chart.TooltipShowRule.FOLLOW_CROSS.value
+            io.lkanvas.chart.TooltipShowRule.FOLLOW_CROSS -> io.lkanvas.chart.TooltipShowRule.NONE.value
+            else -> io.lkanvas.chart.TooltipShowRule.ALWAYS.value
         }
-        SettingRow("Tooltip 规则", tooltipRule.lowercase()) {
+        SettingRow("Tooltip 规则", tooltipRule) {
             tooltipRule = nextRule
             val cur = facade.getStyles()
-            facade.setStyles(
+            facade.setStylesStrict(
                 cur.copy(candle = cur.candle.copy(tooltip = cur.candle.tooltip.copy(showRule = nextRule))),
+            )
+        }
+
+        // tooltip 形态切换（0.3.0：standard 行式 ↔ rect 卡片，渲染端已消费）
+        SettingRow("Tooltip 形态", tooltipType) {
+            val next = if (tooltipType == "standard") "rect" else "standard"
+            tooltipType = next
+            val cur = facade.getStyles()
+            facade.setStylesStrict(
+                cur.copy(candle = cur.candle.copy(tooltip = cur.candle.tooltip.copy(showType = next))),
+            )
+        }
+
+        // 功能图标演示（0.3.0：indicator.tooltip.features；点击图标经门面发三 ActionType）
+        SettingRow("功能图标", if (featureOn) "显示" else "隐藏") {
+            featureOn = !featureOn
+            val cur = facade.getStyles()
+            val features = if (featureOn) listOf(
+                io.lkanvas.chart.styles.TooltipFeatureStyle(
+                    id = "demo_flag",
+                    type = "path",
+                    content = listOf(listOf(0.2, 0.8), listOf(0.5, 0.2), listOf(0.8, 0.8)),
+                ),
+            ) else emptyList()
+            facade.setStylesStrict(
+                cur.copy(indicator = cur.indicator.copy(tooltip = cur.indicator.tooltip.copy(features = features))),
             )
         }
 
         // crosshair 显隐
         SettingRow("十字线", if (crosshairOn) "显示" else "隐藏") {
             crosshairOn = !crosshairOn
-            facade.setStyles(Styles(crosshair = CrosshairStyle(show = crosshairOn)))
+            facade.setStylesStrict(Styles(crosshair = CrosshairStyle(show = crosshairOn)))
         }
 
         // overlay 控制点大小
         SettingRow("画线控制点", if (overlayPointBig) "大" else "小") {
             overlayPointBig = !overlayPointBig
-            facade.setStyles(
+            facade.setStylesStrict(
                 Styles(
                     overlay = facade.getStyles().overlay.copy(
                         point = facade.getStyles().overlay.point.copy(
@@ -98,12 +126,10 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
         SettingRow("分隔线色", "#76808F↔#33353D") {
             val cur = facade.getStyles().separator.color
             val next = if (cur == "#76808F") "#33353D" else "#76808F"
-            facade.setStyles(Styles(separator = io.lkanvas.chart.styles.SeparatorStyle(color = next)))
+            facade.setStylesStrict(Styles(separator = io.lkanvas.chart.styles.SeparatorStyle(color = next)))
         }
     }
 }
-
-private enum class TooltipShowRule { ALWAYS, FOLLOW_CROSS, NONE }
 
 @Composable
 private fun SettingRow(label: String, value: String, onTap: () -> Unit) {

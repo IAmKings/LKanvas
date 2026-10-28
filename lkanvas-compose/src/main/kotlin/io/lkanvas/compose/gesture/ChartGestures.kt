@@ -17,6 +17,39 @@ import kotlin.math.hypot
 
 private enum class GMode { IDLE, PAN, CROSSHAIR, PINCH, CREATE, POINT_DRAG, WHOLE_DRAG, PANE_ADJUST, AXIS_ZOOM }
 
+/** 模板事件回调族派发（0.3.0 批次 8a/8b：OVL-011/012/014/015/016 消费端）。 */
+internal object OverlayEventDispatch {
+
+    /** 模板查询（含内置 16 模板）。 */
+    fun templateOf(state: ChartState, instanceId: String?): io.lkanvas.core.overlay.OverlayDefinition? =
+        state.overlays.get(instanceId ?: return null)?.let { io.lkanvas.core.overlay.OverlayTemplates[it.templateName] }
+
+    fun onClick(state: ChartState, id: String?, x: Float, y: Float) {
+        templateOf(state, id)?.onClick?.invoke(id!!, -1, x.toDouble(), y.toDouble())
+    }
+
+    fun onDoubleClick(state: ChartState, id: String?, x: Float, y: Float) {
+        templateOf(state, id)?.onDoubleClick?.invoke(id!!, -1, x.toDouble(), y.toDouble())
+    }
+
+    fun onRightClick(state: ChartState, id: String?, x: Float, y: Float) {
+        // Android 等价映射：onRightClick → 长按命中（矩阵 OVL-014）
+        templateOf(state, id)?.onRightClick?.invoke(id!!, -1, x.toDouble(), y.toDouble())
+    }
+
+    fun onTouchStart(state: ChartState, id: String?, x: Float, y: Float) {
+        templateOf(state, id)?.onTouchStart?.invoke(id!!, -1, x.toDouble(), y.toDouble())
+    }
+
+    fun onTouchMove(state: ChartState, id: String?, x: Float, y: Float) {
+        templateOf(state, id)?.onTouchMove?.invoke(id!!, -1, x.toDouble(), y.toDouble())
+    }
+
+    fun onTouchEnd(state: ChartState, id: String?, x: Float, y: Float) {
+        templateOf(state, id)?.onTouchEnd?.invoke(id!!, -1, x.toDouble(), y.toDouble())
+    }
+}
+
 /**
  * 图表手势状态机（PRD R-10 Alpha 部分 + R-09 覆盖物）：
  * - 单指拖动（超过触距且横向为主）→ 平移（PAN），释放带基础惯性；
@@ -55,6 +88,12 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         var paneStartY = 0f
         var axisStartY = 0f
 
+        // 轻点/触控回调上下文（批次 8a）
+        var tapHitInstanceId: String? = null
+        var lastTapNanos = 0L
+        var lastTapX = 0f
+        var lastTapY = 0f
+
         // 创建模式优先接管本次手势
         if (state.overlays.creatingId != null) {
             mode = GMode.CREATE
@@ -73,6 +112,8 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         } else {
             val hit = OverlayRenderer.hitTest(state, down.position.x, down.position.y, size.width.toFloat(), size.height.toFloat())
             if (hit != null) {
+                tapHitInstanceId = hit.instanceId
+                OverlayEventDispatch.onTouchStart(state, hit.instanceId, down.position.x, down.position.y)
                 state.overlays.select(hit.instanceId)
                 state.notifyOverlayChanged()
                 if (hit.pointIndex != null && state.overlays.beginDrag(hit.instanceId, hit.pointIndex)) {
@@ -115,8 +156,11 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                 awaitPointerEvent(PointerEventPass.Main)
             }
 
-            // 长按到期且未移动未抬指 → 进入十字线
+            // 长按到期且未移动未抬指 → 进入十字线（命中覆盖物时先派发 onRightClick，批次 8a）
             if (event == null) {
+                if (tapHitInstanceId != null) {
+                    OverlayEventDispatch.onRightClick(state, tapHitInstanceId, down.position.x, down.position.y)
+                }
                 mode = GMode.CROSSHAIR
                 state.setGestureOwner(GestureOwner.CROSSHAIR)
                 state.showCrosshairAt(down.position.x, down.position.y)
@@ -187,9 +231,17 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                             val c = event.changes.firstOrNull() ?: continue
                             val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
                             if (anchor != null) {
-                                state.overlays.drag(dragInstanceId, dragPointIndex, to = anchor)
-                                state.notifyOverlayChanged()
+                                // 批次 8b：模板提供 performEventPressedMove 时委托（自定义拖动定位）
+                                val hook = OverlayEventDispatch.templateOf(state, dragInstanceId)?.performEventPressedMove
+                                if (hook != null) {
+                                    hook(dragInstanceId!!, dragPointIndex ?: -1, anchor)
+                                    state.notifyOverlayChanged()
+                                } else {
+                                    state.overlays.drag(dragInstanceId, dragPointIndex, to = anchor)
+                                    state.notifyOverlayChanged()
+                                }
                             }
+                            OverlayEventDispatch.onTouchMove(state, dragInstanceId, c.position.x, c.position.y)
                             event.changes.forEach { it.consume() }
                         }
 
@@ -207,6 +259,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                 lastAnchor = anchor
                                 state.notifyOverlayChanged()
                             }
+                            OverlayEventDispatch.onTouchMove(state, dragInstanceId, c.position.x, c.position.y)
                             event.changes.forEach { it.consume() }
                         }
 
@@ -259,7 +312,33 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                     when (mode) {
                         GMode.CROSSHAIR -> state.hideCrosshair()
                         GMode.PAN -> state.fling(velocity.calculateVelocity().x)
-                        GMode.IDLE -> if (!moved) state.tapCandle(down.position.x)
+                        GMode.IDLE -> if (!moved) {
+                            // 批次 7c：tooltip feature 命中优先（手势端分发三 ActionType）
+                            val feature = state.tooltipFeatureAt(down.position.x, down.position.y)
+                            when {
+                                feature != null ->
+                                    state.onTooltipFeatureClick?.invoke(feature.first, feature.second, down.position.x.toDouble(), down.position.y.toDouble())
+
+                                tapHitInstanceId != null -> {
+                                    // 批次 8a：双击检测（<400ms 内同位两次）→ onDoubleClick，否则 onClick
+                                    val now = System.nanoTime()
+                                    val isDouble = lastTapNanos != 0L &&
+                                        (now - lastTapNanos) < 400_000_000L &&
+                                        hypot(down.position.x - lastTapX, down.position.y - lastTapY) < 40f
+                                    if (isDouble) {
+                                        OverlayEventDispatch.onDoubleClick(state, tapHitInstanceId, down.position.x, down.position.y)
+                                        lastTapNanos = 0L
+                                    } else {
+                                        OverlayEventDispatch.onClick(state, tapHitInstanceId, down.position.x, down.position.y)
+                                        lastTapNanos = now
+                                        lastTapX = down.position.x
+                                        lastTapY = down.position.y
+                                    }
+                                }
+
+                                else -> state.tapCandle(down.position.x)
+                            }
+                        }
                         GMode.PINCH -> Unit
 
                         GMode.CREATE -> {
@@ -279,6 +358,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                         GMode.POINT_DRAG, GMode.WHOLE_DRAG -> {
                             state.overlays.endDrag(dragInstanceId, dragPointIndex)
                             state.notifyOverlayChanged()
+                            OverlayEventDispatch.onTouchEnd(state, dragInstanceId, down.position.x, down.position.y)
                         }
                         GMode.PANE_ADJUST, GMode.AXIS_ZOOM -> Unit
                     }

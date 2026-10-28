@@ -123,9 +123,10 @@ interface IndicatorDefinition {
 
     /**
      * 上游 draw：完全自定义绘制回调（绕过 figures 渲染管线）。
-     * Alpha 阶段仅建模接口位，渲染端消费随批次 5+。
+     * 上下文 [IndicatorDrawContext] 的 scope 由宿主层注入（compose 端为 DrawScope）；
+     * palette 为宿主层颜色对象列表（compose 端为 Color）。
      */
-    val draw: Any? get() = null
+    val draw: ((IndicatorDrawContext) -> Unit)? get() = null
 
     /** 空数据的初始私有状态。 */
     fun initScratch(params: List<Double>): Any?
@@ -148,6 +149,24 @@ enum class IncrementalCapability {
     /** 支持末根替换与追加的 O(参数) 增量；Prepend/Patch 回退全量。 */
     REPLACE_APPEND,
 }
+
+/**
+ * draw 钩子绘制上下文（0.3.0 批次 8c）：core 不依赖 Compose，
+ * scope/palette 由宿主层注入（compose 端 scope=DrawScope、palette=Color）。
+ */
+class IndicatorDrawContext(
+    val result: IndicatorResult,
+    val rangeFirst: Int,
+    val rangeLast: Int,
+    /** 数据值 → y 像素映射。 */
+    val yOf: (Double) -> Double,
+    /** 数据索引 → x 像素映射。 */
+    val xOf: (Int) -> Double,
+    /** 宿主层颜色调色板（compose 端 Color）。 */
+    val palette: List<Any?>,
+    /** 宿主绘制作用域（compose 端 DrawScope）。 */
+    val scope: Any?,
+)
 
 /**
  * 指标实例（PRD 4.1）：携带参数、独立计算状态；实例之间不共享可变状态。
