@@ -2,6 +2,7 @@ package io.lkanvas.chart
 
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.core.data.Candle
+import io.lkanvas.core.overlay.OverlayPoint
 import io.lkanvas.core.indicator.IndicatorDefinition
 import io.lkanvas.core.indicator.IndicatorDrawContext
 import io.lkanvas.core.indicator.IndicatorEngine
@@ -134,6 +135,34 @@ class TooltipAndCallbacksTest {
         assertNotNull(captured)
         assertEquals(3, captured.result["v"].size)
         assertEquals(2, captured.rangeLast)
+    }
+
+    // ---------- 批次 9a：覆盖物无障碍遍历 ----------
+
+    @Test
+    fun selectNextOverlay_cyclesAndAccessibilityTextMentionsOverlays() {
+        val state = ChartState()
+        val chart = LKanvasChart.init(state)
+        kotlinx.coroutines.runBlocking {
+            state.reset(io.lkanvas.core.store.MarketKey("T", "1m"), listOf(candle(1, 10.0), candle(2, 12.0), candle(3, 13.0)))
+        }
+        // 空覆盖物：false
+        assertFalse(state.selectNextOverlay())
+        // 画两条线
+        val id1 = chart.createOverlay(OverlayCreate("segment", points = listOf(OverlayPoint(100L, 1.0), OverlayPoint(200L, 2.0))))!!
+        val id2 = chart.createOverlay(OverlayCreate("segment", points = listOf(OverlayPoint(300L, 3.0), OverlayPoint(400L, 4.0))))!!
+        // 从未选 → 选中第一个；再调 → 第二个；再调 → 循环回第一个
+        assertTrue(state.selectNextOverlay())
+        assertEquals(id1, state.overlays.selectedId)
+        assertTrue(state.selectNextOverlay())
+        assertEquals(id2, state.overlays.selectedId)
+        assertTrue(state.selectNextOverlay())
+        assertEquals(id1, state.overlays.selectedId)
+        // 无障碍摘要含覆盖物信息
+        val text = state.accessibilityText { ts -> ts.toString() }
+        assertTrue(text.contains("画线"), "摘要应含覆盖物数量词: $text")
+        assertTrue(text.contains("segment"), "摘要应含选中模板名: $text")
+        LKanvasChart.dispose(chart)
     }
 
     // ---------- 批次 8e：时区接线 ----------

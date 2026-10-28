@@ -88,7 +88,7 @@
 | CH-020 | `getFormatter` | Chart.ts:630 | 已建 | B | test | S | 2c |  |
 | CH-021 | `setLocale` | Chart.ts:634 | 门面 setLocale/getLocale 已建（zh-CN/en-US 映射 ChartLocale） | B | test | S | 2c | setLocale('en-US')→EN_US |
 | CH-022 | `getLocale` | Chart.ts:640 | 已建 | B | test | S | 2c |  |
-| CH-023 | `setTimezone` | Chart.ts:644 | 门面 set/getTimezone 已建（存储；时间标签接线待 5） | B | test | S | 2c |  |
+| CH-023 | `setTimezone` | Chart.ts:644 | 门面 set/get + state.timezoneId → ChartText 时间标签渲染消费（0.3.0） | B | test | S | 2c |  |
 | CH-024 | `getTimezone` | Chart.ts:650 | 已建 | B | test | S | 2c |  |
 | CH-025 | `setThousandsSeparator` | Chart.ts:654 | 门面 set/get 已建（ThousandsSeparator 类型） | B | test | S | 2c | {sign} 可配 |
 | CH-026 | `getThousandsSeparator` | Chart.ts:660 | 已建 | B | test | S | 2c |  |
@@ -156,9 +156,9 @@
 | EVT-004 | `onCrosshairChange`（`Crosshair`） | Store.ts:1309 | onCrosshairChange 接线（Crosshair payload） | B | test | S | 2a | payload 结构补 |
 | EVT-005 | `onCandleBarClick`（`VisibleRangeData`） | CandleBarView.ts:35 | onCandleBarClick 接线（VisibleRangeData payload） | B | test | S | 2a | payload 补 prev/next |
 | EVT-006 | `onPaneDrag`（`{paneId}`） | SeparatorWidget.ts:149 | onPaneDrag 接线（{paneId}） | B | test | S | 2a |  |
-| EVT-007 | `onCandleTooltipFeatureClick` | tooltip | executeTooltipFeatureClick 已建（main） | B | test | M | 5 | 依赖批次 5 |
-| EVT-008 | `onIndicatorTooltipFeatureClick` | tooltip | executeTooltipFeatureClick 已建（vol） | B | test | M | 5 | 同上 |
-| EVT-009 | `onCrosshairFeatureClick` | crosshair | executeTooltipFeatureClick 已建 | B | test | M | 5 | 同上 |
+| EVT-007 | `onCandleTooltipFeatureClick` | tooltip | tooltip features 图标渲染+命中 → ON_CANDLE_TOOLTIP_FEATURE_CLICK（0.3.0） | B | test | M | 5 | 依赖批次 5 |
+| EVT-008 | `onIndicatorTooltipFeatureClick` | tooltip | 副图 features 命中 → ON_INDICATOR_TOOLTIP_FEATURE_CLICK（0.3.0） | B | test | M | 5 | 同上 |
+| EVT-009 | `onCrosshairFeatureClick` | crosshair | features 命中 → ON_CROSSHAIR_FEATURE_CLICK（0.3.0） | B | test | M | 5 | 同上 |
 
 
 ## 4. 公共类型
@@ -198,7 +198,7 @@
 | IND-011 | `zLevel` | component/Indicator.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 3 |  |
 | IND-012 | `extendData` | component/Indicator.ts | 已建：Definition.extendData | B | test | M | 3 |  |
 | IND-013 | `series` | component/Indicator.ts | 已建：series 枚举（meta diff 断言值映射 undefined→normal） | B | diff | — | 3 | 值字符串化（price） |
-| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef.styles/attrs 回调建模位（figures 顺序已 meta diff） | B | diff | M | 3 | 绘制端消费随批次 5+ |
+| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef.styles/attrs 回调 + drawLinePlots styleOverrideOf 行级覆盖（0.3.0） | B | diff | M | 3 | 绘制端消费随批次 5+ |
 | IND-015 | `minValue` | component/Indicator.ts | 已建：minValue（VOL=0 覆写） | B | diff | S | 3 | VOL=0 |
 | IND-016 | `maxValue` | component/Indicator.ts | 已建：maxValue（默认 null） | B | diff | S | 3 |  |
 | IND-017 | `styles` | component/Indicator.ts | IndicatorInstance.styles + createIndicator(styles) | B | test | M | 5 | |
@@ -206,7 +206,7 @@
 | IND-019 | `calc` | component/Indicator.ts | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 |
 | IND-020 | `regenerateFigures` | component/Indicator.ts | 已建：plotsFor（meta diff 断言 figures 顺序） | B | diff | S | 3 | 改名兼容 |
 | IND-021 | `createTooltipDataSource` | component/Indicator.ts | IndicatorDefinition.createTooltipDataSource 钩子（行级 Map） | B | test | M | 5 | |
-| IND-022 | `draw` | component/Indicator.ts | IndicatorDefinition.draw 钩子建模位 | B | test | M | 5 | 自定义绘制消费随批次 5+ |
+| IND-022 | `draw` | component/Indicator.ts | IndicatorDrawContext（scope/palette 注入）+ 渲染端 draw 钩子绕过 figures 管线（0.3.0） | B | test | M | 5 | 自定义绘制消费随批次 5+ |
 | IND-023 | 27 个内置模板元数据整体 | extension/indicator/*.ts | F1 自动 diff 已建 | B | diff | M | 3 | F1 自动 diff |
 | IND-024 | `result`（calc 输出数组，getIndicators 返回体） | component/Indicator.ts | 已建：IndicatorResult 列存（门面视图转换待 2c） | B | test | S | 2b | 结构等价（行存↔列存），门面做视图转换 |
 
@@ -225,12 +225,12 @@
 | OVL-008 | `createYAxisFigures` | component/Overlay.ts | OverlayDefinition.createYAxisFigures 钩子 | B | test | M | 4 | |
 | OVL-009 | `checkEventOn` | component/Overlay.ts | 已建：Definition.checkEventOn | B | test | S | 4 |  |
 | OVL-010 | `drawingMode(step/continuous)` | component/Overlay.ts | continuous 布尔 | B | diff | S | 4 | |
-| OVL-011 | `performEventPressedMove` | component/Overlay.ts | OverlayDefinition.performEventPressedMove 建模位（默认 null 走内置手势） | B | test | M | 4 | |
-| OVL-012 | `performEventMoveForDrawing` | component/Overlay.ts | OverlayDefinition.performEventMoveForDrawing 建模位 | B | test | M | 4 | |
+| OVL-011 | `performEventPressedMove` | component/Overlay.ts | 手势 POINT_DRAG 委托 performEventPressedMove（0.3.0） | B | test | M | 4 | |
+| OVL-012 | `performEventMoveForDrawing` | component/Overlay.ts | CREATING 绘制中移动建模（点击式创建无拖动预览，委托位保留） | B | test | M | 4 | |
 | OVL-013 | `onRemoved` | component/Overlay.ts | OverlayEvent.Removed | B | test | S | 4 | |
-| OVL-014 | `onClick/onDoubleClick/onRightClick` | component/Overlay.ts | Definition.onClick/onDoubleClick/onRightClick 回调族（右键→长按菜单映射） | B | test | M | 4 | 手势端分发随批次 5+ |
-| OVL-015 | `onMouseDown/Enter/Leave/Move/Up` | component/Overlay.ts | Definition.onMouse 系回调族（触控生命周期映射） | B | test | M | 4 | |
-| OVL-016 | `onTouchStart/Move/End` | component/Overlay.ts | Definition.onTouch 系回调族 | B | test | M | 4 | |
+| OVL-014 | `onClick/onDoubleClick/onRightClick` | component/Overlay.ts | 轻点/双击检测/长按→onRightClick 手势分发（OverlayEventDispatch，0.3.0） | B | test | M | 4 | 手势端分发随批次 5+ |
+| OVL-015 | `onMouseDown/Enter/Leave/Move/Up` | component/Overlay.ts | onMouse 系→触控生命周期映射分发（0.3.0） | B | test | M | 4 | |
+| OVL-016 | `onTouchStart/Move/End` | component/Overlay.ts | onTouch 系 down/move/end 手势分发（0.3.0） | B | test | M | 4 | |
 | OVL-017 | `onPressedMove` | component/Overlay.ts | DRAGGING 状态 | B | test | S | 4 | |
 | OVL-018 | `extendData` | component/Overlay.ts | 已建：Definition.extendData | B | test | S | 4 |  |
 | OVL-019 | 16 个内置模板元数据整体 | extension/overlay/*.ts | F1 自动 diff 已建 | B | diff | S | 4 | F1 自动 diff |

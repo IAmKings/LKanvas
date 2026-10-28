@@ -73,7 +73,7 @@
 
 - 周期切换 UI（app 未做多周期 tab；内核 setPeriod 已就绪）→ 后续样例
 - 指标参数设置面板 UI（API 层已通）→ 后续样例
-- tooltip features 图标点击（依赖 tooltip 完整版，批次 5 余量）
+- ~~tooltip features 图标点击~~：**0.3.0 已收口**——features 图标渲染 + 手势命中 → 三种 ActionType（EVT-007~009），样例面板「功能图标」开关演示
 
 ## 结论
 

@@ -88,6 +88,8 @@ fun KLineChart(
                         CustomAccessibilityAction(state.locale.actionZoomIn) { state.zoomIn() },
                         CustomAccessibilityAction(state.locale.actionZoomOut) { state.zoomOut() },
                         CustomAccessibilityAction(state.locale.actionDeleteOverlay) { state.removeSelectedOverlay() },
+                        // 0.3.0 批次 9a：TalkBack 遍历覆盖物列表（循环选中）
+                        CustomAccessibilityAction(state.locale.actionNextOverlay) { state.selectNextOverlay() },
                     )
                 },
         ) {

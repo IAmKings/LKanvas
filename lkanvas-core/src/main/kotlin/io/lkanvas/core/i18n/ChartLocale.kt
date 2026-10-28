@@ -26,7 +26,12 @@ data class ChartLocale(
     val actionZoomIn: String = "放大",
     val actionZoomOut: String = "缩小",
     val actionDeleteOverlay: String = "删除选中画线",
+    val actionNextOverlay: String = "选中下一画线",
+    val overlayCountTemplate: String = "画线共 %d 条",
+    val overlaySelectedTemplate: String = "选中画线",
+    val overlayPoints: String = "控制点",
 ) {
+    fun overlaySummary(count: Int): String = overlayCountTemplate.format(count)
     fun versusPrev(direction: Direction): String = versusPrevTemplate.format(
         when (direction) {
             Direction.UP -> up
@@ -59,6 +64,10 @@ data class ChartLocale(
             actionZoomIn = "Zoom in",
             actionZoomOut = "Zoom out",
             actionDeleteOverlay = "Delete selected drawing",
+            actionNextOverlay = "Select next drawing",
+            overlayCountTemplate = "%d drawings",
+            overlaySelectedTemplate = "Selected drawing",
+            overlayPoints = "points",
         )
     }
 }

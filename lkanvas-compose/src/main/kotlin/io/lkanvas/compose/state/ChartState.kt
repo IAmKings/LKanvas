@@ -464,7 +464,31 @@ class ChartState(
         return buildString {
             append(candleText)
             if (maText != null) append("。").append(maText)
+            // 0.3.0 批次 9a：覆盖物列表摘要（数量 + 选中项）
+            val visibleOverlays = overlays.all().filter { it.visible }
+            if (visibleOverlays.isNotEmpty()) {
+                append("。").append(locale.overlaySummary(visibleOverlays.size))
+                val selected = visibleOverlays.firstOrNull { it.id == overlays.selectedId }
+                if (selected != null) {
+                    append("。").append(
+                        io.lkanvas.core.accessibility.AccessibilitySummary.overlaySummary(
+                            selected.templateName, selected.points.size, selected.currentStep, locale,
+                        ),
+                    )
+                }
+            }
         }
+    }
+
+    /** 无障碍动作：选中下一画线（TalkBack 遍历覆盖物；循环）。 */
+    fun selectNextOverlay(): Boolean {
+        val list = overlays.all()
+        if (list.isEmpty()) return false
+        val curIdx = list.indexOfFirst { it.id == overlays.selectedId }
+        val next = list[(curIdx + 1).mod(list.size)]
+        overlays.select(next.id)
+        notifyOverlayChanged()
+        return true
     }
 
     /** 手势所有权：任一时刻至多一个交互所有者（PRD A-33 前置）。 */

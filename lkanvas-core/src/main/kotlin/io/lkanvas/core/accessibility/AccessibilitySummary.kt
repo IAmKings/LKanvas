@@ -48,6 +48,10 @@ object AccessibilitySummary {
     }
 
     /** 图表整体摘要（选中位置上下文）。 */
+    /** 覆盖物摘要（0.3.0 批次 9a）：模板名 + 控制点进度。 */
+    fun overlaySummary(templateName: String, pointCount: Int, currentStep: Int, locale: ChartLocale): String =
+        "${locale.overlaySelectedTemplate}:$templateName,${locale.overlayPoints}:$currentStep/$pointCount"
+
     fun chartSummary(
         selectedText: String?,
         latestText: String?,
