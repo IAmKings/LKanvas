@@ -46,6 +46,7 @@ fun KLineChart(
     // T-34：tooltip DrawOp 缓存（静态内容录制一次回放，实测省 ~27ms/帧）
     val tooltipCache = remember { ChartRenderer.TooltipKeyHolder() }
 
+
     val subPaneH = with(density) { config.subPaneHeight.toPx() }
     val timeAxisH = with(density) { config.timeAxisHeight.toPx() }
     // 右轴留白随系统字体缩放（A-41：字体放大后轴标签仍完整显示；1..2 倍钳制）

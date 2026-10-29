@@ -6,6 +6,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import io.lkanvas.compose.state.ChartState
@@ -447,6 +450,9 @@ object PaneRenderers {
         lastValueMark: Boolean = true,
         styleOverrideOf: ((key: String, index: Int) -> Pair<Color?, Float?>)? = null,
     ) {
+        // T-34 第二轮：drawLines(FloatArray) 批量提交替代逐点 Path（B-02 分段定位
+        // 指标线占 13ms/帧：65 列 × ~240 点的 Path 构建+drawPath 为 UI 线程大头）。
+        // 连续段（NaN 断开）各一次 drawLines；线段重复端点语义与 lineTo 一致。
         val lineKeys = keys ?: result.result.keys.filterNot { it in skipKeys }
         val eff = if (dashed) dashedEffect() else null
         for ((idx, key) in lineKeys.withIndex()) {
@@ -463,28 +469,46 @@ object PaneRenderers {
             }
             val color = overrideColor ?: baseColor
             val width = overrideWidth ?: lineSizePx
-            val path = Path()
-            var started = false
+            // 预计算恒定项：candleCenterX = barSpacing*(i - scrollIndex + 0.5)
+            val barSpacing = vp.barSpacing.toFloat()
+            val x0 = ((0 - vp.scrollIndex + 0.5) * vp.barSpacing).toFloat()
             var lastX = Float.NaN
             var lastY = Float.NaN
+            var seg = FloatArray(64)
+            var segPos = 0
+            var prevWasFinite = false
             for (i in range.first..range.last) {
                 val v = column[i]
                 if (v.isNaN()) {
-                    started = false
+                    prevWasFinite = false
                     continue
                 }
-                val x = vp.candleCenterX(i.toDouble()).toFloat()
+                val x = x0 + barSpacing * i
                 val yy = y(v).toFloat()
-                if (!started) {
-                    path.moveTo(x, yy)
-                    started = true
-                } else {
-                    path.lineTo(x, yy)
+                // drawLines 每 4 float 为一条线段 (start,end)：连续区每步 push
+                // (last, cur) 保证相邻点两两成段（错位会产生隔点「虚线」）
+                if (prevWasFinite) {
+                    if (segPos + 4 > seg.size) seg = seg.copyOf(seg.size * 2)
+                    seg[segPos++] = lastX; seg[segPos++] = lastY
+                    seg[segPos++] = x; seg[segPos++] = yy
                 }
                 lastX = x
                 lastY = yy
+                prevWasFinite = true
             }
-            drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = width, pathEffect = eff))
+            if (segPos >= 4) {
+                // T-34：native drawLines 一次 JNI 提交整列折线
+                drawIntoCanvas { canvas ->
+                    val p2 = android.graphics.Paint().apply {
+                        this.strokeWidth = width
+                        this.color = color.toArgb()
+                        this.style = android.graphics.Paint.Style.STROKE
+                        this.strokeCap = android.graphics.Paint.Cap.ROUND
+                        eff?.let { this.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 4f), 0f) }
+                    }
+                    canvas.nativeCanvas.drawLines(seg, 0, segPos, p2)
+                }
+            }
             // Styles indicator.lastValueMark.show：线末端值点
             if (lastValueMark && !lastX.isNaN()) {
                 drawCircle(color, radius = 2.5f, center = Offset(lastX, lastY))
