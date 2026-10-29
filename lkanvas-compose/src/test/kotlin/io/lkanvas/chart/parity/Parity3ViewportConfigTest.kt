@@ -126,6 +126,9 @@ class Parity3ViewportConfigTest {
     fun `parity3_pane高度调整`() {
         val chart = newChart()
         drainFor(chart)
+        // 0.7.0 严格默认：vol/macd 由示例/宿主显式创建（上游 demo 场景有副图）
+        chart.createIndicator("VOL", paneId = "vol")
+        chart.createIndicator("MACD", paneId = "macd")
         val before = chart.getPaneOptions("main").single().height!!
         // 上游：chart.setPaneOptions({ id: 'candle_pane', height: 300 })
         chart.setPaneOptions(PaneOptions(id = "main", height = before * 0.5))

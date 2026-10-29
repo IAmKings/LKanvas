@@ -96,8 +96,13 @@ object ChartRenderer {
         } else emptyList()
         with(PaneRenderers) {
             drawMainPane(state, theme, 0f, contentRight, mainTop, mainBottom, text, crosshair, legendHeight, extraAxisCols = extraAxisCols)
-            drawVolumePane(state, theme, 0f, contentRight, volTop, volBottom, text)
-            drawMacdPane(state, theme, 0f, contentRight, macdTop, macdBottom, text)
+            // R07：vol/macd 按需存在（不在 pane 集合时高度 0 → 跳过绘制）
+            if (state.hasBuiltinPane("vol")) {
+                drawVolumePane(state, theme, 0f, contentRight, volTop, volBottom, text)
+            }
+            if (state.hasBuiltinPane("macd")) {
+                drawMacdPane(state, theme, 0f, contentRight, macdTop, macdBottom, text)
+            }
             // 0.5.x 动态副图：逐 pane 画绑定指标的线列 + 网格 + 标签
             for ((paneId, bounds) in state.extraPaneLayout) {
                 drawExtraPane(state, theme, text, paneId, 0f, contentRight, bounds.first, bounds.second)

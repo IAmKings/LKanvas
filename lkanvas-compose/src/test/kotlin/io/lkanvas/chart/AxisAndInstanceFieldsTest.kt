@@ -475,4 +475,79 @@ class AxisAndInstanceFieldsTest {
         LKanvasChart.dispose(chart)
     }
 
+
+    // ---------- 0.7.0 R07：pane 集合单一来源 ----------
+
+    @Test
+    fun `动态pane可查询与设高（R07）`() {
+        val chart = LKanvasChart.init()
+        kotlinx.coroutines.runBlocking {
+            chart.state.reset(
+                io.lkanvas.core.store.MarketKey("T", "1m"),
+                (1..40L).map { candleOf(it, 100.0 + it) },
+            )
+        }
+        val pane = "pane_r07"
+        chart.state.onLayout(600f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        chart.createIndicator("RSI", paneId = pane)!!
+        // 复审 R07 复现：getPaneOptions(newPane) 返回空
+        val opts = chart.getPaneOptions(pane)
+        assertEquals(1, opts.size, "动态 pane 可查询")
+        assertTrue((opts[0].height ?: 0.0) > 0, "动态 pane 有高度")
+        // setPaneOptions 对动态 pane 生效
+        chart.setPaneOptions(io.lkanvas.chart.PaneOptions(pane, 120.0))
+        val after = chart.getPaneOptions(pane)
+        assertEquals(120.0, after[0].height ?: -1.0, 1e-6, "动态 pane 设高生效")
+        // 全列表含动态 pane
+        assertTrue(chart.getPaneOptions().any { it.id == pane })
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `overrideIndicator迁移paneId维护pane集合（R07）`() {
+        val chart = LKanvasChart.init()
+        kotlinx.coroutines.runBlocking {
+            chart.state.reset(
+                io.lkanvas.core.store.MarketKey("T", "1m"),
+                (1..40L).map { candleOf(it, 100.0 + it) },
+            )
+        }
+        val srcPane = "pane_src"
+        val dstPane = "pane_dst"
+        val id = chart.createIndicator("RSI", paneId = srcPane)!!
+        assertTrue(chart.state.extraPanes.value.contains(srcPane))
+        // 迁移到新 pane：目标 pane 创建
+        chart.overrideIndicator(io.lkanvas.compose.state.ChartState.IndicatorFilter(id = id), paneId = dstPane)
+        assertTrue(chart.state.extraPanes.value.contains(dstPane), "目标 pane 创建（复审 R07 复现收口）")
+        // 原 pane 空了自动回收
+        assertTrue(!chart.state.extraPanes.value.contains(srcPane), "空 pane 回收")
+        assertEquals(dstPane, chart.getIndicatorByInstanceId(id)!!.paneId)
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `vol与macd按需存在且无实例不占布局（R07）`() {
+        val chart = LKanvasChart.init()
+        kotlinx.coroutines.runBlocking {
+            chart.state.reset(
+                io.lkanvas.core.store.MarketKey("T", "1m"),
+                (1..40L).map { candleOf(it, 100.0 + it) },
+            )
+        }
+        chart.state.onLayout(600f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        // 无 VOL/MACD 实例 → pane 集合不含 vol/macd（高度 0）
+        assertTrue(chart.state.paneList().containsAll(listOf("main")), "main 恒在")
+        assertEquals(0f, chart.state.paneHeightsPx.vol, "vol 无实例不占布局（严格上游默认）")
+        assertEquals(0f, chart.state.paneHeightsPx.macd, "macd 无实例不占布局")
+        // 创建 VOL/MACD 后 pane 出现
+        chart.createIndicator("VOL", paneId = "vol")
+        chart.createIndicator("MACD", paneId = "macd")
+        assertTrue(chart.state.paneList().containsAll(listOf("vol", "macd")))
+        assertTrue(chart.state.paneHeightsPx.vol > 0f)
+        assertTrue(chart.state.paneHeightsPx.macd > 0f)
+        // 严格 paneId：volumePaneResult 不再有按名回退
+        org.junit.Assert.assertNotNull(chart.state.volumePaneResult())
+        org.junit.Assert.assertNotNull(chart.state.macdPaneResult())
+        LKanvasChart.dispose(chart)
+    }
 }

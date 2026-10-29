@@ -93,6 +93,7 @@ class ChartState(
         val inst = IndicatorInstance(instanceId, def, params ?: def.calcParams, resolvedPaneId, yAxisId, styles)
         indicatorInstances.add(inst)
         advanceIndicators(dataSnapshot, null)
+        relayout() // R07：paneList 派生（vol/macd 按需出现）需要重算布局
         viewRevision++
         return instanceId
     }
@@ -145,6 +146,7 @@ class ChartState(
             extendData?.let { ext -> inst.extendData.putAll(ext) }
         }
         advanceIndicators(dataSnapshot, null)
+        relayout() // R07：paneId 迁移后 paneList 派生刷新
         viewRevision++
         return true
     }
@@ -159,6 +161,7 @@ class ChartState(
         if (targets.isEmpty()) return false
         indicatorInstances.removeAll(targets.toSet())
         advanceIndicators(dataSnapshot, null)
+        relayout() // R07：paneList 派生（vol/macd 按需消失）
         viewRevision++
         return true
     }
@@ -1028,18 +1031,18 @@ class ChartState(
             it.visible && it.paneId == "main" && it.state != null
         }
 
-    /** VOL pane 实例结果（绑定 vol pane 的 volume 系；回退 VOLUME 模板实例）。 */
+    /** VOL pane 实例结果（严格 paneId=="vol"；R07 删按名回退——避免重复归属）。 */
     fun volumePaneResult(): IndicatorResultState? =
         indicatorInstances.firstOrNull {
             it.visible && it.paneId == "vol" &&
                 it.definition.series == io.lkanvas.core.indicator.IndicatorSeries.VOLUME && it.state != null
-        }?.state ?: resultOfName("VOL")
+        }?.state
 
-    /** MACD pane 实例结果（绑定 macd pane 的实例；回退 MACD 模板实例）。 */
+    /** MACD pane 实例结果（严格 paneId=="macd"；R07 删按名回退）。 */
     fun macdPaneResult(): IndicatorResultState? =
         indicatorInstances.firstOrNull {
             it.visible && it.paneId == "macd" && it.state != null
-        }?.state ?: resultOfName("MACD")
+        }?.state
 
     // ---------- 布局回填 ----------
 
@@ -1070,18 +1073,46 @@ class ChartState(
     /** 0.5.x 动态副图：每 pane 高度覆写（拖动分隔条写入；px）。 */
     private val extraPaneHeightOverride = HashMap<String, Float>()
 
+    /**
+     * R07（复审 2026-10-30）：pane 集合**单一来源**——main 恒在；vol/macd 仅当
+     * 有可见实例绑定（paneId=="vol"/"macd"）时存在；extras 随建删。
+     * 查询（getPaneOptions）、布局（relayout）、覆写（setPaneOptions/override）、
+     * 渲染（ChartRenderer 跳过零高 pane）与删除全部消费本函数。
+     */
+    fun paneList(): List<String> {
+        val boundPanes = indicatorInstances
+            .filter { it.visible && it.paneId in setOf("vol", "macd") }
+            .map { it.paneId }
+            .toSet()
+        return buildList {
+            add("main")
+            if ("vol" in boundPanes) add("vol")
+            if ("macd" in boundPanes) add("macd")
+            addAll(extraPanes.value)
+        }
+    }
+
+    /** 内置副图 pane 是否在 pane 集合中。 */
+    fun hasBuiltinPane(paneId: String): Boolean = paneId in paneList()
+
     private fun relayout() {
         // 0.5.x 动态 pane：自定义副图排在内置 VOL/MACD 之后、时间轴之前，
         // 高度 = 覆写或默认副图高（main 相应压缩，保底规则不变）
+        // R07：vol/macd 不在 pane 集合时高度为 0（渲染端跳过、分隔条命中退化无效）
         var extraH = 0f
         for (pane in extraPanes.value) extraH += (extraPaneHeightOverride[pane] ?: defaultSubPanePx)
         val usable = (containerHeightPx - timeAxisHeightPx - extraH).coerceAtLeast(minSubPanePx * 2)
         // 主 pane 保底 35% 可用高（A-41：横屏/大字体下关键绘图区不被挤没）
         val mainMin = (usable * 0.35f).coerceAtLeast(minMainPanePx)
         val maxSub = ((usable - mainMin) / 2f).coerceAtLeast(minSubPanePx)
-        val vol = volPaneOverride.coerceIn(minSubPanePx, maxSub)
-        val macd = macdPaneOverride.coerceIn(minSubPanePx, maxSub)
-        val main = (usable - vol - macd).coerceAtLeast(minMainPanePx)
+        val hasVol = hasBuiltinPane("vol")
+        val hasMacd = hasBuiltinPane("macd")
+        val vol = if (hasVol) volPaneOverride.coerceIn(minSubPanePx, maxSub) else 0f
+        val macd = if (hasMacd) macdPaneOverride.coerceIn(minSubPanePx, maxSub) else 0f
+        // R07：mainPaneOverride（setPaneOptions("main") 直接设定；null=派生）
+        val main = mainPaneOverride
+            ?.coerceIn(minMainPanePx, usable)
+            ?: (usable - vol - macd).coerceAtLeast(minMainPanePx)
         paneHeightsPx = PaneHeights(main, vol, macd, timeAxisHeightPx)
         // 自定义副图布局（top/bottom 从 macd 底开始顺序排布）
         var cursor = main + vol + macd
@@ -1153,6 +1184,15 @@ class ChartState(
         extraPaneHeightOverride[paneId] = (startValue + dyTotal).coerceAtLeast(minSubPanePx)
         relayout()
     }
+
+    /** R07：setPaneOptions 路由——直接设置动态 pane 高度。 */
+    fun setExtraPaneHeight(paneId: String, heightPx: Float) {
+        extraPaneHeightOverride[paneId] = heightPx.coerceAtLeast(minSubPanePx)
+        relayout()
+    }
+
+    /** R07：setPaneOptions("main") 的直接高度设定（null=按剩余空间派生）。 */
+    internal var mainPaneOverride: Float? = null
 
     /** 拖动分隔条：[which]=0 调整 VOL pane 高度，1 调整 MACD pane 高度（dy 累计）。 */
     fun adjustPane(which: Int, startValue: Float, dyTotal: Float) {

@@ -539,9 +539,31 @@ class LKanvasChart private constructor(
         yAxisId: String? = null,
         zLevel: Int? = null,
         extendData: Map<String, Any?>? = null,
-    ): Boolean = state.overrideIndicator(
-        filter, calcParams, visible, styles, shortName, paneId, yAxisId, zLevel, extendData,
-    )
+    ): Boolean {
+        val changed = state.overrideIndicator(
+            filter, calcParams, visible, styles, shortName, paneId, yAxisId, zLevel, extendData,
+        )
+        if (changed) maintainExtraPanesAfterMove(paneId)
+        return changed
+    }
+
+    /**
+     * R07：paneId 迁移后维护 pane 集合——目标为用户 extras 时确保存在，
+     * 原属用户 extras 空了自动回收（vol/macd 由 paneList 按绑定派生）。
+     */
+    private fun maintainExtraPanesAfterMove(paneId: String?) {
+        if (paneId != null && paneId !in setOf("main", "vol", "macd") && paneId !in state.extraPanes.value) {
+            state.extraPanes.value = state.extraPanes.value + paneId
+            state.relayoutExtraPanes()
+        }
+        val emptyExtras = state.extraPanes.value.filter { extra ->
+            state.getIndicators(ChartState.IndicatorFilter(paneId = extra)).isEmpty()
+        }
+        if (emptyExtras.isNotEmpty()) {
+            state.extraPanes.value = state.extraPanes.value - emptyExtras.toSet()
+            state.relayoutExtraPanes()
+        }
+    }
 
     /** 上游 `overrideIndicator` 按 id 简写。 */
     fun overrideIndicator(id: String, calcParams: List<Double>? = null, visible: Boolean? = null): Boolean =
@@ -871,38 +893,55 @@ class LKanvasChart private constructor(
         val cur = state.paneHeightsPx
         val usable = cur.main + cur.vol + cur.macd
         if (usable <= 0f) return // 无布局（Compose 未挂载）：无意义
+        // R07：动态 pane → extraPaneHeightOverride 路由（可设高）
+        if (options.id !in setOf("main", "vol", "macd")) {
+            if (options.id in state.extraPanes.value && options.height != null) {
+                state.setExtraPaneHeight(options.id, options.height!!.toFloat())
+            }
+            return
+        }
         when (options.id) {
             "main" -> {
-                // 主 pane 高度变化：剩余空间按当前比例分给 VOL/MACD
+                // R07：主 pane 高度直接设定（上游 candle_pane height 语义）；
+                // 剩余空间按当前比例分给**存在的**副图
                 val heightF = (options.height ?: cur.main).toFloat()
-                val mainTarget = heightF.coerceIn(60f, (usable * 0.65f))
-                val rest = (usable - mainTarget).coerceAtLeast(0f)
-                val ratio = if (cur.vol + cur.macd > 0) cur.vol / (cur.vol + cur.macd) else 0.5f
-                val vol = rest * ratio
-                val macd = rest - vol
-                state.setSubPaneHeights(vol, macd)
+                val rest = (usable - heightF).coerceAtLeast(0f)
+                if (cur.vol + cur.macd > 0) {
+                    val ratio = if (cur.vol + cur.macd > 0) cur.vol / (cur.vol + cur.macd) else 0.5f
+                    val vol = rest * ratio
+                    state.setSubPaneHeights(vol, rest - vol)
+                }
+                state.mainPaneOverride = heightF
             }
 
             "vol" -> {
                 val vol = (options.height ?: cur.vol).toFloat()
+                state.mainPaneOverride = null
                 state.setSubPaneHeights(vol, usable - vol)
             }
 
             "macd" -> {
                 val macd = (options.height ?: cur.macd).toFloat()
+                state.mainPaneOverride = null
                 state.setSubPaneHeights(usable - macd, macd)
             }
         }
+        state.relayoutExtraPanes() // 触发 relayout 应用覆写
     }
 
-    /** 上游 `getPaneOptions(id?)`：单 pane 或全列表。 */
+    /** 上游 `getPaneOptions(id?)`：遍历实际 pane 集合（R07——动态 pane 可查询）。 */
     fun getPaneOptions(id: String? = null): List<PaneOptions> {
         val p = state.paneHeightsPx
-        val all = listOf(
-            PaneOptions("main", p.main.toDouble()),
-            PaneOptions("vol", p.vol.toDouble()),
-            PaneOptions("macd", p.macd.toDouble()),
-        )
+        val layout = state.extraPaneLayout.associate { it.first to it.second }
+        val all = state.paneList().map { paneId ->
+            val height = when (paneId) {
+                "main" -> p.main.toDouble()
+                "vol" -> p.vol.toDouble()
+                "macd" -> p.macd.toDouble()
+                else -> layout[paneId]?.let { (top, bottom) -> (bottom - top).toDouble() } ?: 0.0
+            }
+            PaneOptions(paneId, height)
+        }
         return if (id == null) all else all.filter { it.id == id }
     }
 
