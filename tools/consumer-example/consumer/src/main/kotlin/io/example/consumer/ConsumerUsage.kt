@@ -7,7 +7,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import io.lkanvas.chart.ActionCallback
 import io.lkanvas.chart.ActionType
-import io.lkanvas.chart.DataLoader
+import io.lkanvas.chart.DataLoadMore
+import io.lkanvas.chart.DataLoadType
+import io.lkanvas.chart.GetBarsParams
 import io.lkanvas.chart.LKanvasChart
 import io.lkanvas.chart.Period
 import io.lkanvas.chart.SymbolInfo
@@ -26,24 +28,27 @@ class ConsumerUsage {
 
     init {
         // 上游 quickstart DataLoader 模式
-        chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
+        chart.setDataLoader(object : io.lkanvas.chart.DataLoader {
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
                     params.callback(
                         (0 until 100).map {
                             Candle(
                                 it.toLong(), 100.0 + it, 101.0 + it, 99.0 + it, 100.5 + it, 1000.0,
                             )
                         },
-                        DataLoader.DataLoadMore.NONE,
+                        DataLoadMore.NONE,
                     )
                 }
             }
         })
         chart.setSymbol(SymbolInfo("EXAMPLE"))
-        chart.setPeriod(Period(Period.PeriodType.MINUTE))
-        // 上游 createIndicator 语义
+        chart.setPeriod(Period.ofMinutes(1))
+        // 上游 createIndicator 语义（0.6.0：缺省自动新建指标 pane + isStack=false）
         chart.createIndicator("MA")
+        // 0.6.0 严格语义：图表不预置指标，宿主按需创建 VOL/MACD 副图
+        chart.createIndicator("VOL", paneId = "vol")
+        chart.createIndicator("MACD", paneId = "macd")
         // 上游 subscribeAction 语义
         chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE, ActionCallback { })
     }

@@ -184,6 +184,17 @@ gfxinfo 非压缩等价口径（PRD 7.3「不混算」），R8 压缩口径待�
 **B-03 达标**：就绪耗时 -49% 进入 D1 门槛，且就绪期间 UI 可交互。
 口径：注入开始→完成日志差（含 100 覆盖物创建）；两口径均含 10 指标计算。
 
+## 4.x 0.6.0 发版回归实测（2026-10-30，冻结设备 23078PND5G 在线实采）
+
+| 门槛 | 口径 | 0.5.0 基线 | 0.6.0 实测 | 判定 |
+|---|---|---|---|---|
+| B-01 启动 | StartupTimingMetric（benchmark 变体，5 次冷启动） | median 387.6ms | **median 412.8ms**（min 393.3 / max 426.2） | ✅ D1≤1500ms 的 3.6 倍余量；较基线 +6.5%（<10% 劣化上限） |
+| B-02 帧耗时 | gfxinfo 等价口径（benchmark 变体非压缩，50k/10 指标/100 覆盖物，20 次滑动，571 帧） | P50 23ms / P95 32ms | **P50 23ms / P95 32ms**（P90 30ms） | ✅ 0% 劣化（门槛 ≤10%）；0.6.0 结构镜像（calc 全量路径 + 统一轴模型）未回退优化成果 |
+| B02StressBenchmark | FrameTimingMetric | @Ignore（MIUI14 vendor 限制，§4 对照实验） | 维持跳过（1 skipped） | 按冻结口径豁免，R8 帧数据待设备兼容 |
+
+执行：`./gradlew :benchmark:connectedBenchmarkAndroidTest`（3 tests，0 failed，1 skipped）；
+B-02 帧统计经 dumpsys gfxinfo 手工按协议复采（20 次滑动 reset 后 571 帧）。
+
 ## 5. 后续动作（T-34 输入）
 
 - B-02 首轮数据 vs 门槛差距分析 → 超标项进入 T-34 优化循环（视口裁剪、覆盖物批量绘制、指标线分帧）

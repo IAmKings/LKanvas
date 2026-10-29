@@ -75,7 +75,20 @@
 - 指标参数设置面板 UI（API 层已通）→ 后续样例
 - ~~tooltip features 图标点击~~：**0.3.0 已收口**——features 图标渲染 + 手势命中 → 三种 ActionType（EVT-007~009），样例面板「功能图标」开关演示
 
+## 0.6.0 复核记录（2026-10-30，结构与逻辑对齐完整版发版）
+
+| 类别 | 0.6.0 影响 | 复核方式与结论 |
+|---|---|---|
+| A1/B1（默认三指标） | **破坏性变更**：init 不再预置 MA/VOL/MACD；示例改为显式创建（MainActivity LaunchedEffect，paneId=main/vol/macd） | 行为等价性由单测守护：Parity7PaneRenderTest（任意实例绑定内置 pane 渲染集合）+ LKanvasChartCrudTest（无预置实例断言）；视觉三 pane 布局不变。**真机视觉复核待下一轮真机批次** |
+| B2/B3/B4/E3 | createIndicator 缺省新建 pane + isStack=false；overrideIndicator 全字段；removeIndicator 无内置保护 | 单测全部更新并通过（parity-5/7、LKanvasChartCrudTest、AxisAndInstanceFieldsTest）——0.6.0 全量回归 340 测试 0 失败 |
+| A4（历史分页） | 0.6.0 修复分页触发（Store 边界判定 + 同方向 more 更新） | parity-4 六用例守护（方向/次数/more 停止/时间戳）；真机行为验证待下一轮 |
+| C5/D1-D3/E1-E2 | 视口锚点模型（scale=1 无位移、右锚定位）与开关门禁变更 | parity-8 守护；真机手势复核待下一轮 |
+| 其余真机项 | 无 0.6.0 语义变化 | 维持 2026-10-27/28 轮次 ✅ 结论 |
+
+**本环境（无真机）口径**：可执行项=全部单测/差分覆盖项（0.6.0 回归全绿）；真机视觉/手势项按上表标注复核状态，无阻断项（0.6.0 变更均有等价单测证据）。
+
 ## 结论
 
 人工验收 2026-10-27/28 轮次：A1-A4、C1-C4、D1-D5、E1-E2、F1、G3-G4 真机通过；
-其余经单测覆盖。无阻断项。
+其余经单测覆盖。0.6.0 复核见上节：单测守护项全绿，受破坏性变更影响的真机视觉项
+（A1/B1 三 pane 布局）待下一轮真机批次复核，无阻断项。

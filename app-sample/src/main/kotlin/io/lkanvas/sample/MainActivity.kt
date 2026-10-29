@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.lkanvas.chart.Period
+import io.lkanvas.chart.PeriodType
 import io.lkanvas.compose.KLineChart
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
@@ -80,14 +81,14 @@ class MainActivity : ComponentActivity() {
             Surface(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     // —— 批次 6 余量：周期 tab + 指标面板（对齐上游 demo 信息架构） ——
-                    val currentPeriod = remember { androidx.compose.runtime.mutableStateOf(Period(Period.PeriodType.MINUTE)) }
+                    val currentPeriod = remember { androidx.compose.runtime.mutableStateOf(Period(PeriodType.MINUTE)) }
                     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState())) {
                         val periods: List<Pair<String, Period>> = listOf(
-                            "1m" to Period(Period.PeriodType.MINUTE),
-                            "5m" to Period(Period.PeriodType.MINUTE, 5 * 60_000L),
-                            "15m" to Period(Period.PeriodType.MINUTE, 15 * 60_000L),
-                            "1h" to Period(Period.PeriodType.HOUR),
-                            "1d" to Period(Period.PeriodType.DAY),
+                            "1m" to Period(PeriodType.MINUTE),
+                            "5m" to Period(PeriodType.MINUTE, 5 * 60_000L),
+                            "15m" to Period(PeriodType.MINUTE, 15 * 60_000L),
+                            "1h" to Period(PeriodType.HOUR),
+                            "1d" to Period(PeriodType.DAY),
                         )
                         periods.forEach { (label, period) ->
                             val selected = currentPeriod.value == period
@@ -155,7 +156,7 @@ class MainActivity : ComponentActivity() {
                         Modifier.fillMaxWidth().padding(8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                     ) {
                         // 画线工具循环（16 种，T-20/21/22）
-                        val tools = io.lkanvas.core.extension.overlay.OverlayTemplates.all.keys.toList()
+                        val tools = io.lkanvas.core.extension.overlay.OverlayTemplates.supported()
                         Button(
                             onClick = {
                                 val next = tools[(tools.indexOf(state.currentTool) + 1) % tools.size]
