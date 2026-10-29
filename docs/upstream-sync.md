@@ -63,3 +63,20 @@
 | 回归证据 | `Parity8ViewportEventsTest.executeAction写十字线状态且抑制反向广播`（抑制断言 + 内部广播断言 + 状态写入断言）；`LKanvasChartTest.subscribe_execute_unsubscribe事件恰好一次` |
 | 残余差异 | notInvalidate 优化映射到平台失效模型（Compose viewRevision 单一失效路径，无需逐调用点跳过）——差异登记 gap-matrix（平台层） |
 | 受影响符号 | 本地 3 个（LKanvasChart.executeAction/emit、ChartState.applyCrosshairAction）——补丁可定位为有限改动，无需重写数据/渲染模块（U1 达成） |
+
+
+## 演练 5（2026-10-30，真实源码补丁移植——before/after 证据，R13/R14 收口）
+
+**补丁**：上游 main `e829f30eff1f`（2026-10-25 作者/2026-10-30 合入 `66dd45b3`）
+「fix: hit-test arc figure by angular sweep」——`src/extension/figure/arc.ts`
+的 checkCoordinateOnArc 由端点包围盒改为**角扫描 + 端点线宽容差**。
+
+| 项 | 内容 |
+|---|---|
+| 补丁范围 | 1 文件（arc.ts），+11/-8：角扫描（sweep≥360° 直接命中；atan2 偏移 ≤ span）+ 起止端点距离 < DEVIATION 容差 |
+| 本地对照 | `lkanvas-core/.../figure/Figures.kt` FigureHit Arc 分支——**角扫描（withinAngle）本地已有且优于旧上游**；缺端点容差（复审 R14 复现：r=100、0°→90°、点 -0.5° 距起点 0.873px，2px 容差下 false） |
+| **before** | 临时分支 `drill/upstream-e829f30e`：新增 `ArcEndpointDrillTest` 2 用例 5 断言 → **2 用例失败**（起点外/终点外命中断言失败；弧外不误命中/远离端点不命中共 3 断言本就通过）——失败日志留档于本轮测试报告 |
+| 本地最小 diff | FigureHit Arc 分支：withinAngle 通过 → true；否则补起/止端点坐标距离 ≤ tolerance 判定（+9/-1 行，度数制端点换算） |
+| **after** | 2 用例转绿（5/5 断言通过）；core 全量 220 测试 0 失败（无回归） |
+| main compare 登记 | 上游 main 领先 v10.1.0 共 3 提交：2 README（不适用）+ e829f30e（**已采纳**，本次演练移植）——「上游仅文档提交」的旧结论作废，后续 compare 逐提交核对源码 |
+| U1 判定 | 补丁可定位为**有限本地改动**（1 文件 +9/-1），before/after 可复现，无需重写相关模块（快照 third_party 保持 v10.1.0 不动，oracle 基线不受影响） |
