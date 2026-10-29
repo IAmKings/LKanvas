@@ -236,6 +236,19 @@ class MainActivity : ComponentActivity() {
                             },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text("图例+") }
+                        // 0.5.x 动态副图演示：在自定义 paneId 上建 BOLL（新副图 pane 出现/消失）
+                        var subPaneOn by remember { androidx.compose.runtime.mutableStateOf(false) }
+                        Button(
+                            onClick = {
+                                subPaneOn = !subPaneOn
+                                if (subPaneOn) {
+                                    chartFacade.createIndicator("BOLL", paneId = "pane_boll")
+                                } else {
+                                    chartFacade.removeIndicator(ChartState.IndicatorFilter(paneId = "pane_boll"))
+                                }
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text(if (subPaneOn) "图✓" else "图") }
                         // 0.4.0 多轴演示：创建自定义轴 + 绑定 MA(10)（独立值域 + 独立标签列）
                         var multiAxisOn by remember { androidx.compose.runtime.mutableStateOf(false) }
                         Button(

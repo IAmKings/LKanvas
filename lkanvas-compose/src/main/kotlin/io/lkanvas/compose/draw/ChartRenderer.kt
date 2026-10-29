@@ -78,6 +78,10 @@ object ChartRenderer {
         // 分隔线（Styles separator.color/size 消费）
         drawLine(theme.separatorColor, Offset(0f, mainBottom), Offset(params.width, mainBottom), theme.separatorSizePx)
         drawLine(theme.separatorColor, Offset(0f, volBottom), Offset(params.width, volBottom), theme.separatorSizePx)
+        // 0.5.x 动态副图分隔线
+        for ((_, bounds) in state.extraPaneLayout) {
+            drawLine(theme.separatorColor, Offset(0f, bounds.second), Offset(params.width, bounds.second), theme.separatorSizePx)
+        }
 
         val crosshair = if (params.includeCrosshair && theme.crosshairShow) state.crosshairPosition else null
         // 主 pane 顶部两行图例（OHLC + MA）的避让高度
@@ -91,6 +95,10 @@ object ChartRenderer {
             drawMainPane(state, theme, 0f, contentRight, mainTop, mainBottom, text, crosshair, legendHeight, extraAxisCols = extraAxisCols)
             drawVolumePane(state, theme, 0f, contentRight, volTop, volBottom, text)
             drawMacdPane(state, theme, 0f, contentRight, macdTop, macdBottom, text)
+            // 0.5.x 动态副图：逐 pane 画绑定指标的线列 + 网格 + 标签
+            for ((paneId, bounds) in state.extraPaneLayout) {
+                drawExtraPane(state, theme, text, paneId, 0f, contentRight, bounds.first, bounds.second)
+            }
         }
         // 覆盖物（主 pane 区域）
         with(OverlayRenderer) {

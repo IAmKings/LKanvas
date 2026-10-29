@@ -443,7 +443,14 @@ class LKanvasChart private constructor(
         isStack: Boolean = true,
         yAxisId: String = "main",
         styles: Any? = null,
-    ): String? = state.createIndicator(name, calcParams, paneId, isStack, yAxisId, styles)
+    ): String? {
+        val id = state.createIndicator(name, calcParams, paneId, isStack, yAxisId, styles)
+        // 0.5.x 动态副图：paneId 非内置时自动创建 pane（布局随 relayout 扩展）
+        if (id != null && paneId !in setOf("main", "vol", "macd")) {
+            ensureExtraPane(paneId)
+        }
+        return id
+    }
 
     /** 上游 `overrideIndicator`：字段级覆盖（calcParams/visible）。 */
     fun overrideIndicator(id: String, calcParams: List<Double>? = null, visible: Boolean? = null): Boolean =
@@ -456,9 +463,31 @@ class LKanvasChart private constructor(
     /** 上游 `getIndicatorByInstanceId(id)`。 */
     fun getIndicatorByInstanceId(id: String) = state.getIndicatorByInstanceId(id)
 
-    /** 上游 `removeIndicator(filter)`。 */
-    fun removeIndicator(filter: ChartState.IndicatorFilter = ChartState.IndicatorFilter()): Boolean =
-        state.removeIndicator(filter)
+    /** 0.5.x 动态副图：确保自定义 pane 存在（去重）。 */
+    private fun ensureExtraPane(paneId: String) {
+        if (paneId !in state.extraPanes.value) {
+            state.extraPanes.value = state.extraPanes.value + paneId
+            state.relayoutExtraPanes()
+        }
+    }
+
+    /** 0.5.x 动态副图：pane 内无实例时移除 pane。 */
+    private fun pruneEmptyExtraPanes() {
+        val empty = state.extraPanes.value.filter { pane ->
+            state.getIndicators(ChartState.IndicatorFilter(paneId = pane)).isEmpty()
+        }
+        if (empty.isNotEmpty()) {
+            state.extraPanes.value = state.extraPanes.value - empty.toSet()
+            state.relayoutExtraPanes()
+        }
+    }
+
+    /** 上游 `removeIndicator(filter)`；动态副图 pane 空了自动移除。 */
+    fun removeIndicator(filter: ChartState.IndicatorFilter = ChartState.IndicatorFilter()): Boolean {
+        val removed = state.removeIndicator(filter)
+        if (removed) pruneEmptyExtraPanes()
+        return removed
+    }
 
     // ---------- 样式（对齐 setStyles/getStyles，批次 5） ----------
 

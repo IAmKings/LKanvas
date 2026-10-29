@@ -66,7 +66,8 @@ fun KLineChart(
     // 布局回调（尺寸变化）
     val layoutModifier = Modifier.onSizeChanged { size ->
         val contentW = size.width - gutterW
-        val mainH = (size.height - 2 * subPaneH - timeAxisH).coerceAtLeast(0f)
+        // 0.5.x 动态副图：容器高扣除自定义 pane 数 × 默认副图高
+        val mainH = (size.height - 2 * subPaneH - timeAxisH - state.extraPanes.value.size * subPaneH).coerceAtLeast(0f)
         state.onLayout(contentW, ChartState.PaneHeights(mainH, subPaneH, subPaneH, timeAxisH))
     }
 

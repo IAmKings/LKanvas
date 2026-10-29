@@ -166,6 +166,32 @@ class AxisAndInstanceFieldsTest {
         assertTrue(updated.fixedZLevel)
     }
 
+    // ---------- 0.5.x 动态副图 pane ----------
+
+    @Test
+    fun dynamicSubPane_createOnBindPruneOnRemove() {
+        val chart = newChart()
+        val st = chart.state
+        // 无自定义 pane
+        assertTrue(st.extraPanes.value.isEmpty())
+        // 绑定自定义 paneId 的指标 → pane 自动创建 + 布局生成
+        val id = chart.createIndicator("MA", calcParams = listOf(5.0), paneId = "pane_a")
+        assertNotNull(id)
+        assertTrue(st.extraPanes.value.contains("pane_a"), "pane 应创建：${st.extraPanes.value}")
+        assertTrue(st.extraPaneLayout.any { it.first == "pane_a" }, "布局应含 pane_a：${st.extraPaneLayout}")
+        // 两个指标同 pane → 仍一个 pane
+        chart.createIndicator("MA", calcParams = listOf(10.0), paneId = "pane_a")
+        assertEquals(1, st.extraPanes.value.size)
+        // 删除 pane 内全部指标 → pane 移除
+        chart.removeIndicator(ChartState.IndicatorFilter(paneId = "pane_a"))
+        assertTrue(st.extraPanes.value.isEmpty(), "pane 空后移除")
+        assertTrue(st.extraPaneLayout.isEmpty())
+        // 内置 pane 不进动态列表
+        chart.createIndicator("MA", calcParams = listOf(5.0), paneId = "main")
+        assertTrue(st.extraPanes.value.isEmpty())
+        LKanvasChart.dispose(chart)
+    }
+
     // ---------- isStack 语义（CH-044 收口；上游 Store.addIndicator） ----------
 
     @Test

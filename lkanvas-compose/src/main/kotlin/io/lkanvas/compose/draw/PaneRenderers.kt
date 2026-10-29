@@ -259,6 +259,68 @@ object PaneRenderers {
         drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), y, contentRight)
     }
 
+    /**
+     * 0.5.x 动态副图 pane：绑定该 paneId 的全部指标按各自全量线列绘制
+     * （palette 顺序、lastValueMark、网格与 y 轴标签同内置副图口径）。
+     */
+    fun DrawScope.drawExtraPane(
+        state: ChartState,
+        theme: ChartTheme,
+        text: ChartText,
+        paneId: String,
+        contentLeft: Float,
+        contentRight: Float,
+        top: Float,
+        bottom: Float,
+    ) {
+        val insts = state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
+        val valid = insts.mapNotNull { it.state }
+        if (valid.isEmpty()) return
+        val candles = state.dataSnapshot.candles
+        val range = state.viewport.visibleRange(candles.size)
+        if (range.count <= 0) return
+
+        // 全 pane 值域：全部实例全部列在可见区的 min/max
+        var lo = Double.NaN
+        var hi = Double.NaN
+        for (res in valid) {
+            for (key in res.result.keys) {
+                val col = res.result[key] ?: continue
+                for (i in range.first..range.last) {
+                    val v = col[i]
+                    if (v.isNaN()) continue
+                    if (lo.isNaN() || v < lo) lo = v
+                    if (hi.isNaN() || v > hi) hi = v
+                }
+            }
+        }
+        if (lo.isNaN()) return
+        if (lo == hi) { lo -= 1.0; hi += 1.0 }
+        val y: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
+
+        drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
+        clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
+            var paletteIdx = 0
+            for (inst in insts) {
+                val res = inst.state ?: continue
+                val customDraw = inst.definition.draw
+                if (customDraw != null) {
+                    customDraw(
+                        io.lkanvas.core.indicator.IndicatorDrawContext(
+                            result = res.result, rangeFirst = range.first, rangeLast = range.last,
+                            yOf = y, xOf = { i -> state.viewport.candleCenterX(i.toDouble()) },
+                            palette = theme.linePalette, scope = this,
+                        ),
+                    )
+                } else {
+                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
+                }
+                paletteIdx += res.result.keys.size
+            }
+        }
+        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), y, contentRight)
+    }
+
     // ---------- 内部 ----------
 
     private fun DrawScope.drawGrid(

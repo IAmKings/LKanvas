@@ -686,6 +686,17 @@ class ChartState(
     var paneHeightsPx: PaneHeights = PaneHeights(0f, 0f, 0f, 0f)
         private set
 
+    /**
+     * 0.5.x 动态副图 pane（Alpha）：createIndicator 的 paneId 非内置
+     * （main/vol/macd）时自动创建；pane 内全部指标删除后自动移除。
+     * 渲染按 [extraPaneLayout] 逐 pane 画绑定指标的线列。
+     */
+    val extraPanes = androidx.compose.runtime.mutableStateOf(emptyList<String>())
+
+    /** 自定义副图布局（paneId → (topPx, bottomPx)，relayout 计算）。 */
+    var extraPaneLayout by androidx.compose.runtime.mutableStateOf(emptyList<Pair<String, Pair<Float, Float>>>())
+        private set
+
     init {
         engine.onSnapshot = { snap, change ->
             val prevCount = dataSnapshot.candles.size
@@ -741,7 +752,10 @@ class ChartState(
 
     /** 主 pane 叠加的指标实例结果（MA + 用户 price 系实例）。 */
     fun mainPaneIndicatorResults(): List<IndicatorInstance> =
-        indicatorInstances.filter { it.visible && it.definition.series == io.lkanvas.core.indicator.IndicatorSeries.PRICE && it.state != null }
+        indicatorInstances.filter {
+            it.visible && it.paneId == "main" &&
+                it.definition.series == io.lkanvas.core.indicator.IndicatorSeries.PRICE && it.state != null
+        }
 
     /** VOL pane 实例（第一个可见 volume 系；缺省内置）。 */
     fun volumePaneResult(): IndicatorResultState? = volInstance.state
@@ -764,7 +778,8 @@ class ChartState(
 
     fun onLayout(widthPx: Float, panes: PaneHeights) {
         contentWidthPx = widthPx
-        containerHeightPx = panes.main + panes.vol + panes.macd + panes.timeAxis
+        containerHeightPx = panes.main + panes.vol + panes.macd + panes.timeAxis +
+            extraPanes.value.size * defaultSubPanePx
         timeAxisHeightPx = panes.timeAxis
         if (defaultSubPanePx == 0f) {
             defaultSubPanePx = panes.vol
@@ -775,7 +790,10 @@ class ChartState(
     }
 
     private fun relayout() {
-        val usable = (containerHeightPx - timeAxisHeightPx).coerceAtLeast(minSubPanePx * 2)
+        // 0.5.x 动态 pane：自定义副图排在内置 VOL/MACD 之后、时间轴之前，
+        // 高度 = 默认副图高（main 相应压缩，保底规则不变）
+        val extraH = extraPanes.value.size * defaultSubPanePx
+        val usable = (containerHeightPx - timeAxisHeightPx - extraH).coerceAtLeast(minSubPanePx * 2)
         // 主 pane 保底 35% 可用高（A-41：横屏/大字体下关键绘图区不被挤没）
         val mainMin = (usable * 0.35f).coerceAtLeast(minMainPanePx)
         val maxSub = ((usable - mainMin) / 2f).coerceAtLeast(minSubPanePx)
@@ -783,9 +801,20 @@ class ChartState(
         val macd = macdPaneOverride.coerceIn(minSubPanePx, maxSub)
         val main = (usable - vol - macd).coerceAtLeast(minMainPanePx)
         paneHeightsPx = PaneHeights(main, vol, macd, timeAxisHeightPx)
+        // 自定义副图布局（top/bottom 从 macd 底开始顺序排布）
+        var cursor = main + vol + macd
+        extraPaneLayout = extraPanes.value.map { pane ->
+            val top = cursor + 1f
+            val bottom = top + defaultSubPanePx
+            cursor = bottom
+            pane to (top to bottom)
+        }
         viewport.layout(contentWidthPx.toDouble(), dataSnapshot.candles.size)
         viewRevision++
     }
+
+    /** 动态副图变更后重新布局（门面调用；relayout 的公开入口）。 */
+    fun relayoutExtraPanes() = relayout()
 
     /**
      * 分隔条命中（A-33：手势层判定）；返回 0=主|VOL 分隔、1=VOL|MACD 分隔、null=未命中。
