@@ -237,7 +237,9 @@ object IndicatorEngine {
 
     /** 全量计算（fold 模型，公式与上游逐位对照由 fixtures 保证）。 */
     fun recompute(definition: IndicatorDefinition, params: List<Double>, candles: List<Candle>): IndicatorResultState {
-        val plots = definition.plots
+        // PRD R-08：实际输出列以 plotsFor(params) 为准（实例参数个数可与默认不同；
+        // 用 definition.plots 会在自定义参数实例上留下永久 NaN 假列）
+        val plots = definition.plotsFor(params)
         val columns = HashMap<String, DoubleArray>(plots.size * 2)
         for (p in plots) columns[p.key] = DoubleArray(candles.size) { Double.NaN }
         var scratch: Any? = definition.initScratch(params)

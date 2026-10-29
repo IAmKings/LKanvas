@@ -275,6 +275,8 @@ class LocalFeed(private val seed: Int = 2026) {
      */
     suspend fun start(state: ChartState, stress: StressConfig?, facade: io.lkanvas.chart.LKanvasChart?) {
         if (stress != null) {
+            val injectStartMs = System.currentTimeMillis()
+            android.util.Log.i("LKanvas", "stress 注入开始：${stress.candles} candle / ${stress.indicators} 指标 / ${stress.overlays} 覆盖物")
             val nowMin = System.currentTimeMillis() / 60_000L * 60_000L
             val count = stress.candles
             val initial = ArrayList<Candle>(count)
@@ -309,7 +311,12 @@ class LocalFeed(private val seed: Int = 2026) {
                     ),
                 )
             }
-            android.util.Log.i("LKanvas", "stress 注入完成：${stress.candles} candle / ${stress.indicators} 指标 / ${stress.overlays} 覆盖物")
+            // B-03 口径：注入开始→完成 = 「初始主图及必需指标就绪」实测（同步 reset+全量计算）
+            android.util.Log.i(
+                "LKanvas",
+                "stress 注入完成：${stress.candles} candle / ${stress.indicators} 指标 / ${stress.overlays} 覆盖物，" +
+                    "就绪耗时 ${System.currentTimeMillis() - injectStartMs}ms",
+            )
             return
         }
         start(state)
