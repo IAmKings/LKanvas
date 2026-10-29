@@ -19,6 +19,8 @@ kotlin {
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    // Merge.kt 通用 DeepPartial 深合并（上游 typeChecks.ts merge 镜像）需 kotlin-reflect
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(kotlin("test"))

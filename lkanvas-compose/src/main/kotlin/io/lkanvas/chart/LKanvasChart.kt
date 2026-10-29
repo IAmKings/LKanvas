@@ -275,12 +275,15 @@ class LKanvasChart private constructor(
             val idx = state.dataSnapshot.candles.indexOf(candle)
             emit(
                 ActionType.ON_CANDLE_BAR_CLICK,
+                // 上游 payload 嵌套结构：data:{prev,current,next}（common/Data.ts VisibleRangeData）
                 VisibleRangeData(
                     dataIndex = idx,
                     x = state.viewport.candleCenterX(idx.toDouble()),
-                    prev = state.dataSnapshot.candles.getOrNull(idx - 1),
-                    data = candle,
-                    next = state.dataSnapshot.candles.getOrNull(idx + 1),
+                    data = NeighborData(
+                        prev = state.dataSnapshot.candles.getOrNull(idx - 1),
+                        current = candle,
+                        next = state.dataSnapshot.candles.getOrNull(idx + 1),
+                    ),
                 ),
             )
         }
@@ -321,7 +324,7 @@ class LKanvasChart private constructor(
 
     private var dataLoader: DataLoader? = null
     private var loading = false
-    private var loadMore: DataLoader.DataLoadMore = DataLoader.DataLoadMore.NONE
+    private var loadMore: DataLoadMore = DataLoadMore.NONE
 
     /** 上游 `setDataLoader(loader)`：设置数据源并 resetData（触发 init 拉取）。 */
     fun setDataLoader(loader: DataLoader) {
@@ -340,28 +343,28 @@ class LKanvasChart private constructor(
         state.restoreGate.let { /* 存档门禁：宿主恢复流程不受此影响 */ }
         scope.launch {
             state.reset(MarketKey(sym.ticker, per.toString()), emptyList())
-            processLoad(DataLoader.DataLoadType.INIT, loader, sym, per)
+            processLoad(DataLoadType.INIT, loader, sym, per)
         }
     }
 
-    private fun processLoad(type: DataLoader.DataLoadType, loader: DataLoader, sym: SymbolInfo, per: Period) {
+    private fun processLoad(type: DataLoadType, loader: DataLoader, sym: SymbolInfo, per: Period) {
         if (loading) return
         loading = true
         val timestamp = when (type) {
-            DataLoader.DataLoadType.BACKWARD -> state.dataSnapshot.candles.lastOrNull()?.timestamp
-            DataLoader.DataLoadType.FORWARD -> state.dataSnapshot.candles.firstOrNull()?.timestamp
+            DataLoadType.BACKWARD -> state.dataSnapshot.candles.lastOrNull()?.timestamp
+            DataLoadType.FORWARD -> state.dataSnapshot.candles.firstOrNull()?.timestamp
             else -> null
         }
         loader.getBars(
-            DataLoader.GetBarsParams(type, timestamp, sym, per) { data, more ->
+            GetBarsParams(type, timestamp, sym, per) { data, more ->
                 // 回调可能来自任意线程：串行化到引擎上下文
                 scope.launch {
                     loading = false
                     addData(data, type, more)
-                    if (type == DataLoader.DataLoadType.INIT) {
+                    if (type == DataLoadType.INIT) {
                         loader.subscribeBar(
-                            DataLoader.SubscribeBarParams(sym, per) { candle ->
-                                scope.launch { addData(listOf(candle), DataLoader.DataLoadType.UPDATE, null) }
+                            SubscribeBarParams(sym, per) { candle ->
+                                scope.launch { addData(listOf(candle), DataLoadType.UPDATE, null) }
                             },
                         )
                     }
@@ -377,35 +380,35 @@ class LKanvasChart private constructor(
      * - 单根 update：时间戳大于末根→追加；等于→替换；小于→静默忽略
      * 批次 2c 将把「视口到边界且 more=true」的自动拉取接到手势层。
      */
-    private fun addData(data: List<Candle>, type: DataLoader.DataLoadType, more: DataLoader.DataLoadMore?) {
+    private fun addData(data: List<Candle>, type: DataLoadType, more: DataLoadMore?) {
         val realMore = when {
-            more == null -> DataLoader.DataLoadMore.NONE
+            more == null -> DataLoadMore.NONE
             else -> more
         }
         scope.launch {
             when (type) {
-                DataLoader.DataLoadType.INIT -> {
+                DataLoadType.INIT -> {
                     val r = state.reset(currentKey(), data)
                     if (r is io.lkanvas.core.store.ChangeResult.Accepted) {
                         loadMore = realMore
                     }
                 }
 
-                DataLoader.DataLoadType.BACKWARD -> {
+                DataLoadType.BACKWARD -> {
                     val r = state.appendBatch(data)
                     if (r is io.lkanvas.core.store.ChangeResult.Accepted) {
-                        loadMore = DataLoader.DataLoadMore(loadMore.backward, realMore.forward)
+                        loadMore = DataLoadMore(loadMore.backward, realMore.forward)
                     }
                 }
 
-                DataLoader.DataLoadType.FORWARD -> {
+                DataLoadType.FORWARD -> {
                     val r = state.prependHistory(data)
                     if (r is io.lkanvas.core.store.ChangeResult.Accepted) {
-                        loadMore = DataLoader.DataLoadMore(realMore.backward, loadMore.forward)
+                        loadMore = DataLoadMore(realMore.backward, loadMore.forward)
                     }
                 }
 
-                DataLoader.DataLoadType.UPDATE -> data.forEach { c ->
+                DataLoadType.UPDATE -> data.forEach { c ->
                     // 镜像上游：小于末根静默忽略（内核拒绝结果吞掉）
                     state.upsertLatest(c)
                 }
@@ -424,7 +427,7 @@ class LKanvasChart private constructor(
         val sym = symbol
         val per = period
         if (loader != null && sym != null && per != null) {
-            loader.unsubscribeBar(DataLoader.UnsubscribeBarParams(sym, per))
+            loader.unsubscribeBar(UnsubscribeBarParams(sym, per))
         }
         scope.cancel()
     }
@@ -668,6 +671,10 @@ class LKanvasChart private constructor(
 
     /** 上游 `setThousandsSeparator(o)` / `getThousandsSeparator()`。 */
     internal var thousandsSeparator = ThousandsSeparator()
+        set(value) {
+            field = value
+            syncFormatConfig()
+        }
 
     fun setThousandsSeparator(separator: ThousandsSeparator) {
         thousandsSeparator = separator
@@ -677,6 +684,10 @@ class LKanvasChart private constructor(
 
     /** 上游 `setDecimalFold(o)` / `getDecimalFold()`。 */
     internal var decimalFold = DecimalFold()
+        set(value) {
+            field = value
+            syncFormatConfig()
+        }
 
     fun setDecimalFold(fold: DecimalFold) {
         decimalFold = fold
@@ -686,12 +697,31 @@ class LKanvasChart private constructor(
 
     /** 上游 `setFormatter(f)` / `getFormatter()`。 */
     internal var formatter: Formatter? = null
+        set(value) {
+            field = value
+            syncFormatConfig()
+        }
 
     fun setFormatter(formatter: Formatter?) {
         this.formatter = formatter
     }
 
     fun getFormatter(): Formatter? = formatter
+
+    /**
+     * SLA-011 格式链接线：把 thousandsSeparator/decimalFold/formatter 同步到
+     * state.formatConfig，由 ChartText.price/volume 统一消费。
+     */
+    private fun syncFormatConfig() {
+        state.formatConfig = ChartState.FormatConfig(
+            thousandsSign = thousandsSeparator.sign,
+            decimalFoldThreshold = decimalFold.threshold,
+            formatDate = formatter?.let { f ->
+                { ts: Long, tpl: String -> f.formatDate?.invoke(ts, tpl, null) ?: io.lkanvas.core.common.utils.Format.formatTimestampByTemplate(ts, tpl) }
+            },
+            formatBigNumber = formatter?.formatBigNumber,
+        )
+    }
 
     /** 上游 `setHotkey(hotkey)` / `getHotkey()`（平台占位）。 */
     internal var hotkey = Hotkey()

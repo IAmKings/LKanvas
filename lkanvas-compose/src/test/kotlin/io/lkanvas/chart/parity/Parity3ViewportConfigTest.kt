@@ -2,10 +2,16 @@ package io.lkanvas.chart.parity
 
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.chart.DataLoader
+import io.lkanvas.chart.DataLoadType
+import io.lkanvas.chart.DataLoadMore
+import io.lkanvas.chart.GetBarsParams
+import io.lkanvas.chart.SubscribeBarParams
+import io.lkanvas.chart.UnsubscribeBarParams
 import io.lkanvas.chart.DecimalFold
 import io.lkanvas.chart.LKanvasChart
 import io.lkanvas.chart.PaneOptions
 import io.lkanvas.chart.Period
+import io.lkanvas.chart.PeriodType
 import io.lkanvas.chart.SymbolInfo
 import io.lkanvas.chart.ThousandsSeparator
 import io.lkanvas.core.data.Candle
@@ -41,16 +47,16 @@ class Parity3ViewportConfigTest {
     private fun newChart(withLayout: Boolean = true): LKanvasChart {
         val chart = LKanvasChart.init()
         chart.setSymbol(SymbolInfo("DEMO"))
-        chart.setPeriod(Period(Period.PeriodType.MINUTE))
+        chart.setPeriod(Period(PeriodType.MINUTE))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
                     params.callback(
                         (0 until 300).map {
                             val close = 100.0 + it * 0.1
                             Candle(it.toLong(), close, close + 1, close - 1, close, 1000.0)
                         },
-                        DataLoader.DataLoadMore.NONE,
+                        DataLoadMore.NONE,
                     )
                 }
             }

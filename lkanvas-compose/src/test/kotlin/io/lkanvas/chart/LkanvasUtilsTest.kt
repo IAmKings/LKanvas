@@ -1,5 +1,6 @@
 package io.lkanvas.chart
 
+import io.lkanvas.core.common.utils.Format
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -93,14 +94,46 @@ class LkanvasUtilsTest {
 
     @Test
     fun formatDate_replacesTemplatePlaceholders() {
-        // 2026-03-05 07:08:09 UTC
-        val ts = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+        // 2026-03-05 07:08:09 UTC；formatDate 走上游 formatTimestampByTemplate（YYYY/MM/DD/HH/mm/ss），
+        // 未传时区=系统时区，期望值按同一时区构造
+        val utc = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
             clear()
             set(2026, 2, 5, 7, 8, 9)
         }.timeInMillis
-        assertEquals("2026-03-05 07:08", LkanvasUtils.formatDate(ts))
-        assertEquals("07:08:09", LkanvasUtils.formatDate(ts, "HH:mm:ss"))
-        assertEquals("2026/03/05", LkanvasUtils.formatDate(ts, "yyyy/MM/dd"))
+        val expected = {
+            val cal = java.util.Calendar.getInstance()
+            cal.timeInMillis = utc
+            "%04d-%02d-%02d %02d:%02d".format(
+                cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1,
+                cal.get(java.util.Calendar.DAY_OF_MONTH), cal.get(java.util.Calendar.HOUR_OF_DAY),
+                cal.get(java.util.Calendar.MINUTE),
+            )
+        }()
+        assertEquals(expected, LkanvasUtils.formatDate(utc))
+        assertEquals(
+            {
+                val cal = java.util.Calendar.getInstance()
+                cal.timeInMillis = utc
+                "%02d:%02d:%02d".format(
+                    cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE),
+                    cal.get(java.util.Calendar.SECOND),
+                )
+            }(),
+            LkanvasUtils.formatDate(utc, "HH:mm:ss"),
+        )
+        assertEquals(
+            {
+                val cal = java.util.Calendar.getInstance()
+                cal.timeInMillis = utc
+                "%04d/%02d/%02d".format(
+                    cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1,
+                    cal.get(java.util.Calendar.DAY_OF_MONTH),
+                )
+            }(),
+            LkanvasUtils.formatDate(utc, "YYYY/MM/DD"),
+        )
+        // 显式时区：上游 Options.timezone 消费
+        assertEquals("2026-03-05 15:08", Format.formatTimestampByTemplate(utc, "YYYY-MM-DD HH:mm", "Asia/Shanghai"))
     }
 
     @Test

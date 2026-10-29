@@ -63,15 +63,15 @@ class LKanvasChartTest {
         val chart = newChart()
         var subscribed = 0
         val loader = object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
+            override fun getBars(params: GetBarsParams) {
                 when (params.type) {
-                    DataLoader.DataLoadType.INIT ->
-                        params.callback((0 until 10).map { c(it.toLong(), 100.0 + it) }, DataLoader.DataLoadMore.of(true))
-                    else -> params.callback(emptyList(), DataLoader.DataLoadMore.NONE)
+                    DataLoadType.INIT ->
+                        params.callback((0 until 10).map { c(it.toLong(), 100.0 + it) }, DataLoadMore.of(true))
+                    else -> params.callback(emptyList(), DataLoadMore.NONE)
                 }
             }
 
-            override fun subscribeBar(params: DataLoader.SubscribeBarParams) {
+            override fun subscribeBar(params: SubscribeBarParams) {
                 subscribed++
             }
         }
@@ -91,14 +91,14 @@ class LKanvasChartTest {
         chart.setPeriod(Period.ofMinutes(1))
         var push: ((Candle) -> Unit)? = null
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback(listOf(c(1000, 10.0), c(1060, 11.0)), DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback(listOf(c(1000, 10.0), c(1060, 11.0)), DataLoadMore.NONE)
                     push = { params.callback }
                 }
             }
 
-            override fun subscribeBar(params: DataLoader.SubscribeBarParams) {
+            override fun subscribeBar(params: SubscribeBarParams) {
                 push = params.callback
             }
         })
@@ -124,15 +124,15 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         val loader = object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
+            override fun getBars(params: GetBarsParams) {
                 when (params.type) {
-                    DataLoader.DataLoadType.INIT ->
-                        params.callback((0 until 10).map { c(it.toLong(), 100.0 + it) }, DataLoader.DataLoadMore.NONE)
-                    DataLoader.DataLoadType.FORWARD ->
-                        params.callback((-3 until 0).map { c(it.toLong(), 97.0 + it + 3) }, DataLoader.DataLoadMore.of(false))
-                    DataLoader.DataLoadType.BACKWARD ->
-                        params.callback((10 until 13).map { c(it.toLong(), 110.0 + it - 10) }, DataLoader.DataLoadMore.of(false))
-                    else -> params.callback(emptyList(), DataLoader.DataLoadMore.NONE)
+                    DataLoadType.INIT ->
+                        params.callback((0 until 10).map { c(it.toLong(), 100.0 + it) }, DataLoadMore.NONE)
+                    DataLoadType.FORWARD ->
+                        params.callback((-3 until 0).map { c(it.toLong(), 97.0 + it + 3) }, DataLoadMore.of(false))
+                    DataLoadType.BACKWARD ->
+                        params.callback((10 until 13).map { c(it.toLong(), 110.0 + it - 10) }, DataLoadMore.of(false))
+                    else -> params.callback(emptyList(), DataLoadMore.NONE)
                 }
             }
         }
@@ -176,9 +176,9 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback((0 until 100).map { c(it.toLong(), 100.0) }, DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 100).map { c(it.toLong(), 100.0) }, DataLoadMore.NONE)
                 }
             }
         })
@@ -198,9 +198,9 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback((0 until 200).map { c(it.toLong(), 100.0) }, DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 200).map { c(it.toLong(), 100.0) }, DataLoadMore.NONE)
                 }
             }
         })
@@ -222,9 +222,9 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback((0 until 300).map { c(it.toLong(), 100.0) }, DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 300).map { c(it.toLong(), 100.0) }, DataLoadMore.NONE)
                 }
             }
         })
@@ -248,9 +248,9 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback((0 until 100).map { c(it.toLong(), 100.0 + it) }, DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 100).map { c(it.toLong(), 100.0 + it) }, DataLoadMore.NONE)
                 }
             }
         })
@@ -281,9 +281,9 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback((0 until 200).map { c(it.toLong(), 100.0 + it) }, DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 200).map { c(it.toLong(), 100.0 + it) }, DataLoadMore.NONE)
                 }
             }
         })
@@ -327,9 +327,9 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback((0 until 50).map { c(it.toLong(), 100.0) }, DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 50).map { c(it.toLong(), 100.0) }, DataLoadMore.NONE)
                 }
             }
         })
@@ -343,7 +343,7 @@ class LKanvasChartTest {
         drain()
         assertTrue(clicks.isNotEmpty(), "onCandleBarClick 触发")
         val click = clicks.last() as VisibleRangeData
-        assertTrue(click.data.timestamp >= 0 && click.prev != null || click.dataIndex == 0, "payload 含邻居结构")
+        assertTrue(click.data.current.timestamp >= 0 && click.data.prev != null || click.dataIndex == 0, "payload 含邻居结构")
 
         chart.state.adjustPane(0, 92f, 20f)
         drain()
@@ -407,9 +407,9 @@ class LKanvasChartTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
-                    params.callback((0 until 100).map { c(it.toLong(), 100.0) }, DataLoader.DataLoadMore.NONE)
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 100).map { c(it.toLong(), 100.0) }, DataLoadMore.NONE)
                 }
             }
         })

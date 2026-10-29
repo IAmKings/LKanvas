@@ -138,7 +138,7 @@ object TooltipRenderer {
         val idx = crosshair
             ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) }
             ?: (candles.size - 1)
-        val tooltipText = ChartText(measurer, theme.axisText, baseTextSizePx)
+        val tooltipText = ChartText(measurer, theme.axisText, baseTextSizePx, format = state.formatConfig)
         val groups = buildMainIndicatorGroups(state, idx, styles, theme, tooltipText)
         val drawCandle = shouldDraw(candleT.showRule, crosshair != null)
         val drawInd = groups.any { it.name.isNotEmpty() || it.legends.any { r -> r.value != "—" } }

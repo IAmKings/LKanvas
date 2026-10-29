@@ -7,12 +7,18 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.sp
+import io.lkanvas.compose.state.ChartState
+import io.lkanvas.core.common.utils.Format
 import java.text.DecimalFormat
 import java.util.TimeZone
 
 /**
  * 文本绘制辅助：持有 TextMeasurer 与格式化规则（PRD R-11 基础部分）。
  * 绘制期无状态分配以外的无界缓存；formatter 复用 DecimalFormat。
+ *
+ * SLA-011 格式链接线：price/volume 按 [ChartState.FormatConfig] 消费
+ * thousandsSeparator/decimalFold/formatter，应用顺序与上游一致：
+ * `decimalFold(thousandsSeparator(formatPrecision(v, precision)))`。
  */
 class ChartText(
     internal val measurer: TextMeasurer,
@@ -22,21 +28,33 @@ class ChartText(
     val pricePrecision: Int = 2,
     /** 成交量精度。 */
     val volumePrecision: Int = 2,
+    /** 格式配置（千分位/小数折叠/自定义钩子）；null 用内置默认。 */
+    val format: ChartState.FormatConfig? = null,
 ) : io.lkanvas.compose.draw.TooltipRenderer.NumericText {
     private val priceFormat = createFormat(pricePrecision)
     private val volumeFormat = createFormat(volumePrecision)
-    private val compactFormat = DecimalFormat("#,###.##")
 
     val textHeight: Float = textSizePx * 1.1f
     val tagHeight: Float = textHeight + 6f
     val tagWidth: Float = textSizePx * (pricePrecision + 4)
 
-    override fun price(v: Double): String = if (v.isFinite()) priceFormat.format(v) else "—"
-    override fun volume(v: Double): String = when {
-        !v.isFinite() -> "—"
-        v >= 1e8 -> String.format("%.2f亿", v / 1e8)
-        v >= 1e4 -> String.format("%.2f万", v / 1e4)
-        else -> volumeFormat.format(v)
+    override fun price(v: Double): String {
+        if (!v.isFinite()) return "—"
+        // 上游顺序：decimalFold(thousandsSeparator(formatPrecision(v, precision)))
+        val precisioned = Format.formatPrecision(v, pricePrecision)
+        val grouped = Format.formatThousands(precisioned, format?.thousandsSign ?: "")
+        val fold = format?.decimalFoldThreshold
+        return if (fold != null) Format.formatFoldDecimal(grouped, fold) else grouped
+    }
+
+    override fun volume(v: Double): String {
+        if (!v.isFinite()) return "—"
+        format?.formatBigNumber?.let { return it(v) }
+        return when {
+            v >= 1e8 -> String.format("%.2f亿", v / 1e8)
+            v >= 1e4 -> String.format("%.2f万", v / 1e4)
+            else -> volumeFormat.format(v)
+        }
     }
 
     private val widthCache = HashMap<String, Float>()

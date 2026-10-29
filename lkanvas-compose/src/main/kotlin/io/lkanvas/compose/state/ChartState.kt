@@ -536,6 +536,21 @@ class ChartState(
     var timezoneId: String = ""
 
     /**
+     * 格式配置（上游 Options 的 thousandsSeparator/decimalFold/formatter 消费端，
+     * SLA-011 格式链接线）：ChartText.price/volume 与时间标签统一读取。
+     * thousandsSign=null 不分组；decimalFoldThreshold=null 不折叠；
+     * formatDate/formatBigNumber 自定义钩子未提供时用内置实现。
+     */
+    var formatConfig: FormatConfig = FormatConfig()
+
+    data class FormatConfig(
+        val thousandsSign: String? = null,
+        val decimalFoldThreshold: Int? = null,
+        val formatDate: ((timestamp: Long, template: String) -> String)? = null,
+        val formatBigNumber: ((value: Double) -> String)? = null,
+    )
+
+    /**
      * 0.4.0 多轴渲染（CH-053~056 消费端）：自定义 Y 轴（id→reverse）。
      * 门面 createYAxis/removeYAxis/overrideYAxis 同步；仅 paneId=main 的轴进入渲染。
      * 绑定该轴的指标（IndicatorInstance.yAxisId）用独立值域映射并获独立标签列。

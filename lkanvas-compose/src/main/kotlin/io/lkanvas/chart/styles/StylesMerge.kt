@@ -1,56 +1,24 @@
 package io.lkanvas.chart.styles
 
-import kotlin.reflect.full.primaryConstructor
+import io.lkanvas.core.common.utils.Merge
 
 /**
  * 上游 `utils.merge` 语义：DeepPartial 深合并（对象递归合并）。
- * 对齐上游 common/utils/typeChecks.ts merge 行为——setStyles(DeepPartial) 的实现基础。
- * 实现：kotlin-reflect 主构造遍历；非 data/异类型整体替换。
+ * 对齐上游 common/utils/typeChecks.ts merge 行为——**按提供的属性合并**
+ * （Kotlin 约定：字段值非 null 即已提供，null 即未提供；显式设回默认值
+ * 的 patch 会正常生效）。实现委托 core/common/utils/Merge.kt。
  */
 object StylesMerge {
 
-    /**
-     * DeepPartial 深合并。Kotlin data class 无 undefined，约定：
-     * patch 字段值 **等于 patch 类型默认实例同字段值** 时视为「未提供」，保留 base
-     * （差异登记：上游以 undefined 表达未提供；Kotlin 以默认值等价表达）。
-     */
-    fun merge(base: Any?, patch: Any?): Any? = mergeInternal(base, patch, skipDefaults = true)
+    /** 上游 `merge(target, source)` 语义（提供即覆盖；null=未提供）。 */
+    fun merge(base: Any?, patch: Any?): Any? = Merge.merge(base, patch)
 
-    /** 严格合并（字段值非 null 即覆盖；无默认值跳过语义）。 */
-    fun mergeStrict(base: Any?, patch: Any?): Any? = mergeInternal(base, patch, skipDefaults = false)
-
-    private fun mergeInternal(base: Any?, patch: Any?, skipDefaults: Boolean): Any? {
-        if (patch == null) return base
-        if (base == null) return patch
-        if (base::class != patch::class) return patch
-        val k = base::class
-        if (!k.isData) return patch
-        val primary = k.primaryConstructor ?: return patch
-        val membersByName = k.members.associateBy { it.name }
-
-        // 默认实例：本树 data class 全参数带默认值 → callBy(emptyMap)
-        val patchDefault: Any? = if (skipDefaults) {
-            runCatching { primary.callBy(emptyMap()) }.getOrNull()
-        } else null
-
-        val args = HashMap<kotlin.reflect.KParameter, Any?>()
-        for (param in primary.parameters) {
-            val name = param.name ?: continue
-            val getter = membersByName[name] ?: continue
-            val baseVal = getter.call(base)
-            val patchVal = getter.call(patch)
-            // DeepPartial 约定：patch 字段 == patch 类型默认值 → 视为未提供
-            val isUnset = patchDefault != null && getter.call(patchDefault) == patchVal
-            args[param] = when {
-                patchVal == null -> baseVal
-                isUnset -> baseVal
-                baseVal != null && baseVal::class.isData && baseVal::class == patchVal::class ->
-                    mergeInternal(baseVal, patchVal, skipDefaults)
-                else -> patchVal
-            }
-        }
-        return primary.callBy(args)
-    }
+    /** 历史 API：与 [merge] 同语义（上游无 skip-defaults 分支；保留名以兼容调用方）。 */
+    @Deprecated(
+        message = "上游 merge 无 skip-defaults 语义；本函数与 merge 相同，请直接使用 merge",
+        replaceWith = ReplaceWith("merge(base, patch)"),
+    )
+    fun mergeStrict(base: Any?, patch: Any?): Any? = Merge.merge(base, patch)
 
     /** 便捷：字符串主题名 → Styles（注册表查询；未知名回退 light）。 */
     fun resolveTheme(name: String?): Styles = StylesThemes.getStyles(name) ?: StylesThemes.light

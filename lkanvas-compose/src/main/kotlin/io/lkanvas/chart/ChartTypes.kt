@@ -1,59 +1,33 @@
 package io.lkanvas.chart
 
-import io.lkanvas.core.data.Candle
+import io.lkanvas.core.common.NeighborData as CoreNeighborData
+import io.lkanvas.core.common.VisibleRangeData as CoreVisibleRangeData
 
 /**
- * 事件类型与 payload——对齐上游 `common/Action.ts` 的 9 种 ActionType
- * 与各分发点 payload（源位置见 docs/alignment/ts-inventory.md §3）。
+ * 事件与视口类型——领域定义已镜像至 core/common（上游 `common/{Data,Action,
+ * Crosshair,VisibleRange,BarSpace}.ts` 同名文件）；本文件保留同包别名，
+ * 使 `io.lkanvas.chart` 包内既有引用与上游补丁检索路径同时有效。
  */
-enum class ActionType {
-    ON_ZOOM,
-    ON_SCROLL,
-    ON_VISIBLE_RANGE_CHANGE,
-    ON_CANDLE_TOOLTIP_FEATURE_CLICK,
-    ON_INDICATOR_TOOLTIP_FEATURE_CLICK,
-    ON_CROSSHAIR_FEATURE_CLICK,
-    ON_CROSSHAIR_CHANGE,
-    ON_CANDLE_BAR_CLICK,
-    ON_PANE_DRAG,
-}
+
+typealias ActionType = io.lkanvas.core.common.ActionType
 
 /** 上游 `VisibleRange`：可见窗口（realFrom/realTo 为含未来留白的实际范围）。 */
-data class VisibleRange(
-    val from: Int,
-    val to: Int,
-    val realFrom: Double,
-    val realTo: Double,
-)
+typealias VisibleRange = io.lkanvas.core.common.VisibleRange
 
 /** 上游 `BarSpace`：槽位四值。 */
-data class BarSpace(val bar: Double, val halfBar: Double, val gapBar: Double, val halfGapBar: Double)
+typealias BarSpace = io.lkanvas.core.common.BarSpace
 
-/** 上游 `VisibleRangeData`：单根 candle 的命中/点击数据（含前后邻居）。 */
-data class VisibleRangeData(
-    val dataIndex: Int,
-    val x: Double,
-    val prev: Candle?,
-    val data: Candle,
-    val next: Candle?,
-)
+/** 上游 `NeighborData`：点击/命中 payload 邻居三元组。 */
+typealias NeighborData<D> = CoreNeighborData<D>
+
+/** 上游 `VisibleRangeData`：单根 candle 的命中/点击数据（嵌套 `data:{prev,current,next}`）。 */
+typealias VisibleRangeData = CoreVisibleRangeData
 
 /** 上游 `Crosshair`：十字线状态（全字段可选，与上游 Partial 语义一致）。 */
-data class Crosshair(
-    val x: Double? = null,
-    val y: Double? = null,
-    val paneId: String? = null,
-    val realX: Double? = null,
-    val timestamp: Long? = null,
-    val kLineData: Candle? = null,
-    val dataIndex: Int? = null,
-    val realDataIndex: Double? = null,
-)
+typealias Crosshair = io.lkanvas.core.common.Crosshair
 
 /** 事件回调（上游 `ActionCallback = (data?) => void`）。 */
-fun interface ActionCallback {
-    fun onAction(data: Any?)
-}
+typealias ActionCallback = io.lkanvas.core.common.ActionCallback
 
 /** 上游 `ZoomAnchor`：缩放锚点（'cursor' | 'last_bar'）。 */
 data class ZoomAnchor(
@@ -106,6 +80,3 @@ enum class ZoomAnchorType(val value: String) { CURSOR("cursor"), LAST_BAR("last_
 
 /** 上游 `OverlayDrawingMode = 'step' | 'continuous'`。 */
 enum class OverlayDrawingMode(val value: String) { STEP("step"), CONTINUOUS("continuous") }
-
-/** 上游 `DataLoadType = 'init' | 'forward' | 'backward' | 'update'`（DataLoader.kt 亦有同名）。 */
-enum class DataLoadType(val value: String) { INIT("init"), FORWARD("forward"), BACKWARD("backward"), UPDATE("update") }

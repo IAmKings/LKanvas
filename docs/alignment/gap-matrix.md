@@ -27,12 +27,12 @@
 | IDX-002 | `dispose` | index.ts | LKanvasChart.dispose 已建 | B | test | S | 2a |  | 已声明 |
 | IDX-003 | `version` | index.ts | LKanvasChart.version() 已建 | B | test | S | 2a | 门面静态同名 | 已声明 |
 | IDX-004 | `utils.clone` | utils | data class copy 等价 | B | compile | S | 2a | | 已声明 |
-| IDX-005 | `utils.merge` | utils | LkanvasUtils.merge（浅）+ StylesMerge（深合并 skip-defaults） | B | test | S | 2a | 双轨：Map 浅合并/Styles 深合并 | 已声明 |
+| IDX-005 | `utils.merge` | utils | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Merge.kt（提供即合并，null=未提供）+ StylesMerge 委托 | B | test | S | 06 | SLA-009：显式设回默认值生效（StylesMergeTest） | 行为通过 |
 | IDX-006~012 | `utils.isString/isNumber/isValid/isObject/isArray/isFunction/isBoolean` | utils | Kotlin 类型系统等价 | C | compile | S | 2a | 提供 utils 对象占位 | — |
 | IDX-013 | `utils.formatValue` | utils/format | LkanvasUtils.formatValue（isValid 兜底「—」） | B | test | S | 2a | | 已声明 |
 | IDX-014 | `utils.formatPrecision` | utils/format | LkanvasUtils.formatPrecision（toFixed 语义，默认 2 位） | B | test | S | 2a | | 已声明 |
 | IDX-015 | `utils.formatBigNumber` | utils/format | LkanvasUtils.formatBigNumber（K/M/B 分档，对齐上游 format.ts） | B | test | S | 2a | | 已声明 |
-| IDX-016 | `utils.formatDate` | utils/format | LkanvasUtils.formatDate（模板占位替换，UTC） | B | test | S | 2a | 模板化 | 已声明 |
+| IDX-016 | `utils.formatDate` | utils/format | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Format.kt（YYYY/MM/DD/HH/mm/ss token + Options.timezone） | B | test | S | 06 | 时区消费接线（LkanvasUtilsTest） | 行为通过 |
 | IDX-017 | `utils.formatThousands` | utils/format | LkanvasUtils.formatThousands（整数分组，小数原样） | B | test | S | 2a | | 已声明 |
 | IDX-018 | `utils.formatFoldDecimal` | utils/format | LkanvasUtils.formatFoldDecimal（0{count} 折叠标记） | B | test | S | 2a | | 已声明 |
 | IDX-019 | `utils.calcTextWidth` | utils/canvas | ChartText.measureWidth（门面待包装） | B | test | S | 2a |  | 已声明 |
@@ -166,13 +166,13 @@
 | ID | TS 符号 | 源 | Kotlin 现状 | 分类 | 验收 | 工作量 | 批次 | 备注 | 状态 |
 |---|---|---|---|---|---|---|---|---| --- |
 | TYP-001 | `KLineData` | Data.ts | Candle 同名同义 | A | existing | — | — | | 已声明 |
-| TYP-002 | `Crosshair` | Crosshair.ts | Crosshair 类型已建（chart/ChartTypes.kt） | B | test | S | 2a | 字段级见 ts-inventory §5 | 已声明 |
+| TYP-002 | `Crosshair` | Crosshair.ts | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/Crosshair.kt（lkanvas-compose/src/main/kotlin/io/lkanvas/chart/ChartTypes.kt 同包别名保 API） | B | test | S | 06 | 字段级见 ts-inventory §5 | 已接线 |
 | TYP-003 | `BarSpace{bar,halfBar,gapBar,halfGapBar}` | BarSpace.ts | ChartTypes.BarSpace{bar,halfBar,gapBar,halfGapBar} | B | test | S | 2c | | 已声明 |
 | TYP-004 | `VisibleRange{from,to,realFrom,realTo}` | VisibleRange.ts | VisibleRange{from,to,realFrom,realTo} 已建 | B | test | S | 2a |  | 已声明 |
-| TYP-005 | `VisibleRangeData` | Data.ts:36 | VisibleRangeData 已建（prev/data/next） | B | test | S | 2a | 事件 payload 用 | 已声明 |
+| TYP-005 | `VisibleRangeData` | Data.ts:36 | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/Data.kt 嵌套 NeighborData{prev,current,next}（上游原貌） | B | test | S | 06 | payload 嵌套结构（LKanvasChartTest） | 行为通过 |
 | TYP-006 | `SymbolInfo` | SymbolInfo.ts | SymbolInfo 已建（ticker/precision 默认 2） | B | test | S | 2a |  | 已声明 |
 | TYP-007 | `Period` | Period.ts | Period 已建（type+milliseconds+toMillis） | B | test | S | 2a |  | 已声明 |
-| TYP-008 | `DataLoader`（含 DataLoadMore 双向） | DataLoader.ts | DataLoader 已建（init/forward/backward+subscribeBar；v10 无 update type） | B | test+parity | M | 2a | 四 type 对齐 | 已声明 |
+| TYP-008 | `DataLoader`（含 DataLoadMore 双向） | DataLoader.ts | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/DataLoader.kt（lkanvas-compose/src/main/kotlin/io/lkanvas/chart/DataLoader.kt 同包别名+嵌套类型顶层别名） | B | test+parity | M | 06 | 四 type 对齐 | 已接线 |
 | TYP-009 | `CandleType` 六值 | Styles.ts:242 | MainChartType 同名 | A | existing | — | — | | 已声明 |
 | TYP-010 | `LineType/PolygonType/PathType/TooltipShowRule/TooltipShowType/TooltipFeaturePosition/FeatureType/FormatDateType/ZoomAnchorType` | Styles.ts 等 | 同名枚举 11 个（LineType/PolygonType/PathType/TooltipShowRule/ShowType/FeatureType/FeaturePosition/CandleType/FormatDateType/ZoomAnchorType/DataLoadType），带 value 字段 | B | compile | S | 5 | 树内字段沿用 String 常量，枚举迁移随批次 5+ | 已声明 |
 | TYP-011 | `IndicatorSeries` 三值 | Indicator.ts:34 | IndicatorSeries（PRICE/VOLUME/NORMAL） | A | existing | — | — | 字符串值对齐在批次 3 | 已声明 |
@@ -399,7 +399,7 @@
 | SLA-006 | 切品种无退订/清 loading/代次，串品种 | 06 | Store resetData 顺序 + 请求代次门禁 | 已声明 |
 | SLA-007 | 指标 CRUD 默认实例/批量/替换语义 | 06 | 严格上游默认（破坏性变更已批准） | 已声明 |
 | SLA-008 | 参数改变未按实例重生成输出列 | 06 | plotsFor 已修（4a58aea），补守护测试 | 已声明 |
-| SLA-009 | Styles 默认值被误当未提供 | 06 | Merge 镜像 typeChecks.ts 提供即合并 | 已声明 |
+| SLA-009 | Styles 默认值被误当未提供 | 06 | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Merge.kt + lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesMerge.kt + StylesMergeTest 显式默认恢复用例 | 行为通过 |
 | SLA-010 | 多轴只管理记录，未进坐标/渲染链 | 06 | 主轴覆写入链、createYAxis 校验 pane | 已声明 |
 | SLA-011 | 开关/格式/部分 Styles 无消费者 | 06 | scroll/zoom 开关、格式链、candle.type、逐根回调 | 已声明 |
 | SLA-012 | 数据与像素转换未共用绘制轴模型 | 06 | 单一轴实例 + ConvertFilter | 已声明 |

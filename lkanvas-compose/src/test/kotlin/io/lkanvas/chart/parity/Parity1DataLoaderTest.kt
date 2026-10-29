@@ -1,8 +1,14 @@
 package io.lkanvas.chart.parity
 
 import io.lkanvas.chart.DataLoader
+import io.lkanvas.chart.DataLoadType
+import io.lkanvas.chart.DataLoadMore
+import io.lkanvas.chart.GetBarsParams
+import io.lkanvas.chart.SubscribeBarParams
+import io.lkanvas.chart.UnsubscribeBarParams
 import io.lkanvas.chart.LKanvasChart
 import io.lkanvas.chart.Period
+import io.lkanvas.chart.PeriodType
 import io.lkanvas.chart.SymbolInfo
 import io.lkanvas.core.data.Candle
 import kotlinx.coroutines.Dispatchers
@@ -59,15 +65,15 @@ class Parity1DataLoaderTest {
         val total = 1000
         val calls = AtomicInteger(0)
 
-        fun getKlineList(endTime: Long?, limit: Int, direction: DataLoader.DataLoadType): Pair<List<Map<String, Double>>, Pair<Boolean, Boolean>> {
+        fun getKlineList(endTime: Long?, limit: Int, direction: DataLoadType): Pair<List<Map<String, Double>>, Pair<Boolean, Boolean>> {
             calls.incrementAndGet()
             val bars = when (direction) {
-                DataLoader.DataLoadType.INIT -> (0 until limit).map { i ->
+                DataLoadType.INIT -> (0 until limit).map { i ->
                     val ts = (endTime ?: 0) / 60_000 * 60_000 - (limit - 1 - i) * 60_000
                     mapOf("timestamp" to ts.toDouble(), "open" to 100.0, "high" to 101.0, "low" to 99.0, "close" to 100.5, "volume" to 10.0)
                 }
 
-                DataLoader.DataLoadType.FORWARD -> (0 until limit).map { i ->
+                DataLoadType.FORWARD -> (0 until limit).map { i ->
                     val ts = (endTime ?: 0) - (limit - i) * 60_000
                     mapOf("timestamp" to ts.toDouble(), "open" to 100.0, "high" to 101.0, "low" to 99.0, "close" to 100.5)
                 }
@@ -75,8 +81,8 @@ class Parity1DataLoaderTest {
                 else -> emptyList()
             }
             // 页边判定：首尾各留一页
-            val hasMoreBefore = direction == DataLoader.DataLoadType.INIT || direction == DataLoader.DataLoadType.FORWARD
-            val hasMoreAfter = direction == DataLoader.DataLoadType.BACKWARD
+            val hasMoreBefore = direction == DataLoadType.INIT || direction == DataLoadType.FORWARD
+            val hasMoreAfter = direction == DataLoadType.BACKWARD
             return bars to (hasMoreBefore to hasMoreAfter)
         }
     }
@@ -92,7 +98,7 @@ class Parity1DataLoaderTest {
         fun makeKey(symbol: SymbolInfo, period: Period) = "${symbol.ticker}-${period.type}"
 
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
+            override fun getBars(params: GetBarsParams) {
                 val response = api.getKlineList(
                     params.timestamp,
                     500,
@@ -103,24 +109,24 @@ class Parity1DataLoaderTest {
                     .sortedBy { it.timestamp }
                 params.callback(
                     bars,
-                    DataLoader.DataLoadMore(backward = response.second.second, forward = response.second.first),
+                    DataLoadMore(backward = response.second.second, forward = response.second.first),
                 )
             }
 
-            override fun subscribeBar(params: DataLoader.SubscribeBarParams) {
+            override fun subscribeBar(params: SubscribeBarParams) {
                 val key = makeKey(params.symbol, params.period)
                 stopMap[key] = {
                     pushedRealtime?.let { params.callback(it) }
                 }
             }
 
-            override fun unsubscribeBar(params: DataLoader.UnsubscribeBarParams) {
+            override fun unsubscribeBar(params: UnsubscribeBarParams) {
                 val key = makeKey(params.symbol, params.period)
                 stopMap.remove(key)
             }
         })
         chart.setSymbol(SymbolInfo("BTCUSDT"))
-        chart.setPeriod(Period(Period.PeriodType.MINUTE))
+        chart.setPeriod(Period(PeriodType.MINUTE))
         // —— 迁移结束 ——
         drain()
 

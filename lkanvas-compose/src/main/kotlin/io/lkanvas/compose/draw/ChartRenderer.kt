@@ -62,7 +62,7 @@ object ChartRenderer {
     ) {
         val panes = state.paneHeightsPx
         val contentRight = params.width - params.gutterWidth
-        val text = ChartText(textMeasurer, theme.axisText, params.axisTextSizePx)
+        val text = ChartText(textMeasurer, theme.axisText, params.axisTextSizePx, format = state.formatConfig)
 
         drawRect(theme.background, size = size)
 

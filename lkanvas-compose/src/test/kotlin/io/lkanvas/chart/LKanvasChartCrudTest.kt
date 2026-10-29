@@ -40,13 +40,13 @@ class LKanvasChartCrudTest {
         chart.setSymbol(SymbolInfo("T"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(object : DataLoader {
-            override fun getBars(params: DataLoader.GetBarsParams) {
-                if (params.type == DataLoader.DataLoadType.INIT) {
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
                     params.callback(
                         (0 until 120).map {
                             Candle(it.toLong(), 100.0 + it, 101.0 + it, 99.0 + it, 100.5 + it, 1000.0 + it)
                         },
-                        DataLoader.DataLoadMore.NONE,
+                        DataLoadMore.NONE,
                     )
                 }
             }
