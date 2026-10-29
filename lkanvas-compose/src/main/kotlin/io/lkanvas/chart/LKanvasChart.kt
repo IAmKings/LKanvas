@@ -136,26 +136,25 @@ class LKanvasChart private constructor(
         scrollByDistance(delta, animationDuration)
     }
 
-    /** 上游 `scrollToDataIndex(dataIndex, animationDuration?)`：右侧留白锚点模型（非居中）。 */
+    /**
+     * 上游 `scrollToDataIndex(dataIndex, animationDuration?)`（R11，复审
+     * 2026-10-30）：按上游 Chart.ts:1171-1173 距离模型——目标落点与当前的
+     * 距离差经 [scrollByDistance] 动画（panBy 增量驱动同一状态入口）。
+     */
     fun scrollToDataIndex(dataIndex: Int, animationDuration: Long? = null) {
         val vp = state.viewport
         val total = state.dataSnapshot.candles.size
-        val before = vp.candleCenterX(dataIndex.toDouble())
-        vp.scrollToDataIndexAtRightAnchor(dataIndex, total)
-        state.notifyViewportChanged()
-        // 按上游：以距离差做动画（无动画时已完成定位）
-        val after = vp.candleCenterX(dataIndex.toDouble())
-        if (animationDuration != null && animationDuration > 0) {
-            // 锚点定位即时生效（与上游 scrollByDistance 距离模型等价的落点），动画仅回放过渡
-            animate(before - after, animationDuration) { }
-        }
+        // 目标：右锚模型落点（dataIndex 距右缘 rightOffset 处）
+        val targetScroll = dataIndex - vp.visibleCount + vp.effectiveRightSlotsFor()
+        val distance = (targetScroll - vp.scrollIndex) * vp.barSpacing
+        scrollByDistance(distance, animationDuration)
     }
 
     /** 上游 `scrollToTimestamp(timestamp, animationDuration?)`。 */
     fun scrollToTimestamp(timestamp: Long, animationDuration: Long? = null): Boolean {
         val candles = state.dataSnapshot.candles
         val idx = Viewport_indexOfTimestamp(timestamp, candles) ?: return false
-        scrollToDataIndex(idx)
+        scrollToDataIndex(idx, animationDuration)
         return true
     }
 
@@ -174,7 +173,20 @@ class LKanvasChart private constructor(
                 vp.candleCenterX((state.dataSnapshot.candles.size - 1).coerceAtLeast(0).toDouble()).toFloat()
             else -> vp.contentWidth.toFloat() / 2f
         }
-        state.zoomAt(scale.toFloat(), anchorX)
+        if (animationDuration != null && animationDuration > 0) {
+            // 上游公式：barSpace 线性插值；animate 传**每帧增量**（px），帧 scale = (prev+delta)/prev
+            val startBar = vp.barSpacing
+            val difSpace = startBar * scale - startBar
+            animate(difSpace, animationDuration) { deltaPx ->
+                val prev = vp.barSpacing
+                if (prev > 0) {
+                    val frameScale = ((prev + deltaPx) / prev).toFloat()
+                    if (frameScale != 1f) state.zoomAt(frameScale, anchorX)
+                }
+            }
+        } else {
+            state.zoomAt(scale.toFloat(), anchorX)
+        }
     }
 
     /** 上游 `zoomAtDataIndex`：以该索引**当前像素**为缩放锚点（不先滚动；scale=1 无位移）。 */
@@ -187,7 +199,7 @@ class LKanvasChart private constructor(
     /** 上游 `zoomAtTimestamp(scale, timestamp, animationDuration?)`。 */
     fun zoomAtTimestamp(scale: Double, timestamp: Long, animationDuration: Long? = null): Boolean {
         val idx = Viewport_indexOfTimestamp(timestamp, state.dataSnapshot.candles) ?: return false
-        zoomAtDataIndex(scale, idx)
+        zoomAtDataIndex(scale, idx, animationDuration)
         return true
     }
 
@@ -943,14 +955,28 @@ class LKanvasChart private constructor(
         return if (id == null) all else all.filter { it.id == id }
     }
 
-    /** 布局选项（上游 Options.layoutOptions 的 pane 段；SLA-014 同名入口）。 */
+    /**
+     * 布局选项（R11，复审 2026-10-30：对齐上游 Options.ts:88-92 Layout 字段面）。
+     */
     data class LayoutOptions(
         /** 各 pane 基准高度（px；null=默认布局）。 */
         val paneHeights: Map<String, Double>? = null,
+        /** 上游 Layout.barSpaceLimit：bar 间距上下限（px）。 */
+        val barSpaceLimit: Pair<Double, Double>? = null,
+        /** 上游 Layout.pane：分隔条拖动开关（按 paneId；缺省 true）。 */
+        val paneDragEnabled: Map<String, Boolean>? = null,
     )
 
-    /** 上游 `setLayoutOptions(options)`：应用 pane 基准高度（无布局前忽略）。 */
+    /** 上游 `setLayoutOptions(options)`：应用 pane 基准高度/bar 间距限制/拖动开关。 */
     fun setLayoutOptions(options: LayoutOptions) {
+        options.barSpaceLimit?.let { (min, max) ->
+            state.viewport.minBarSpacing = min
+            state.viewport.maxBarSpacing = max
+        }
+        options.paneDragEnabled?.let { drag ->
+            drag["vol"]?.let { state.volDragEnabled = it }
+            drag["macd"]?.let { state.macdDragEnabled = it }
+        }
         val heights = options.paneHeights ?: return
         val cur = state.paneHeightsPx
         val usable = cur.main + cur.vol + cur.macd
@@ -963,13 +989,17 @@ class LKanvasChart private constructor(
     /** 上游 `getLayoutOptions()`。 */
     fun getLayoutOptions(): LayoutOptions {
         val p = state.paneHeightsPx
-        if (p.main <= 0f) return LayoutOptions()
+        val limit = state.viewport.minBarSpacing to state.viewport.maxBarSpacing
+        if (p.main <= 0f) {
+            return LayoutOptions(barSpaceLimit = limit)
+        }
         return LayoutOptions(
-            mapOf(
+            paneHeights = mapOf(
                 "main" to p.main.toDouble(),
                 "vol" to p.vol.toDouble(),
                 "macd" to p.macd.toDouble(),
             ),
+            barSpaceLimit = limit,
         )
     }
 
@@ -983,7 +1013,17 @@ class LKanvasChart private constructor(
         backgroundColor: Int = android.graphics.Color.WHITE,
     ): String? {
         val type = if (format.equals("jpeg", ignoreCase = true) || format.equals("jpg", ignoreCase = true)) "jpeg" else "png"
-        val bitmap = bitmapProvider() ?: return null
+        val source = bitmapProvider() ?: return null
+        // R11：backgroundColor 消费——背景填充后再压缩（上游 getConvertPictureUrl 语义）
+        val bitmap = if (backgroundColor != android.graphics.Color.WHITE) {
+            android.graphics.Bitmap.createBitmap(source.width, source.height, android.graphics.Bitmap.Config.ARGB_8888).also { out ->
+                out.eraseColor(backgroundColor)
+                val canvas = android.graphics.Canvas(out)
+                canvas.drawBitmap(source, 0f, 0f, null)
+            }
+        } else {
+            source
+        }
         val bytes = java.io.ByteArrayOutputStream().use { out ->
             bitmap.compress(if (type == "jpeg") android.graphics.Bitmap.CompressFormat.JPEG else android.graphics.Bitmap.CompressFormat.PNG, 100, out)
             out.toByteArray()

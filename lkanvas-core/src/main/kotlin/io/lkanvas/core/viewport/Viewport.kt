@@ -176,6 +176,9 @@ class Viewport(
     /** 末端滚动边界（公开只读；门面 scrollToRealTime 距离差计算用）。 */
     fun maxScrollFor(dataCount: Int): Double = maxScroll(dataCount)
 
+    /** 有效右留白（公开只读；门面 scrollToDataIndex 距离模型用）。 */
+    fun effectiveRightSlotsFor(): Double = effectiveRightSlots()
+
     /** 左侧最小可见 bar 数（上游 setLeftMinVisibleBarCount；0=不限制）。 */
     var leftMinVisibleBarCount: Int = 0
 

@@ -227,4 +227,64 @@ class Parity8ViewportEventsTest {
         assertEquals(chart.state.viewport.candleCenterX(150.0).toFloat(), pos.x, 0.5f, "x-only 按 x 推导索引（R10）")
         LKanvasChart.dispose(chart)
     }
+
+    // ---------- 0.7.0 R11：动画与布局接口 ----------
+
+    @Test
+    fun `scrollToDataIndex带duration动画过渡（R11）`() {
+        val chart = newChartWithData()
+        chart.state.onLayout(800f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        val start = chart.state.viewport.scrollIndex
+        chart.scrollToDataIndex(100, 1_000)
+        // 动画中途：scrollIndex 已在移动（非瞬移；复审 R11 复现收口）
+        mainDispatcher.scheduler.advanceTimeBy(48)
+        drain()
+        val mid = chart.state.viewport.scrollIndex
+        assertTrue(mid != start, "动画中途位置已变化（非瞬移）")
+        drain()
+        val end = chart.state.viewport.scrollIndex
+        assertTrue(end != start, "动画完成到达目标")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `zoomAtCoordinate带duration动画缩放（R11）`() {
+        val chart = newChartWithData()
+        chart.state.onLayout(800f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        val start = chart.state.viewport.barSpacing
+        chart.zoomAtCoordinate(2.0, null, 1_000)
+        mainDispatcher.scheduler.advanceTimeBy(48)
+        drain()
+        val mid = chart.state.viewport.barSpacing
+        assertTrue(mid > start && mid < start * 2, "缩放动画中途（增量驱动，非一步到位）")
+        drain()
+        assertEquals(start * 2, chart.state.viewport.barSpacing, 0.5, "动画完成到达 2 倍")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `LayoutOptions_barSpaceLimit与paneDragEnabled消费（R11）`() {
+        val chart = newChartWithData()
+        chart.state.onLayout(800f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        // vol/macd pane 需实例绑定才存在（R07 严格语义）
+        chart.createIndicator("VOL", paneId = "vol")
+        chart.createIndicator("MACD", paneId = "macd")
+        drain()
+        chart.setLayoutOptions(
+            LKanvasChart.LayoutOptions(
+                barSpaceLimit = 2.0 to 20.0,
+                paneDragEnabled = mapOf("vol" to false),
+            ),
+        )
+        chart.setBarSpace(40.0)
+        assertEquals(20.0, chart.state.viewport.barSpacing, 1e-9, "barSpaceLimit.max 生效")
+        chart.state.adjustPane(0, 100f, 100f)
+        assertEquals(40f, chart.state.paneHeightsPx.vol, "vol 拖动被禁用（高度不变）")
+        chart.state.adjustPane(1, 80f, 100f)
+        assertTrue(chart.state.paneHeightsPx.macd != 80f, "macd 拖动仍可用")
+        LKanvasChart.dispose(chart)
+    }
 }

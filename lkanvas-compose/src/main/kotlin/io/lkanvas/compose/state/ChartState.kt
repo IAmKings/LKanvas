@@ -1220,8 +1220,15 @@ class ChartState(
     /** R07：setPaneOptions("main") 的直接高度设定（null=按剩余空间派生）。 */
     internal var mainPaneOverride: Float? = null
 
+    /** R11：LayoutOptions.paneDragEnabled 消费——分隔条拖动开关（按 paneId）。 */
+    var volDragEnabled: Boolean = true
+    var macdDragEnabled: Boolean = true
+
     /** 拖动分隔条：[which]=0 调整 VOL pane 高度，1 调整 MACD pane 高度（dy 累计）。 */
     fun adjustPane(which: Int, startValue: Float, dyTotal: Float) {
+        // R11：LayoutOptions.paneDragEnabled=false → 分隔条拖动禁用
+        if (which == 0 && !volDragEnabled) return
+        if (which == 1 && !macdDragEnabled) return
         if (which == 0) {
             volPaneOverride = startValue + dyTotal
         } else {
