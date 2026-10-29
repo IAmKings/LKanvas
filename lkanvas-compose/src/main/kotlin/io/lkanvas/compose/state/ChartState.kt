@@ -932,6 +932,9 @@ class ChartState(
 
     fun notifyViewportChanged() {
         viewRevision++
+        // SLA-005：视口调整末尾统一发出范围变化（上游 _adjustVisibleRange 末尾
+        // 的边界分页判定依赖该事件；手势路径 panBy/zoomAt 已各自发出）
+        emitRangeChange()
     }
 
     // ---------- 公开数据操作（挂起经引擎队列；主线程调用） ----------

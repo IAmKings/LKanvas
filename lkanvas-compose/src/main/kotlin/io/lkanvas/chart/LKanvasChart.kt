@@ -3,6 +3,7 @@ package io.lkanvas.chart
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.store.MarketKey
+import io.lkanvas.core.store.Store
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
@@ -53,37 +54,27 @@ class LKanvasChart private constructor(
         private fun stateOf(chart: LKanvasChart) = chart.state
     }
 
-    // ---------- 品种/周期（SymbolInfo/Period） ----------
+    // ---------- 品种/周期（Store 持有；上游 Store.setSymbol/setPeriod 经 resetData 变更） ----------
 
-    internal var symbol: SymbolInfo? = null
-        private set
+    internal val symbol: SymbolInfo? get() = store.symbol
 
-    internal var period: Period? = null
-        private set
+    internal val period: Period? get() = store.period
 
-    /** 分页触发条数（上游 setLoadMoreDataCount；批次 2c 接手势自动拉取）。 */
-    var loadMoreDataCount: Int = 5
-        set(value) {
-            field = value.coerceAtLeast(1)
-        }
-
-    /** 上游 `setSymbol`：切品种（resetData + 重载 init）。 */
+    /** 上游 `setSymbol`：切品种（退订旧上下文 → 变更 → 清 loading → init 重载）。 */
     fun setSymbol(symbol: SymbolInfo) {
-        this.symbol = symbol
-        resetData()
+        scope.launch { store.setSymbol(symbol) }
     }
 
     /** 上游 `getSymbol`。 */
-    fun getSymbol(): SymbolInfo? = symbol
+    fun getSymbol(): SymbolInfo? = store.symbol
 
-    /** 上游 `setPeriod`：切周期（resetData + 重载 init）。 */
+    /** 上游 `setPeriod`：切周期（同上顺序）。 */
     fun setPeriod(period: Period) {
-        this.period = period
-        resetData()
+        scope.launch { store.setPeriod(period) }
     }
 
     /** 上游 `getPeriod`。 */
-    fun getPeriod(): Period? = period
+    fun getPeriod(): Period? = store.period
 
     // ---------- 视口（对齐 Chart.ts 视口组） ----------
 
@@ -161,10 +152,14 @@ class LKanvasChart private constructor(
 
     /** 上游 `setOffsetRightDistance(distance)`：px→槽位换算（barSpacing 为槽宽）。 */
     fun setOffsetRightDistance(distance: Double) {
+        offsetRightDistanceInternal = distance
         val slots = if (state.viewport.barSpacing > 0) (distance / state.viewport.barSpacing).toInt() else 0
         state.viewport.rightOffsetSlots = slots
         state.notifyViewportChanged()
     }
+
+    /** init 重载后按上游 `_addData` init 分支重放（Store.Host.onDataAdjusted 消费）。 */
+    private var offsetRightDistanceInternal: Double? = null
 
     /** 上游 `getOffsetRightDistance()`：按当前 barSpacing 反算 px。 */
     fun getOffsetRightDistance(): Double = state.viewport.rightOffsetSlots * state.viewport.barSpacing
@@ -257,6 +252,8 @@ class LKanvasChart private constructor(
             executeTooltipFeatureClick(featureId, paneId)
         }
         state.onVisibleRangeChanged = { from, to, realFrom, realTo ->
+            // SLA-005 分页触发入口：视口调整末尾的边界判定（上游 _adjustVisibleRange 末尾）
+            scope.launch { store.adjustVisibleRangeBoundary(from, to) }
             emit(ActionType.ON_VISIBLE_RANGE_CHANGE, VisibleRange(from, to, realFrom, realTo))
         }
         state.onCrosshairChanged = { x, y, dataIndex, timestamp ->
@@ -320,16 +317,54 @@ class LKanvasChart private constructor(
 
     private fun emit(type: ActionType, data: Any?) = executeAction(type, data)
 
-    // ---------- 数据（DataLoader 模式，对齐 Store._addData/_processDataLoad） ----------
+    // ---------- 数据（core Store 数据路径镜像：_processDataLoad/_addData/resetData；SLA-005/006） ----------
 
-    private var dataLoader: DataLoader? = null
-    private var loading = false
-    private var loadMore: DataLoadMore = DataLoadMore.NONE
+    /**
+     * 数据路径编排器：拉取触发、more 同方向更新、边界分页、退订顺序与
+     * 请求代次门禁全部在 core/store/Store.kt（上游 Store.ts 数据段镜像）；
+     * 门面只提供宿主桥（数据应用到内核）与协程串行化。
+     */
+    private val store: Store = Store(storeHost())
 
-    /** 上游 `setDataLoader(loader)`：设置数据源并 resetData（触发 init 拉取）。 */
+    private fun storeHost() = object : Store.Host {
+        override fun applyInit(data: List<Candle>): Boolean {
+            scope.launch { state.reset(currentKey(), data) }
+            return true
+        }
+
+        override fun applyBackward(data: List<Candle>): Boolean {
+            scope.launch { state.appendBatch(data) }
+            return true
+        }
+
+        override fun applyForward(data: List<Candle>): Boolean {
+            scope.launch { state.prependHistory(data) }
+            return true
+        }
+
+        override fun applyUpdate(candle: Candle): Boolean {
+            scope.launch { state.upsertLatest(candle) }
+            return true
+        }
+
+        override fun candleCount(): Int = state.dataSnapshot.candles.size
+
+        override fun firstTimestamp(): Long? = state.dataSnapshot.candles.firstOrNull()?.timestamp
+
+        override fun lastTimestamp(): Long? = state.dataSnapshot.candles.lastOrNull()?.timestamp
+
+        override fun onDataAdjusted(type: DataLoadType) {
+            // 上游 _addData 成功分支：_adjustVisibleRange + init 时 setOffsetRightDistance 重放；
+            // 本域视口派生与重算由内核在写入路径完成，事件经 onVisibleRangeChanged 自然触发
+            if (type == DataLoadType.INIT) {
+                offsetRightDistanceInternal?.let { d -> setOffsetRightDistance(d) }
+            }
+        }
+    }
+
+    /** 上游 `setDataLoader(loader)`：经 Store.resetData（退订 → 变更 → 清 loading → init）。 */
     fun setDataLoader(loader: DataLoader) {
-        dataLoader = loader
-        resetData()
+        scope.launch { store.setDataLoader(loader) }
     }
 
     /** 上游 `getDataList()`。 */
@@ -337,98 +372,17 @@ class LKanvasChart private constructor(
 
     /** 上游 `resetData()`：清空数据并触发 loader init 重载。 */
     fun resetData() {
-        val loader = dataLoader ?: return
-        val sym = symbol ?: return
-        val per = period ?: return
-        state.restoreGate.let { /* 存档门禁：宿主恢复流程不受此影响 */ }
-        scope.launch {
-            state.reset(MarketKey(sym.ticker, per.toString()), emptyList())
-            processLoad(DataLoadType.INIT, loader, sym, per)
-        }
-    }
-
-    private fun processLoad(type: DataLoadType, loader: DataLoader, sym: SymbolInfo, per: Period) {
-        if (loading) return
-        loading = true
-        val timestamp = when (type) {
-            DataLoadType.BACKWARD -> state.dataSnapshot.candles.lastOrNull()?.timestamp
-            DataLoadType.FORWARD -> state.dataSnapshot.candles.firstOrNull()?.timestamp
-            else -> null
-        }
-        loader.getBars(
-            GetBarsParams(type, timestamp, sym, per) { data, more ->
-                // 回调可能来自任意线程：串行化到引擎上下文
-                scope.launch {
-                    loading = false
-                    addData(data, type, more)
-                    if (type == DataLoadType.INIT) {
-                        loader.subscribeBar(
-                            SubscribeBarParams(sym, per) { candle ->
-                                scope.launch { addData(listOf(candle), DataLoadType.UPDATE, null) }
-                            },
-                        )
-                    }
-                }
-            },
-        )
-    }
-
-    /**
-     * 上游 `_addData` 语义：
-     * - init：清空重置（more 记录双向）
-     * - backward：尾部追加；forward：头部前插（more 记录对应方向）
-     * - 单根 update：时间戳大于末根→追加；等于→替换；小于→静默忽略
-     * 批次 2c 将把「视口到边界且 more=true」的自动拉取接到手势层。
-     */
-    private fun addData(data: List<Candle>, type: DataLoadType, more: DataLoadMore?) {
-        val realMore = when {
-            more == null -> DataLoadMore.NONE
-            else -> more
-        }
-        scope.launch {
-            when (type) {
-                DataLoadType.INIT -> {
-                    val r = state.reset(currentKey(), data)
-                    if (r is io.lkanvas.core.store.ChangeResult.Accepted) {
-                        loadMore = realMore
-                    }
-                }
-
-                DataLoadType.BACKWARD -> {
-                    val r = state.appendBatch(data)
-                    if (r is io.lkanvas.core.store.ChangeResult.Accepted) {
-                        loadMore = DataLoadMore(loadMore.backward, realMore.forward)
-                    }
-                }
-
-                DataLoadType.FORWARD -> {
-                    val r = state.prependHistory(data)
-                    if (r is io.lkanvas.core.store.ChangeResult.Accepted) {
-                        loadMore = DataLoadMore(realMore.backward, loadMore.forward)
-                    }
-                }
-
-                DataLoadType.UPDATE -> data.forEach { c ->
-                    // 镜像上游：小于末根静默忽略（内核拒绝结果吞掉）
-                    state.upsertLatest(c)
-                }
-            }
-        }
+        scope.launch { store.resetData() }
     }
 
     private fun currentKey(): MarketKey =
-        MarketKey(symbol?.ticker ?: "UNKNOWN", period?.toString() ?: "UNKNOWN")
+        MarketKey(store.symbol?.ticker ?: "UNKNOWN", store.period?.toString() ?: "UNKNOWN")
 
     // ---------- 生命周期 ----------
 
     /** 释放订阅与协程；state 可复用（同一 state 再次 init 返回新实例）。 */
     fun destroy() {
-        val loader = dataLoader
-        val sym = symbol
-        val per = period
-        if (loader != null && sym != null && per != null) {
-            loader.unsubscribeBar(UnsubscribeBarParams(sym, per))
-        }
+        store.unsubscribeData()
         scope.cancel()
     }
 

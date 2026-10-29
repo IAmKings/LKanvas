@@ -94,7 +94,6 @@ class LKanvasChartTest {
             override fun getBars(params: GetBarsParams) {
                 if (params.type == DataLoadType.INIT) {
                     params.callback(listOf(c(1000, 10.0), c(1060, 11.0)), DataLoadMore.NONE)
-                    push = { params.callback }
                 }
             }
 
