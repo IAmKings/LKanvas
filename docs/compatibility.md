@@ -131,6 +131,8 @@
 | 2026-10-29 | **0.5.0 发版（多轴完整版 + 动态 pane 完整版 + 长尾收口）**：切版 0.5.0（publishing/LKanvasChart.VERSION/consumer 依赖）；全量回归绿（core+compose 测试 + assembleRelease）；制品发布 build/maven-repo，consumer 仅凭制品重编通过（A-46 保持）；check.py 七面校验 E=0。发版内容：多轴完整版（独立列/inside/LEFT 位置/reverse/自定义变换轴 CustomYAxis 契约/删除保护/排序同步）、动态 pane 完整版（绑定 paneId 建删/独立渲染/分隔条拖动 per-pane 覆写/排序 moveExtraPane/存档 extraPaneIds 旧版兼容）、长尾收口（诊断可视化渲染计时+面板+导出、平台 fling OverScroller、figure 宿主模板样例、isStack 语义、removeIndicator 全删修复）。余量：R8 口径帧数据/B-05 heap dump（外部依赖）、pane 高度比例入存档（低价值）、上游新版本跟进（upstream-sync.md 每月 compare） |
 | 2026-10-29 | **0.4.0 巩固回归（全绿）**：JVM——core+compose 305 测试 0 失败（含 oracle 27 指标逐位对照/增量一致性/meta diff/parity/新增多轴与 B-04/B-05 测试），assembleRelease 构建通过，consumer 0.4.0 仅凭制品重编通过，check.py 七面校验 E=0；真机（小米 23078PND5G）——B-02 负载（50k/10 指标/100 覆盖物）注入 1095ms（门槛内）、20 次滚动抽样 P50=25ms/P95=34ms（优化水平保持）、figure 四原语在负载叠加下渲染正常。0.4.0 全部计划工作与台账余项收口完毕 |
 
+| 2026-10-30 | **0.6.0 发版（结构与逻辑对齐完整版——审计 16 项发现全部收口）**：**结构镜像**——27 指标/16 覆盖物模板拆分为上游同名文件（extension/indicator\|overlay/*.kt），每模板含上游逐行对照的规范 calc，引擎全量路径走 calc、Scratch 保留为增量优化路径（DualPathParityTest 27 模板双路径互验 + oracle 27/27）；**数据路径**——core/store/Store.kt 镜像上游 Store 数据段：双向分页边界触发、more 同方向更新（修复交叉赋值）、resetData 退订→变更→清 loading→init 顺序、请求代次门禁（在途切品种旧回调/推送丢弃，串品种缺陷收口）；**注册统一**——指标/覆盖物/轴/图形模板注册与创建/渲染/命中/手势共用同一全局表；**严格上游默认（破坏性变更）**——init 不预置 MA/VOL/MACD（示例显式创建）、createIndicator 缺省新建指标 pane 且 isStack=false、无内置删除保护、overrideIndicator 全字段按 filter、事件 payload 嵌套 data:{prev,current,next}、executeAction(十字线) 抑制反向广播、setStyles 显式设回默认值生效；**契约收口**——视口当前像素锚点（scale=1 无位移）/scrollToDataIndex 右锚模型/独立 maxOffset/小数 rightOffset/to 钳制/帧步进动画、log 轴 convert 与绘制同源（YAxisMath 统一）+ ConvertFilter + 主轴 reverse 入链、scroll/zoomEnabled 共用入口门禁、zoomAnchor/candle.type/逐根配色回调/格式链消费、覆盖物模板命中与交互创建配置先行应用、setLayoutOptions/getLayoutOptions/getConvertPictureUrl 同名入口；**验收**——check.py v4 四态校验（行为通过=18）、SLA-001~016 全部行为通过、真实补丁演练 4（95a6f2ad executeAction 修复映射验证）、core+compose 全量测试绿。矩阵 A=15/B=227/C=9/D=6（0.6.0 结构批次 16 行行为通过） |
+
 ## 6. 已知问题与后续计划
 
 - 基础图形 circle/polygon/rect/arc 的宿主自定义模板样例待补（原语与命中已实现）。
@@ -139,5 +141,5 @@
 - 性能门槛（B-02 容量/突发/泄漏/持续运行）尚未完成：B-01 增量路径 JVM 初测已达标（P95=0.270ms vs 4ms），Macrobenchmark 冻结设备测量（真机帧率/内存/启动）待 T-34。
 - D8 构建 WARNING：Kotlin metadata 重写 "Should never be called"（R8 已知噪音，debug 运行正常）；R8 release 验证在 M6/T-31。
 - ~~惯性滚动为基础指数衰减实现~~：**已接平台 OverScroller native spline 曲线**（RecyclerView/ScrollView 同款，KLineChart 注入、null 回退旧衰减保 JVM 测试可用；真机惯性滚动行为验证通过）。
-- pane 增删/排序为固定三 pane 布局（分隔条调高已支持），动态 pane 列表管理待完整版。
+- ~~pane 增删/排序为固定三 pane 布局~~：**0.5.x 动态 pane 完整版收口**（绑定 paneId 自动建删/渲染/拖动/排序/存档）；0.6.0 起主 pane 不再按 series 过滤、vol/macd pane 接受任意绑定实例（上游缺省语义）。
 - PVT volume 缺失按上游显式取 1、ROC 零回看取 0、AVP 缺失按 0：上游明确代码行为，逐位对齐优先（登记备查）。

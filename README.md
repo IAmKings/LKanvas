@@ -25,7 +25,13 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 - **无障碍**：TalkBack 摘要（OHLCV+方向词+MA）与五个替代动作
 - **PNG 导出**：等比缩放三 pane 完整导出（真机验证）；**诊断**：可开关零开销收集器
 - **发布链路**：Maven 本地制品（core JAR+sources / compose AAR）、R8 release 真机验证、独立 consumer 仅凭制品编译通过（A-46）
-- **对齐矩阵 E=0**（A=15/B=227/C=9/D=6，unknown=0）：门面 API 面/模板注册/Styles 树/多轴/utils 22 项全部落位，check.py 七面校验通过
+- **0.6.0 结构与逻辑对齐完整版**（审计 16 项发现全部收口，验收依据 `docs/alignment/structure-logic-audit-2026-10-28.zh-CN.md` + gap-matrix SLA-001~016）：
+  - **结构镜像**：27 指标 / 16 覆盖物模板拆分为上游同名文件（`extension/indicator|overlay/*.kt` ↔ `src/extension/*/*.ts`），每模板含上游逐行对照的规范 `calc`；全量路径走 calc、Scratch 增量为优化路径，27 模板双路径互验逐位一致（DualPathParityTest）+ oracle 27/27
+  - **数据路径**：`core/store/Store.kt` 镜像上游 Store 数据段——双向分页边界触发、more 同方向更新、resetData 退订→变更→清 loading→init 顺序、请求代次门禁（本地增强：在途切品种旧回调/推送丢弃）
+  - **注册统一**：指标/覆盖物/轴/图形模板注册与创建/渲染/命中/手势事件共用同一张全局表（宿主注册端到端可用）
+  - **严格上游默认**（破坏性变更，见 compatibility.md）：init 不预置指标、createIndicator 缺省新建指标 pane 且 isStack=false、overrideIndicator 全字段、payload 嵌套 data:{prev,current,next}、executeAction 抑制反向广播
+  - **契约收口**：视口锚点/右锚滚动模型/独立 maxOffset/小数 rightOffset/to 钳制/动画；log 轴 convert 与绘制同源；ConvertFilter；scroll/zoomEnabled 共用入口；candle.type/逐根配色/格式链消费；覆盖物模板命中与交互创建配置
+  - **对齐矩阵**：check.py v4 四态校验通过（行为通过=18），SLA-001~016 审计项全部「行为通过」；真实源码补丁演练 4（upstream-sync.md）证明补丁可定位有限本地改动
 - **Tooltip 渲染完整版（0.3.0）**：showRule/showType/features 全消费（对齐上游 CandleTooltipView），feature 图标命中→三种 ActionType；样式面板全部开关联动
 - **回调消费端（0.3.0）**：覆盖物 onClick/onDoubleClick/onRightClick(长按)/onTouch 系手势分发、performEventPressedMove 委托、indicator draw 钩子（IndicatorDrawContext）、时区接线；setStylesStrict 修复切回默认值边界
 - **多轴渲染 Alpha（0.4.0）**：createYAxis/removeYAxis/overrideYAxis 渲染消费——绑定自定义轴的指标按独立值域绘制并获独立标签列（reverse 即时生效）
