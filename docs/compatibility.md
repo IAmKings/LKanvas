@@ -121,6 +121,7 @@
 | 2026-10-29 | **B-06 30 分钟热稳定通过 + B-03 就绪后台化达标**：B-06 长测（50k/10 指标/100 覆盖物标准负载，30 轮×60s 滚动交互）——零崩溃（FATAL=0、30 轮同 PID）、本 app 无 ANR（dumpsys+logcat 双查）、PSS 170~194MB 波动后半程无增长、累计渲染 19175 帧（每轮稳定 ~640）。B-03 分批注入改造（首批 1k reset+指标毫秒级全量 → 99k appendBatch 分批 2k/批 delay(16) 让帧，指标 REPLACE_APPEND 增量推进）：首批可交互 54ms（原全程冻结 3.7s）、全量就绪 1895ms（原 3744ms，-49% 进入 D1 2000ms 门槛）——B-03 达标（性能门槛余项仅剩 R8 压缩口径帧数据待设备兼容） |
 | 2026-10-29 | **0.4.0 发版（多轴渲染 Alpha + 性能门槛全绿）**：切版 0.4.0（publishing/LKanvasChart.VERSION/consumer 依赖）；全量回归绿（core+compose 测试 + assembleRelease）；制品发布 build/maven-repo，consumer 仅凭制品重编通过（A-46 保持）；check.py 七面校验通过（E=0）。发版内容：多轴渲染 Alpha（CH-053~056/IND-003 消费端）、tooltip DrawOp 录制回放 + TextMeasurer 缓存 + 时间标签缓存（B-02 帧耗时 -67%）、指标线 native drawLines 批量提交（累计 -67%）、B-03 分批注入（首批可交互 54ms/就绪 1895ms 达标）、视口重绘订阅缺失修复、recompute plotsFor 假列修复；性能门槛 PRD 7.3 全表实测达标（B-01~B-06），余量：R8 口径帧数据、B-05 heap dump 口径、动态 pane/isStack、多轴完整版 |
 | 2026-10-29 | **isStack 语义接线（CH-044 收口，0.4.0 后）**：createIndicator(isStack=false) 先移除该 pane 全部现有非内置实例再创建（上游 Store.addIndicator 同语义）、true 叠加；顺带修 removeIndicator 只删首个匹配→全删匹配（上游 forEach 全删语义）。测试 createIndicator_isStackReplaceAndStack（叠加共存/替换清除/内置保护/跨 pane 隔离）——compose 89 测试全绿 |
+| 2026-10-29 | **诊断可视化（T-30 余量收口）+ 平台 fling 曲线**：诊断——渲染计时接线（lastRenderNanos/renderCount，关闭零开销不变）+ 样例 DiagnosticsPanel（采集开关/summary/最近 12 条环形缓冲/导出 cacheDir），真机实测「计算 0.04ms×33 次；绘制 12.91ms×14 帧」+ 导出写入成功；fling——手写指数衰减替换为平台 OverScroller native spline（RecyclerView 同款，KLineChart 注入、null 回退保 JVM 测试），真机惯性滚动验证通过 |
 
 ## 6. 已知问题与后续计划
 
@@ -129,6 +130,6 @@
 - 诊断可视化（宿主诊断入口 UI/导出）待 T-30 余量；当前经 ChartDiagnostics API 读取。
 - 性能门槛（B-02 容量/突发/泄漏/持续运行）尚未完成：B-01 增量路径 JVM 初测已达标（P95=0.270ms vs 4ms），Macrobenchmark 冻结设备测量（真机帧率/内存/启动）待 T-34。
 - D8 构建 WARNING：Kotlin metadata 重写 "Should never be called"（R8 已知噪音，debug 运行正常）；R8 release 验证在 M6/T-31。
-- 惯性滚动为基础指数衰减实现，未接入 Android fling 动画曲线（后续优化）。
+- ~~惯性滚动为基础指数衰减实现~~：**已接平台 OverScroller native spline 曲线**（RecyclerView/ScrollView 同款，KLineChart 注入、null 回退旧衰减保 JVM 测试可用；真机惯性滚动行为验证通过）。
 - pane 增删/排序为固定三 pane 布局（分隔条调高已支持），动态 pane 列表管理待完整版。
 - PVT volume 缺失按上游显式取 1、ROC 零回看取 0、AVP 缺失按 0：上游明确代码行为，逐位对齐优先（登记备查）。
