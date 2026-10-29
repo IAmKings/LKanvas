@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-对齐矩阵完整性校验 v3（gap-matrix「统计」节的执行者/发布判定工具）。
+对齐矩阵完整性校验 v4（gap-matrix「统计」节的执行者/发布判定工具）。
 
-相对 v2：覆盖面从 2/7 扩到 7/7——
+相对 v3：引入四态状态体系（审计发现 1 的收口）——
+  状态列取值：已声明｜已接线｜行为通过｜结构可对应｜—
+  * 已接线/行为通过/结构可对应 行必须引用至少一个 `.kt` 路径，且被引用文件在
+    lkanvas-core / lkanvas-compose 中真实存在（全路径或文件名均可）；
+  * 行为通过 行还必须引用至少一个 `*Test` 测试类，且对应测试文件真实存在；
+  * E=0 不再视为完成态，发布判定以状态分布为准。
+  * SLA- 行（审计发现追踪）只校验状态枚举，证据由 structure-map.md 与矩阵行承载。
+v3 既有七面校验保留：
   ① Chart.ts 全部公开方法 → CH- 行（符号精确同名，禁合并行）
   ② Styles.ts 全部 export interface → ts-inventory 字段级 + 矩阵 STY- 行
   ③ index.ts export 块 39 符号 → 20 个值符号须在矩阵；19 类型别名须在 ts-inventory
@@ -26,17 +33,20 @@ UP = ROOT / 'third_party/klinechart-v10.1.0/src'
 MATRIX = ROOT / 'docs/alignment/gap-matrix.md'
 TSINV = ROOT / 'docs/alignment/ts-inventory.md'
 
-PREFIXES = ('CH', 'IDX', 'EVT', 'TYP', 'IND', 'OVL', 'STY', 'NUM')
+PREFIXES = ('CH', 'IDX', 'EVT', 'TYP', 'IND', 'OVL', 'STY', 'NUM', 'SLA')
 CLASSES = set('ABCDE')
 VERIFS = {'test', 'diff', 'compile', 'parity', 'manual', 'existing', '—'}
 WORKLOADS = {'S', 'M', 'L', '—'}
-BATCHES = {'2a', '2b', '2c', '3', '4', '5', '6', '—'}
+BATCHES = {'2a', '2b', '2c', '3', '4', '5', '6', '06', '—'}
+STATES = {'已声明', '已接线', '行为通过', '结构可对应', '—'}
+WIRED_STATES = {'已接线', '行为通过', '结构可对应'}
 
 errors = []
 
 
 def err(msg):
     errors.append(msg)
+
 
 
 def extract_chart_methods():
@@ -97,12 +107,69 @@ def parse_matrix():
         if not re.match(r'^\| [A-Z]{2,3}-\d{3}', line):
             continue
         cells = [c.strip() for c in line.split('|')]
+        if cells[1].startswith('SLA-'):
+            # SLA 行（§14 审计追踪表）为 5 列：ID | 发现 | 批次 | 备注 | 状态
+            if len(cells) < 6:
+                err(f'矩阵:{i} SLA 行列数不足: {line[:60]}')
+                continue
+            rows.append({'line': i, 'id': cells[1], 'symbol': cells[2], 'cls': '—',
+                         'verif': '—', 'work': '—', 'batch': cells[3],
+                         'state': cells[5] if len(cells) > 5 else None, 'text': line})
+            continue
         if len(cells) < 10:
             err(f'矩阵:{i} 列数不足（{len(cells)-1}/9）: {line[:60]}')
             continue
+        state = cells[10] if len(cells) > 11 else None
         rows.append({'line': i, 'id': cells[1], 'symbol': cells[2], 'cls': cells[5],
-                     'verif': cells[6], 'work': cells[7], 'batch': cells[8]})
+                     'verif': cells[6], 'work': cells[7], 'batch': cells[8],
+                     'state': state, 'text': line})
     return rows
+
+
+def collect_kt_files():
+    files = {}
+    for base in ('lkanvas-core', 'lkanvas-compose'):
+        d = ROOT / base
+        if d.is_dir():
+            for f in d.rglob('*.kt'):
+                files[f.name] = f
+    return files
+
+
+def validate_states(rows, kt_files):
+    by_state = Counter()
+    for r in rows:
+        s = r['state']
+        if s is None:
+            err(f"矩阵:{r['line']} 缺状态列（v4 必填）: {r['id']}")
+            continue
+        if s not in STATES:
+            err(f"矩阵:{r['line']} 状态列非法（{sorted(STATES)}）: {r['id']} = {s!r}")
+            continue
+        by_state[s] += 1
+        if r['id'].startswith('SLA-') or s == '—':
+            continue
+        if s in WIRED_STATES:
+            kt_tokens = re.findall(r'[\w][\w/.-]*\.kt', r['text'])
+            if not kt_tokens:
+                err(f"矩阵:{r['line']} 状态={s} 须引用至少一个 .kt 符号路径: {r['id']}")
+                continue
+            for tok in set(kt_tokens):
+                if '/' in tok:
+                    if not (ROOT / tok).exists():
+                        err(f"矩阵:{r['line']} 引用文件不存在: {tok} ({r['id']})")
+                elif tok not in kt_files:
+                    err(f"矩阵:{r['line']} 引用文件不存在（文件名未找到）: {tok} ({r['id']})")
+        if s == '行为通过':
+            tests = set(re.findall(r'\b(\w+Test)\b', r['text']))
+            if not tests:
+                err(f"矩阵:{r['line']} 状态=行为通过 须引用至少一个 *Test 测试类: {r['id']}")
+                continue
+            test_files = {f.name for f in kt_files.values() if '/src/test/' in str(f)}
+            for t in tests:
+                if f'{t}.kt' not in test_files:
+                    err(f"矩阵:{r['line']} 引用测试文件不存在: {t}.kt ({r['id']})")
+    return by_state
 
 
 def main():
@@ -128,6 +195,8 @@ def main():
             err(f"矩阵:{r['line']} ID 非法: {r['id']}")
         if r['id'].split('-')[0] not in PREFIXES:
             err(f"矩阵:{r['line']} ID 前缀非法: {r['id']}")
+        if r['id'].startswith('SLA-'):
+            continue
         if r['cls'] not in CLASSES:
             err(f"矩阵:{r['line']} 分类列非法（须单字母）: {r['cls']!r}")
         for part in r['verif'].split('+'):
@@ -215,6 +284,10 @@ def main():
         if f not in ovl_syms:
             err(f'[Overlay] 实例字段 `{f}` 无 OVL- 行')
 
+    # ---- 状态体系（v4） ----
+    kt_files = collect_kt_files()
+    by_state = validate_states(matrix, kt_files)
+
     # ---- 方法名纠错护栏 ----
     for name in ('convertToPictureUrl',):
         if f'`{name}' in matrix_text or f'`{name}' in tsinv:
@@ -229,13 +302,14 @@ def main():
     print(f'矩阵数据行: {len(matrix)}')
     print('按分类:', dict(sorted(by_cls.items())))
     print('按批次:', dict(sorted(by_batch.items())))
+    print('按状态:', dict(sorted(by_state.items())))
 
     if errors:
         print(f'\n校验失败 {len(errors)} 项:', file=sys.stderr)
         for e in errors[:50]:
             print('  -', e, file=sys.stderr)
         sys.exit(1)
-    print('\n校验通过：7 面覆盖完整、格式合法、签名列非空')
+    print('\n校验通过：七面覆盖完整、格式合法、签名列非空、状态列合法且引用文件存在')
 
 
 if __name__ == '__main__':
