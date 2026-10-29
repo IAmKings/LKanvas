@@ -45,6 +45,9 @@ fun KLineChart(
     val textMeasurer = rememberTextMeasurer(cacheSize = 256)
     // T-34：tooltip DrawOp 缓存（静态内容录制一次回放，实测省 ~27ms/帧）
     val tooltipCache = remember { ChartRenderer.TooltipKeyHolder() }
+    // 平台 fling 曲线（OverScroller：RecyclerView 同款 native spline，系统级手感）
+    val context = androidx.compose.ui.platform.LocalContext.current
+    state.flingScroller = remember { android.widget.OverScroller(context) }
 
 
     val subPaneH = with(density) { config.subPaneHeight.toPx() }

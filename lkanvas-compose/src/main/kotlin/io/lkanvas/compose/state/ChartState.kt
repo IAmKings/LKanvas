@@ -637,15 +637,43 @@ class ChartState(
     }
 
     /** 基础惯性：指数衰减平移直到速度接近零（取消即中断）。 */
+    /**
+     * 平台 fling 曲线（T-34 余量收口）：KLineChart 注入平台 [android.widget.OverScroller]
+     * （RecyclerView/ScrollView 同款 native spline 曲线，密度/摩擦系统级一致）；
+     * null 回退旧指数衰减（JVM 测试可用）。
+     */
+    var flingScroller: android.widget.OverScroller? = null
+
     fun fling(velocityX: Float) {
         if (kotlin.math.abs(velocityX) < 200f) return
         flingJob?.cancel()
-        flingJob = scope.launch {
-            var velocity = velocityX
-            while (kotlin.math.abs(velocity) > 60f) {
-                panBy(velocity * 16f / 1000f)
-                velocity *= 0.94f
-                kotlinx.coroutines.delay(16L)
+        val scroller = flingScroller
+        if (scroller != null) {
+            // 平台 spline fling：逐帧 computeScrollOffset 取位移增量（与 View 体系同源）
+            scroller.fling(
+                0, 0,
+                velocityX.toInt(), 0,
+                Int.MIN_VALUE, Int.MAX_VALUE,
+                0, 0,
+            )
+            var lastX = 0
+            flingJob = scope.launch {
+                while (!scroller.isFinished) {
+                    scroller.computeScrollOffset()
+                    val x = scroller.currX
+                    panBy((x - lastX).toFloat())
+                    lastX = x
+                    kotlinx.coroutines.delay(16L)
+                }
+            }
+        } else {
+            flingJob = scope.launch {
+                var velocity = velocityX
+                while (kotlin.math.abs(velocity) > 60f) {
+                    panBy(velocity * 16f / 1000f)
+                    velocity *= 0.94f
+                    kotlinx.coroutines.delay(16L)
+                }
             }
         }
     }
