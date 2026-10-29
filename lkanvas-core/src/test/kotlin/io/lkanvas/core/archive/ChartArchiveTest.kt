@@ -130,6 +130,20 @@ class ChartArchiveTest {
     // ---------- 空存档往返 ----------
 
     @Test
+    fun `extraPaneIds往返与旧版存档缺省`() {
+        val anchor = ChartArchive.ViewportAnchor(3.0, 8.0)
+        val json = ChartArchive.export(null, emptyList(), emptyMap(), anchor, extraPaneIds = listOf("pane_b", "pane_a"))
+        val restored = ChartArchive.restore(json)
+        assertTrue(restored is ChartArchive.RestoreResult.Ok)
+        assertEquals(listOf("pane_b", "pane_a"), (restored as ChartArchive.RestoreResult.Ok).archive.extraPaneIds)
+        // 旧版存档（无 extraPaneIds 字段）：缺省空，不失败
+        val legacy = " " + JSON_LEGACY + " "
+        val r2 = ChartArchive.restore(legacy.trimIndent())
+        assertTrue(r2 is ChartArchive.RestoreResult.Ok)
+        assertEquals(emptyList(), (r2 as ChartArchive.RestoreResult.Ok).archive.extraPaneIds)
+    }
+
+    @Test
     fun `空内容导出恢复不崩溃`() {
         val json = ChartArchive.export(null, emptyList(), emptyMap(), null)
         val result = ChartArchive.restore(json)
@@ -139,3 +153,6 @@ class ChartArchiveTest {
         assertEquals(null, result.archive.viewportAnchor)
     }
 }
+
+
+private const val JSON_LEGACY = """{"schemaVersion":1,"overlays":[],"viewport":{"scrollIndex":0.0,"barSpacing":8.0,"present":false}}"""

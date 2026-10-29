@@ -283,6 +283,12 @@ class ChartState(
             if (anchor != null && dataSnapshot.candles.isNotEmpty()) {
                 viewport.restoreAnchor(anchor.scrollIndex, anchor.barSpacing, dataSnapshot.candles.size)
             }
+            // 0.5.x：恢复动态副图 pane 渲染序（宿主按 archive.extraPaneIds 重建指标后，
+            // pane 经 ensureExtraPane 生成；此处仅回填排序）
+            if (archive.extraPaneIds.isNotEmpty()) {
+                extraPanes.value = archive.extraPaneIds
+                relayout()
+            }
             overlayRevision++
             viewRevision++
         } finally {
@@ -819,6 +825,23 @@ class ChartState(
 
     /** 动态副图变更后重新布局（门面调用；relayout 的公开入口）。 */
     fun relayoutExtraPanes() = relayout()
+
+    /**
+     * 0.5.x pane 排序：把 [paneId] 移动到 [targetIndex]（列表序即渲染序，
+     * 从上到下）。越界钳制到有效范围；未知 paneId 忽略。
+     */
+    fun moveExtraPane(paneId: String, targetIndex: Int) {
+        val current = extraPanes.value
+        val from = current.indexOf(paneId)
+        if (from < 0) return
+        val to = targetIndex.coerceIn(0, current.size - 1)
+        if (from == to) return
+        val mutable = current.toMutableList()
+        mutable.removeAt(from)
+        mutable.add(to, paneId)
+        extraPanes.value = mutable
+        relayout()
+    }
 
     /**
      * 分隔条命中（A-33：手势层判定）；返回 0=主|VOL 分隔、1=VOL|MACD 分隔、null=未命中。

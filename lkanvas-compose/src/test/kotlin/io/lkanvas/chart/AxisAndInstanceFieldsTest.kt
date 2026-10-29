@@ -192,6 +192,29 @@ class AxisAndInstanceFieldsTest {
         LKanvasChart.dispose(chart)
     }
 
+    // ---------- 0.5.x pane 排序 ----------
+
+    @Test
+    fun moveExtraPane_reordersRenderSequence() {
+        val chart = newChart()
+        val st = chart.state
+        chart.createIndicator("MA", calcParams = listOf(5.0), paneId = "pane_a")
+        chart.createIndicator("MA", calcParams = listOf(10.0), paneId = "pane_b")
+        chart.createIndicator("MA", calcParams = listOf(20.0), paneId = "pane_c")
+        // 建立顺序 pane_a, pane_b, pane_c（创建序）
+        assertEquals(listOf("pane_a", "pane_b", "pane_c"), st.extraPanes.value)
+        // pane_c 移到最前
+        chart.moveExtraPane("pane_c", 0)
+        assertEquals(listOf("pane_c", "pane_a", "pane_b"), st.extraPanes.value)
+        // 布局（从上到下）跟随新序
+        assertEquals("pane_c", st.extraPaneLayout.first().first)
+        // 未知 paneId 忽略；越界钳制到尾部（pane_c 已在首位 → 移至末位）
+        chart.moveExtraPane("nope", 0)
+        chart.moveExtraPane("pane_c", 99)
+        assertEquals(listOf("pane_a", "pane_b", "pane_c"), st.extraPanes.value, "越界钳制到末位")
+        LKanvasChart.dispose(chart)
+    }
+
     // ---------- 0.5.x 动态副图分隔条 ----------
 
     @Test

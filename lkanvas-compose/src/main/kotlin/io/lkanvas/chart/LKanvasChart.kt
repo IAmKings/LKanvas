@@ -471,6 +471,9 @@ class LKanvasChart private constructor(
         }
     }
 
+    /** 0.5.x pane 排序：移动自定义 pane 到目标渲染序位（透出 ChartState）。 */
+    fun moveExtraPane(paneId: String, targetIndex: Int) = state.moveExtraPane(paneId, targetIndex)
+
     /** 0.5.x 动态副图：pane 内无实例时移除 pane。 */
     private fun pruneEmptyExtraPanes() {
         val empty = state.extraPanes.value.filter { pane ->

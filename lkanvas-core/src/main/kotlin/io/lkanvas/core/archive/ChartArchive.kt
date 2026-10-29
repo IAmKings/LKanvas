@@ -52,6 +52,8 @@ object ChartArchive {
         val unknownOverlays: List<OverlayInstance>,
         val indicatorParams: Map<String, List<Double>>,
         val viewportAnchor: ViewportAnchor?,
+        /** 0.5.x：动态副图 paneId 渲染序（旧版存档缺省空；宿主据此重建 pane）。 */
+        val extraPaneIds: List<String> = emptyList(),
     )
 
     /** 恢复结果：Ok（含未知条目）或 Failed（原文保留）。 */
@@ -67,6 +69,7 @@ object ChartArchive {
         overlays: List<OverlayInstance>,
         indicatorParams: Map<String, List<Double>>,
         viewportAnchor: ViewportAnchor?,
+        extraPaneIds: List<String> = emptyList(),
     ): String {
         if (overlays.size > MAX_OVERLAYS) {
             throw ArchiveTooLargeException("覆盖物 ${overlays.size} 超上限 $MAX_OVERLAYS")
@@ -85,6 +88,9 @@ object ChartArchive {
                 put("barSpacing", viewportAnchor?.barSpacing ?: 0.0)
                 put("present", viewportAnchor != null)
             })
+            if (extraPaneIds.isNotEmpty()) {
+                put("extraPaneIds", buildJsonArray { extraPaneIds.forEach { add(JsonPrimitive(it)) } })
+            }
         }
         val text = root.toString()
         if (text.encodeToByteArray().size > MAX_ARCHIVE_BYTES) {
@@ -99,7 +105,8 @@ object ChartArchive {
         overlays: List<OverlayInstance>,
         indicatorParams: Map<String, List<Double>>,
         viewportAnchor: ViewportAnchor?,
-    ): String = export(marketKey, overlays.filter { it.phase == OverlayPhase.COMPLETED || it.phase == OverlayPhase.IDLE || it.phase == OverlayPhase.SELECTED }, indicatorParams, viewportAnchor)
+        extraPaneIds: List<String> = emptyList(),
+    ): String = export(marketKey, overlays.filter { it.phase == OverlayPhase.COMPLETED || it.phase == OverlayPhase.IDLE || it.phase == OverlayPhase.SELECTED }, indicatorParams, viewportAnchor, extraPaneIds)
 
     // ---------- 恢复 ----------
 
@@ -130,7 +137,9 @@ object ChartArchive {
                 ViewportAnchor(vp["scrollIndex"]!!.jsonPrimitive.double, vp["barSpacing"]!!.jsonPrimitive.double)
             } else null
         }
-        RestoreResult.Ok(Archive(marketKey, known, unknown, params, viewport))
+        // 0.5.x：extraPaneIds（旧版存档无此字段，缺省空——向后兼容不升版本号）
+        val extraPaneIds = root["extraPaneIds"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList()
+        RestoreResult.Ok(Archive(marketKey, known, unknown, params, viewport, extraPaneIds))
     } catch (t: Throwable) {
         // 已知字段损坏：整次失败，原文保留（不自动覆盖，A-38）
         RestoreResult.Failed(t, rawJson)
