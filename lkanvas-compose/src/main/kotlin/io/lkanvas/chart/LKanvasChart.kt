@@ -734,6 +734,13 @@ class LKanvasChart private constructor(
     internal var xAxisState = XAxisOverride()
 
     /** 上游 `createYAxis(yAxis)`：登记轴实例，返回 id（重复 id 幂等返回）。 */
+    /** 0.4.0 多轴渲染：把自定义轴（paneId=main）同步到 ChartState（渲染消费源）。 */
+    private fun syncExtraAxes() {
+        state.extraYAxisMeta = yAxes.values
+            .filter { it.id != "main" && it.paneId == "main" }
+            .associate { it.id to it.reverse }
+    }
+
     fun createYAxis(yAxis: YAxisOverride): String? {
         val paneId = yAxis.paneId ?: "main"
         if (paneId == "candle_x") return null // x 轴 pane 不支持 y 轴（上游 PaneIdConstants.X_AXIS）
@@ -751,6 +758,7 @@ class LKanvasChart private constructor(
             needWidget = yAxis.needWidget ?: true,
             isDefault = false,
         )
+        syncExtraAxes()
         state.notifyViewportChanged()
         return id
     }
@@ -769,6 +777,7 @@ class LKanvasChart private constructor(
             yAxes.remove(axis.id)
             removed = true
         }
+        if (removed) syncExtraAxes()
         if (removed) state.notifyViewportChanged()
         return removed
     }
@@ -795,7 +804,10 @@ class LKanvasChart private constructor(
                 needWidget = yAxis.needWidget ?: axis.needWidget,
             )
         }
-        if (targets.isNotEmpty()) state.notifyViewportChanged()
+        if (targets.isNotEmpty()) {
+            syncExtraAxes()
+            state.notifyViewportChanged()
+        }
     }
 
     /** 上游 `overrideXAxis(xAxis)`：时间轴覆写登记。 */

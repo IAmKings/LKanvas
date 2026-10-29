@@ -166,6 +166,42 @@ class AxisAndInstanceFieldsTest {
         assertTrue(updated.fixedZLevel)
     }
 
+    // ---------- 0.4.0 多轴渲染消费 ----------
+
+    @Test
+    fun multiAxis_syncToStateAndIndependentRange() {
+        val state = ChartState()
+        val chart = LKanvasChart.init(state)
+        // 空状态：无自定义轴
+        assertTrue(state.extraYAxisMeta.isEmpty())
+        // 创建自定义轴 → 同步到渲染消费源
+        val ax = chart.createYAxis(YAxisOverride(id = "ax1", reverse = true))!!
+        assertTrue(state.extraYAxisMeta.keys.contains("ax1"))
+        assertEquals(true, state.extraYAxisMeta["ax1"])
+        // 移除 → 同步清空
+        assertTrue(chart.removeYAxis(YAxisFilter(id = ax)))
+        assertTrue(state.extraYAxisMeta.isEmpty())
+        // 绑定指标后：独立值域（与主轴无关）
+        kotlinx.coroutines.runBlocking {
+            state.reset(
+                io.lkanvas.core.store.MarketKey("T", "1m"),
+                listOf(candleOf(1, 100.0), candleOf(2, 110.0), candleOf(3, 120.0)),
+            )
+        }
+        val id = chart.createIndicator("MA", calcParams = listOf(2.0), yAxisId = "ax2")
+        assertNotNull(id)
+        chart.createYAxis(YAxisOverride(id = "ax2"))
+        val range = state.extraAxisRange("ax2", 0, 2)
+        assertNotNull(range)
+        val (lo, hi) = range
+        assertTrue(hi > lo, "MA(2) 值域有效：$range")
+        // 主轴无该绑定：extraAxisRange 对主轴不适用（主轴走 mainPaneRange）
+        LKanvasChart.dispose(chart)
+    }
+
+    private fun candleOf(ts: Long, close: Double) =
+        io.lkanvas.core.data.Candle(ts, close, close + 1, close - 1, close, 100.0)
+
     // ---------- registerStyles/XAxis/YAxis ----------
 
     @Test

@@ -51,7 +51,12 @@ fun KLineChart(
     val timeAxisH = with(density) { config.timeAxisHeight.toPx() }
     // 右轴留白随系统字体缩放（A-41：字体放大后轴标签仍完整显示；1..2 倍钳制）
     val fontScale = density.fontScale.coerceIn(1f, 2f)
-    val gutterW = with(density) { config.rightAxisGutter.toPx() * fontScale }
+    // 0.4.0 多轴：每个自定义轴标签列追加 gutter 宽度（44dp，随字体缩放）
+    val extraAxisColW = with(density) {
+        androidx.compose.ui.unit.Dp(44f).toPx() * fontScale
+    }
+    val gutterW = with(density) { config.rightAxisGutter.toPx() * fontScale } +
+        state.extraYAxisMeta.size * extraAxisColW
     val legendTextSizePx = with(density) { config.legendTextSize.toPx() }
     val textSizePx = with(density) { config.axisTextSize.toPx() }
 
@@ -114,6 +119,7 @@ fun KLineChart(
                         drawLegend = legendSlot == null && state.legendMode == ChartState.LegendMode.VISIBLE,
                         styles = styles,
                         tooltipCache = tooltipCache,
+                        extraAxisColW = extraAxisColW,
                     ),
                     textMeasurer = textMeasurer,
                 )

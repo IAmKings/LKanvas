@@ -118,10 +118,10 @@
 | CH-050 | `overrideOverlay` | Chart.ts:943 | 门面 overrideOverlay(id, OverlayOverride) 已建 | B | test | M | 2b | points/styles/extendData |
 | CH-051 | `removeOverlay` | Chart.ts:947 | 门面 removeOverlay(filter/id) 已建 | B | test | S | 2b | 批量 |
 | CH-052 | `setPaneOptions` | Chart.ts:951 | 门面 setPaneOptions 已建（main/vol/macd 高度，35% 保底钳制） | B | test | M | 2c | pane{id,height,axis?} |
-| CH-053 | `createYAxis` | Chart.ts:1003 | 门面 createYAxis：YAxisInfo 记录层（id 生成/幂等/x 轴 pane 拒绝） | B | test | L | 5 | 绘制端单轴，多轴渲染随批次 5+ |
-| CH-054 | `removeYAxis` | Chart.ts:1025 | removeYAxis：主 pane 默认轴与指标绑定轴保护 | B | test | S | 5 | |
-| CH-055 | `getYAxes` | Chart.ts:1057 | getYAxes(filter: paneId/id/name) | B | compile | S | 5 | |
-| CH-056 | `overrideYAxis` | Chart.ts:1079 | overrideYAxis：paneId+id 定位非空字段覆盖 | B | test | S | 5 | |
+| CH-053 | `createYAxis` | Chart.ts:1003 | 门面记录层 + 0.4.0 渲染消费：paneId=main 自定义轴同步 ChartState.extraYAxisMeta，绑定指标独立值域+独立标签列 | B | test | L | 5 | 绘制端单轴，多轴渲染随批次 5+ |
+| CH-054 | `removeYAxis` | Chart.ts:1025 | 删除保护 + syncExtraAxes 同步渲染源（移除后轴/标签消失） | B | test | S | 5 | |
+| CH-055 | `getYAxes` | Chart.ts:1057 | getYAxes 过滤 + 渲染同步（同上） | B | compile | S | 5 | |
+| CH-056 | `overrideYAxis` | Chart.ts:1079 | overrideYAxis（reverse 等）+ syncExtraAxes（翻转值域即时生效） | B | test | S | 5 | |
 | CH-057 | `overrideXAxis` | Chart.ts:1096 | overrideXAxis：XAxisOverride 覆写记录 | B | test | S | 5 | 绘制端消费随批次 5+ |
 | CH-058 | `getPaneOptions` | Chart.ts:1106 | 门面 getPaneOptions 已建 | B | test | S | 2c |  |
 | CH-059 | `setZoomEnabled` | Chart.ts:1114 | 门面 set/is 已建 | B | test | S | 2c | 手势层 |
@@ -187,7 +187,7 @@
 |---|---|---|---|---|---|---|---|---|
 | IND-001 | `id` | component/Indicator.ts | IndicatorInstance.id | A | existing | — | — | |
 | IND-002 | `paneId` | component/Indicator.ts | IndicatorInstance.paneId + createIndicator(paneId) | B | test | S | 3 | |
-| IND-003 | `yAxisId` | component/Indicator.ts | IndicatorInstance.yAxisId + createIndicator(yAxisId)；removeYAxis 绑定检查消费 | B | test | S | 5 | 多轴 CH-053~057 |
+| IND-003 | `yAxisId` | component/Indicator.ts | yAxisId → 渲染端分流：main 走主轴值域，自定义轴走 extraAxisRange 独立值域（0.4.0） | B | test | S | 5 | 多轴 CH-053~057 |
 | IND-004 | `name` | component/Indicator.ts | 有 | A | existing | — | — | |
 | IND-005 | `shortName` | component/Indicator.ts | 有 | A | existing | — | — | |
 | IND-006 | `precision` | component/Indicator.ts | 有 | A | existing | — | — | |

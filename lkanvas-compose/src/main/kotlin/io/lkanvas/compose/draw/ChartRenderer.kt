@@ -44,6 +44,8 @@ object ChartRenderer {
          * 实测占 27ms/帧）。键与缓存的读写经 [TooltipKeyHolder]（调用方 remember）。
          */
         val tooltipCache: TooltipKeyHolder? = null,
+        /** 0.4.0 多轴：每个自定义轴标签列宽 px（调用方按字体缩放算好）。 */
+        val extraAxisColW: Float = 0f,
     )
 
     /** tooltip 缓存（KLineChart remember 持有，绘制阶段读写）。 */
@@ -80,8 +82,13 @@ object ChartRenderer {
         val crosshair = if (params.includeCrosshair && theme.crosshairShow) state.crosshairPosition else null
         // 主 pane 顶部两行图例（OHLC + MA）的避让高度
         val legendHeight = params.legendTextSizePx * 3.2f
+        // 0.4.0 多轴：自定义轴标签列坐标（主轴列右侧依次向右；主轴列宽 = tagWidth+8）
+        val extraAxisCols = if (params.extraAxisColW > 0f && state.extraYAxisMeta.isNotEmpty()) {
+            val mainCol = text.tagWidth + 8f
+            state.extraYAxisMeta.keys.mapIndexed { i, _ -> contentRight + mainCol + i * params.extraAxisColW }
+        } else emptyList()
         with(PaneRenderers) {
-            drawMainPane(state, theme, 0f, contentRight, mainTop, mainBottom, text, crosshair, legendHeight)
+            drawMainPane(state, theme, 0f, contentRight, mainTop, mainBottom, text, crosshair, legendHeight, extraAxisCols = extraAxisCols)
             drawVolumePane(state, theme, 0f, contentRight, volTop, volBottom, text)
             drawMacdPane(state, theme, 0f, contentRight, macdTop, macdBottom, text)
         }

@@ -199,6 +199,21 @@ class MainActivity : ComponentActivity() {
                             onClick = { customLegendOn = !customLegendOn },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text(if (customLegendOn) "槽" else "内") }
+                        // 0.4.0 多轴演示：创建自定义轴 + 绑定 MA(10)（独立值域 + 独立标签列）
+                        var multiAxisOn by remember { androidx.compose.runtime.mutableStateOf(false) }
+                        Button(
+                            onClick = {
+                                multiAxisOn = !multiAxisOn
+                                if (multiAxisOn) {
+                                    chartFacade.createYAxis(io.lkanvas.chart.YAxisOverride(id = "ax_ma10"))
+                                    chartFacade.createIndicator("MA", calcParams = listOf(10.0), yAxisId = "ax_ma10")
+                                } else {
+                                    chartFacade.removeIndicator(ChartState.IndicatorFilter(name = "MA"))
+                                    chartFacade.removeYAxis(io.lkanvas.chart.YAxisFilter(id = "ax_ma10"))
+                                }
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text(if (multiAxisOn) "轴✓" else "轴") }
                         Button(
                             onClick = { showStylesPanel = !showStylesPanel },
                             modifier = Modifier.padding(start = 8.dp),

@@ -55,6 +55,8 @@ object PaneRenderers {
         text: ChartText,
         crosshair: Offset?,
         legendHeight: Float = 0f,
+        /** 0.4.0 多轴：自定义轴标签列 x 坐标（与 state.extraYAxisMeta 键序一致）。 */
+        extraAxisCols: List<Float> = emptyList(),
     ) {
         val candles = state.dataSnapshot.candles
         val range = state.viewport.visibleRange(candles.size)
@@ -92,6 +94,7 @@ object PaneRenderers {
             // 主 pane 指标叠加：内置 MA + 用户 price 系实例（批次 2b）
             var paletteIdx = 0
             for (inst in state.mainPaneIndicatorResults()) {
+                if (inst.yAxisId != "main") continue // 绑定自定义轴的指标由下方多轴块渲染（0.4.0）
                 val res = inst.state ?: continue
                 // 批次 8c：模板 draw 钩子非空时绕过 figures 管线（IND-022 消费端）
                 val customDraw = inst.definition.draw
@@ -118,6 +121,52 @@ object PaneRenderers {
             drawHighLowMarkers(state, theme, text, visible, range.first, y, contentRight)
             if (state.mainChartType == MainChartType.AREA) {
                 drawAreaFill(state, theme, visible, range.first, y, bottom)
+            }
+        }
+        // 0.4.0 多轴渲染（CH-053~056/IND-003 消费端）：绑定自定义轴的指标用
+        // 独立值域映射，轴标签画在各自 gutter 列（reverse 翻转值域方向）
+        val extraAxes = state.extraYAxisMeta
+        for ((ai, axisId) in extraAxes.keys.withIndex()) {
+            val colX = extraAxisCols.getOrNull(ai) ?: continue
+            val (alo, ahi) = state.extraAxisRange(axisId, range.first, range.last) ?: continue
+            val reversed = extraAxes[axisId] == true
+            val (ylo, yhi) = if (reversed) ahi to alo else alo to ahi
+            val ay: (Double) -> Double = { v ->
+                LinearYAxis.valueToY(v, ylo, yhi, top.toDouble(), bottom.toDouble())
+            }
+            clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
+                var axPalette = ai * 3
+                for (inst in state.mainPaneIndicatorResults()) {
+                    if (inst.yAxisId != axisId) continue
+                    val res = inst.state ?: continue
+                    val customDraw = inst.definition.draw
+                    if (customDraw != null) {
+                        customDraw(
+                            io.lkanvas.core.indicator.IndicatorDrawContext(
+                                result = res.result,
+                                rangeFirst = range.first,
+                                rangeLast = range.last,
+                                yOf = ay,
+                                xOf = { i -> state.viewport.candleCenterX(i.toDouble()) },
+                                palette = theme.linePalette,
+                                scope = this,
+                            ),
+                        )
+                    } else {
+                        drawLinePlots(res, state.viewport, range, ay, theme.linePalette, paletteOffset = axPalette, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
+                    }
+                    axPalette += res.result.keys.size
+                }
+            }
+            // 轴标签（该轴绑定指标首色，独立 gutter 列）
+            val axisColor = theme.linePalette[(ai * 3) % theme.linePalette.size]
+            val ticks = LinearYAxis.ticks(ylo, yhi, 5)
+            var lastTop = Float.NEGATIVE_INFINITY
+            for (t in ticks) {
+                val ty = LinearYAxis.valueToY(t, ylo, yhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
+                if (ty < lastTop + 2f || ty < legendHeight) continue
+                drawText(text, text.price(t), Offset(colX, ty), axisColor)
+                lastTop = ty
             }
         }
         drawAxisTicks(text, theme, axisTicks, yReal, contentRight, clipTop = legendHeight)

@@ -526,6 +526,36 @@ class ChartState(
     /** IANA 时区（0.3.0 批次 8e：门面 setTimezone 注入；空=系统时区）。 */
     var timezoneId: String = ""
 
+    /**
+     * 0.4.0 多轴渲染（CH-053~056 消费端）：自定义 Y 轴（id→reverse）。
+     * 门面 createYAxis/removeYAxis/overrideYAxis 同步；仅 paneId=main 的轴进入渲染。
+     * 绑定该轴的指标（IndicatorInstance.yAxisId）用独立值域映射并获独立标签列。
+     */
+    var extraYAxisMeta by androidx.compose.runtime.mutableStateOf(emptyMap<String, Boolean>())
+
+    /**
+     * 自定义轴 [axisId] 的独立值域：绑定该轴的全部指标在可见区 [from,to] 的
+     * 值 min/max（NaN 跳过）。无绑定/无有效值返回 null（渲染跳过该轴）。
+     */
+    fun extraAxisRange(axisId: String, from: Int, to: Int): Pair<Double, Double>? {
+        var lo = Double.NaN
+        var hi = Double.NaN
+        for (inst in indicatorInstances) {
+            if (inst.yAxisId != axisId) continue
+            val res = inst.state ?: continue
+            for (key in res.result.keys) {
+                val col = res.result[key] ?: continue
+                for (i in from..to) {
+                    val v = col[i]
+                    if (v.isNaN()) continue
+                    if (lo.isNaN() || v < lo) lo = v
+                    if (hi.isNaN() || v > hi) hi = v
+                }
+            }
+        }
+        return if (lo.isNaN()) null else lo to hi
+    }
+
     /** 生效时区（非法名回退系统时区；JVM getTimeZone 对无效 ID 返回 GMT，需显式校验）。 */
     fun effectiveTimeZone(): java.util.TimeZone {
         if (timezoneId.isBlank()) return java.util.TimeZone.getDefault()
