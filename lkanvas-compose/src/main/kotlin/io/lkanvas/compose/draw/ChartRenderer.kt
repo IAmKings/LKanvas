@@ -327,15 +327,8 @@ object ChartRenderer {
         contentRight: Float,
         legendHeight: Float,
     ) {
-        val candles = state.dataSnapshot.candles
-        val range = state.viewport.visibleRange(candles.size)
-        if (range.count <= 0) return
-        val visible = candles.subList(range.first, range.last + 1)
-        val (lo, hi) = LinearYAxis.rangeOfCandles(visible) ?: return
-        val spec = state.effectiveMainAxisSpec()
-        val value = YAxisMath.yToValue(
-            spec, crosshair.y.toDouble(), lo, hi, 0.0, state.paneHeightsPx.main.toDouble(),
-        )
+        // R10：标签值经主 pane 统一映射（reverse 翻转 + 与绘制同源值域）
+        val value = state.mainPaneValueAt(crosshair.y) ?: return
         val clampedY = crosshair.y.coerceIn(legendHeight + text.tagHeight / 2f, Float.MAX_VALUE)
         drawTag(text, value, clampedY, contentRight, theme.crosshairLine)
     }

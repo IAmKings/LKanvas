@@ -343,13 +343,8 @@ class LKanvasChart private constructor(
         }
         state.onCrosshairChanged = { x, y, dataIndex, timestamp ->
             val candles = state.dataSnapshot.candles
-            // SLA-015：paneId 来自实际 pane（按 y 与 pane 高度边界推断）
-            val h = state.paneHeightsPx
-            val paneId = when {
-                y <= h.main -> "main"
-                y <= h.main + h.vol -> "vol"
-                else -> "macd"
-            }
+            // R10：paneId 来自实际 pane 布局（main/vol/macd 按需存在 + 动态 pane，R07 集合）
+            val paneId = state.paneIdAt(y.toFloat())
             emit(
                 ActionType.ON_CROSSHAIR_CHANGE,
                 Crosshair(
@@ -388,10 +383,12 @@ class LKanvasChart private constructor(
      * onCrosshairFeatureClick 三种；由宿主 UI 图标点击时调用，映射上游 feature 点击语义）。
      */
     fun executeTooltipFeatureClick(featureId: String, paneId: String = "main") {
-        val type = when (paneId) {
-            "main" -> ActionType.ON_CANDLE_TOOLTIP_FEATURE_CLICK
-            "vol" -> ActionType.ON_INDICATOR_TOOLTIP_FEATURE_CLICK
-            else -> ActionType.ON_CROSSHAIR_FEATURE_CLICK
+        // R10：按 pane 类型分类（candle pane=主图；真实指标 pane=INDICATOR；
+        // "crosshair" 为十字线区哨兵（非真实 pane，保持上游三事件面））
+        val type = when {
+            paneId == "main" -> ActionType.ON_CANDLE_TOOLTIP_FEATURE_CLICK
+            paneId == "crosshair" -> ActionType.ON_CROSSHAIR_FEATURE_CLICK
+            else -> ActionType.ON_INDICATOR_TOOLTIP_FEATURE_CLICK
         }
         emit(type, mapOf("paneId" to paneId, "featureId" to featureId))
     }
@@ -408,12 +405,13 @@ class LKanvasChart private constructor(
      */
     fun executeAction(type: ActionType, data: Any?) {
         if (type == ActionType.ON_CROSSHAIR_CHANGE) {
-            val crosshair = data as? Crosshair ?: return
-            // 上游字段全可选（Partial 语义）：null 视为 NaN（清除）
+            // R10（复审 2026-10-30）：null/非 Crosshair → 清除十字线
+            // （上游 setCrosshair(undefined) 语义，Chart.ts:1263-1270）
+            val crosshair = data as? Crosshair
             state.applyCrosshairAction(
-                crosshair.x ?: Double.NaN,
-                crosshair.y ?: Double.NaN,
-                crosshair.dataIndex ?: 0,
+                crosshair?.x ?: Double.NaN,
+                crosshair?.y ?: Double.NaN,
+                crosshair?.dataIndex ?: -1,
             )
             return
         }

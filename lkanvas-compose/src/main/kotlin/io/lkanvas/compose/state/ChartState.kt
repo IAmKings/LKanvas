@@ -602,6 +602,23 @@ class ChartState(
      * SLA-015：executeAction(ON_CROSSHAIR_CHANGE) 的状态写入（上游
      * setCrosshair(data, { notExecuteAction: true }) —— 写状态、抑制反向广播）。
      */
+    /** R10：y 像素 → 实际 pane id（main/vol/macd 按需存在 + 动态 pane 布局）。 */
+    fun paneIdAt(y: Float): String {
+        val h = paneHeightsPx
+        return when {
+            y <= h.main -> "main"
+            y <= h.main + h.vol && "vol" in paneList() -> "vol"
+            y <= h.main + h.vol + h.macd && "macd" in paneList() -> "macd"
+            else -> extraPaneLayout.lastOrNull { y >= it.second.first && y <= it.second.second }?.first
+                ?: "macd"
+        }
+    }
+
+    /**
+     * R10（复审 2026-10-30）：executeAction 十字线写入——上游顺序
+     * （Store.ts:1285-1310）：x 为数字时**按 x 推导数据索引**（coordinateToDataIndex），
+     * x 缺省回退**最后一根**（非 0）； dataIndex 显式提供时仅在 x 缺省下使用。
+     */
     fun applyCrosshairAction(x: Double, y: Double, dataIndex: Int) {
         val candles = dataSnapshot.candles
         if (candles.isEmpty()) return
@@ -610,9 +627,14 @@ class ChartState(
             viewRevision++
             return
         }
-        val idx = dataIndex.coerceIn(candles.indices)
+        val idx = if (!x.isNaN()) {
+            viewport.logicalIndexAt(x).roundToInt().coerceIn(candles.indices)
+        } else {
+            dataIndex.coerceIn(candles.indices)
+        }
+        val px = viewport.candleCenterX(idx.toDouble()).toFloat()
         crosshairPosition = androidx.compose.ui.geometry.Offset(
-            viewport.candleCenterX(idx.toDouble()).toFloat(),
+            px,
             y.toFloat().coerceIn(0f, paneHeightsPx.main + paneHeightsPx.vol + paneHeightsPx.macd),
         )
         viewRevision++

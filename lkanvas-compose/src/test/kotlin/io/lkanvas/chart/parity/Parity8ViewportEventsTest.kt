@@ -191,4 +191,40 @@ class Parity8ViewportEventsTest {
         assertEquals(candles[11], p.data.next, "payload 嵌套 data.next")
         LKanvasChart.dispose(chart)
     }
+
+    // ---------- 0.7.0 R10：Crosshair 语义 ----------
+
+    @Test
+    fun `executeAction_null清除十字线（R10）`() {
+        val chart = newChartWithData()
+        chart.state.onLayout(800f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        chart.state.showCrosshairAt(100f, 100f)
+        drain()
+        assertTrue(chart.state.crosshairPosition != null, "十字线已显示")
+        // 复审 R10 复现：null → 清除（上游 setCrosshair(undefined)）
+        chart.executeAction(ActionType.ON_CROSSHAIR_CHANGE, null)
+        drain()
+        assertTrue(chart.state.crosshairPosition == null, "null 清除十字线")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `executeAction_xOnly按x推导索引（R10）`() {
+        val chart = newChartWithData()
+        chart.state.onLayout(800f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        val candles = chart.getDataList()
+        // 指向第 150 根的 x（仅 x，不提供 dataIndex）——修复前落第 0 根
+        val x150 = chart.state.viewport.candleCenterX(150.0)
+        chart.executeAction(
+            ActionType.ON_CROSSHAIR_CHANGE,
+            io.lkanvas.core.common.Crosshair(x = x150, y = 200.0),
+        )
+        drain()
+        val pos = chart.state.crosshairPosition!!
+        // 十字线 x 吸附到第 150 根中心（x 推导索引；修复前忽略传入 x 落第 0 根）
+        assertEquals(chart.state.viewport.candleCenterX(150.0).toFloat(), pos.x, 0.5f, "x-only 按 x 推导索引（R10）")
+        LKanvasChart.dispose(chart)
+    }
 }
