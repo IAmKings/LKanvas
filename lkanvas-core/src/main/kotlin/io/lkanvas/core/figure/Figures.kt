@@ -59,7 +59,18 @@ object FigureHit {
         }
         is Figure.Arc -> {
             val d = hypot(x - figure.centerX, y - figure.centerY)
-            abs(d - figure.radius) <= tolerance && withinAngle(figure, x, y)
+            if (abs(d - figure.radius) <= tolerance && withinAngle(figure, x, y)) return true
+            // e829f30e（上游 main 2026-10-30 合入）：弧两端点的线宽容差——
+            // 角度略越过起止角但距端点 ≤ tolerance 时命中（R14 采纳）
+            fun endpoint(axDeg: Double): P =
+                P(
+                    figure.radius * kotlin.math.cos(Math.toRadians(axDeg)) + figure.centerX,
+                    figure.radius * kotlin.math.sin(Math.toRadians(axDeg)) + figure.centerY,
+                )
+            val startP = endpoint(figure.startAngleDeg)
+            val endP = endpoint(figure.endAngleDeg)
+            hypot(x - startP.x, y - startP.y) <= tolerance ||
+                hypot(x - endP.x, y - endP.y) <= tolerance
         }
         is Figure.Path -> {
             var i = 0
