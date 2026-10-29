@@ -313,7 +313,9 @@ object PaneRenderers {
         top: Float,
         bottom: Float,
     ) {
+        // R08（复审 2026-10-30）：可见性过滤进管线（隐藏实例不参与值域与绘制）
         val insts = state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
+            .filter { it.visible }
         val valid = insts.mapNotNull { it.state }
         if (valid.isEmpty()) return
         val candles = state.dataSnapshot.candles
@@ -353,7 +355,9 @@ object PaneRenderers {
                         ),
                     )
                 } else {
-                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow, styleOverrideOf = styleOverrideFor(inst))
+                    // R08：统一 figure 管线——按 PlotDef.type 分发 line/bar（含 baseValue），
+                    // attrs/styles 逐行求值；27 显示模板不再依赖专用 renderer
+                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow)
                 }
                 paletteIdx += res.result.keys.size
             }
@@ -680,28 +684,105 @@ object PaneRenderers {
     }
 
     /**
+     * R08（复审 2026-10-30）：统一 figure 绘制管线——按 `plotsFor(params)` 的
+     * PlotDef.type 分发 LINE（drawLinePlots 批量）/BAR（drawBarPlots，含
+     * baseValue 基线），attrs/styles 逐行求值；上游 view/IndicatorView
+     * eachFigures 的类型分发等价物。
+     */
+    fun DrawScope.drawInstanceFigures(
+        inst: io.lkanvas.core.indicator.IndicatorInstance,
+        res: io.lkanvas.core.indicator.IndicatorResultState,
+        vp: io.lkanvas.core.viewport.Viewport,
+        range: VisibleRange,
+        y: (Double) -> Double,
+        theme: ChartTheme,
+        paletteOffset: Int,
+        lastValueMark: Boolean,
+    ) {
+        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+        val override = styleOverrideFor(inst)
+        val lineKeys = ArrayList<String>()
+        val barEntries = ArrayList<Pair<String, Double?>>() // key → baseValue
+        for ((key, plot) in plots) {
+            if (key !in res.result.keys) continue
+            when (plot.type) {
+                io.lkanvas.core.indicator.PlotType.BAR -> barEntries += key to plot.baseValue
+                else -> lineKeys += key
+            }
+        }
+        // 顺序：先线后柱（与内置 MACD DIF/DEA→柱 口径一致）
+        if (lineKeys.isNotEmpty()) {
+            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = override)
+        }
+        if (barEntries.isNotEmpty()) {
+            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, override)
+        }
+    }
+
+    /**
+     * R08：BAR 型 figure 绘制——值→baseValue 的柱体（缺省基线 0），宽随
+     * barSpacing gapRatio，颜色按行级 styles/attrs 求值（缺省 palette）。
+     */
+    private fun DrawScope.drawBarPlots(
+        res: io.lkanvas.core.indicator.IndicatorResultState,
+        vp: io.lkanvas.core.viewport.Viewport,
+        range: VisibleRange,
+        y: (Double) -> Double,
+        barEntries: List<Pair<String, Double?>>,
+        palette: List<Color>,
+        paletteOffset: Int,
+        override: ((String, Int) -> Pair<Color?, Float?>)?,
+    ) {
+        val gap = (vp.barSpacing * 0.25).coerceAtMost(vp.barSpacing - 1.0).coerceAtLeast(0.0).toFloat()
+        val bodyWidth = (vp.barSpacing - gap).coerceAtLeast(1.0).toFloat()
+        for ((bi, entry) in barEntries.withIndex()) {
+            val (key, baseValue) = entry
+            val col = res.result[key] ?: continue
+            val base = baseValue ?: 0.0
+            val baseY = y(base).toFloat()
+            for (i in range.first..range.last) {
+                val v = col[i]
+                if (v.isNaN()) continue
+                val x = vp.candleCenterX(i.toDouble()).toFloat()
+                val vy = y(v).toFloat()
+                val top = minOf(vy, baseY)
+                val hgt = kotlin.math.abs(vy - baseY).coerceAtLeast(0.5f)
+                val (c0, w0) = override?.invoke(key, i) ?: (null to null)
+                val color = c0 ?: palette[(bi + paletteOffset) % palette.size]
+                val w = (w0 ?: 1f) * bodyWidth
+                drawRect(
+                    color,
+                    topLeft = Offset(x - w / 2f, top),
+                    size = androidx.compose.ui.geometry.Size(w, hgt),
+                )
+            }
+        }
+    }
+
+    /**
      * 实例 PlotDef.styles → drawLinePlots 行级样式回调（SLA-013/IND 消费链）。
      * PlotDef.styles 协议：`(row: Int, params: List<Double>) -> Map<String,String>`
      * 或 `(row: Int) -> Map<String,String>`；null=无覆盖。
      */
     fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int) -> Pair<Color?, Float?>)? {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
-        if (plots.values.all { it.styles == null }) return null
+        if (plots.values.all { it.styles == null && it.attrs == null }) return null
+        // R08：attrs 与 styles 同协议逐行求值（styles 优先，attrs 兜底）
+        fun evaluate(value: Any?, row: Int): Map<*, *>? = when (value) {
+            null -> null
+            is Function2<*, *, *> ->
+                @Suppress("UNCHECKED_CAST")
+                (value as (Int, List<Double>) -> Any?)(row, inst.params) as? Map<*, *>
+            is Function1<*, *> ->
+                @Suppress("UNCHECKED_CAST")
+                (value as (Int) -> Any?)(row) as? Map<*, *>
+            is Map<*, *> -> value
+            else -> null
+        }
         return { key, row ->
-            val stylesVal = plots[key]?.styles
-            val map: Map<*, *>? = when (stylesVal) {
-                null -> null
-                is Function2<*, *, *> ->
-                    @Suppress("UNCHECKED_CAST")
-                    (stylesVal as (Int, List<Double>) -> Any?)(row, inst.params) as? Map<*, *>
-                is Function1<*, *> ->
-                    @Suppress("UNCHECKED_CAST")
-                    (stylesVal as (Int) -> Any?)(row) as? Map<*, *>
-                is Map<*, *> -> stylesVal
-                else -> null
-            }
-            val color = map?.get("color")?.toString()?.let { io.lkanvas.compose.theme.StylesThemeBridge.parse(it) }
-            val width = map?.get("lineWidth")?.let { (it as? Number)?.toFloat() ?: it.toString().toFloatOrNull() }
+            val map = (evaluate(plots[key]?.attrs, row) ?: emptyMap<Any?, Any>()) + (evaluate(plots[key]?.styles, row) ?: emptyMap<Any?, Any>())
+            val color = map["color"]?.toString()?.let { io.lkanvas.compose.theme.StylesThemeBridge.parse(it) }
+            val width = map["lineWidth"]?.let { (it as? Number)?.toFloat() ?: it.toString().toFloatOrNull() }
             color to width
         }
     }

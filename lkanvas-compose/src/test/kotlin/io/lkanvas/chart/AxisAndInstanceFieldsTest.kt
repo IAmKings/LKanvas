@@ -550,4 +550,41 @@ class AxisAndInstanceFieldsTest {
         org.junit.Assert.assertNotNull(chart.state.macdPaneResult())
         LKanvasChart.dispose(chart)
     }
+
+    // ---------- 0.7.0 R08：统一 figure 管线（attrs/styles 逐行求值） ----------
+
+    @Test
+    fun `figure管线attrs与styles逐行求值（R08）`() {
+        // 自定义模板：PlotDef.attrs 供色、styles 覆盖线宽（styles 优先）
+        val def = object : io.lkanvas.core.indicator.IndicatorDefinition {
+            override val name = "audit_fig"
+            override val shortName = "AF"
+            override val calcParams = emptyList<Double>()
+            override val precision = 2
+            override val plots = listOf(
+                io.lkanvas.core.indicator.PlotDef(
+                    key = "k",
+                    title = "K: ",
+                    type = io.lkanvas.core.indicator.PlotType.LINE,
+                    attrs = { row: Int -> mapOf("color" to if (row % 2 == 0) "#111111" else "#222222") },
+                    styles = { row: Int -> mapOf("lineWidth" to "${row + 1}") },
+                ),
+            )
+            override fun initScratch(params: List<Double>): Any? = null
+            override fun stepScratch(prev: Any?, candles: List<io.lkanvas.core.data.Candle>, params: List<Double>, i: Int): Any? = null
+            override fun rowFromScratch(scratch: Any?, candles: List<io.lkanvas.core.data.Candle>, params: List<Double>, i: Int): Map<String, Double> = emptyMap()
+            override fun calc(candles: List<io.lkanvas.core.data.Candle>, params: List<Double>): List<Map<String, Double>> = candles.map { emptyMap() }
+        }
+        val inst = io.lkanvas.core.indicator.IndicatorInstance("audit_fig_inst", def)
+        val override = io.lkanvas.compose.draw.PaneRenderers.styleOverrideFor(inst)
+        val overrideFn = override
+        kotlin.test.assertNotNull(overrideFn, "attrs/styles 有消费者（R08）")
+        val (c0, w0) = overrideFn!!("k", 0)
+        kotlin.test.assertNotNull(c0, "attrs 供色")
+        assertEquals(1f, w0!!, "styles 供线宽（row=0 → 1）")
+        val (c1, w1) = overrideFn("k", 3)
+        kotlin.test.assertNotNull(c1, "逐行 attrs 求值（row=3 色≠row=0）")
+        assertTrue(c0 != c1, "逐行求值（row=3 色 ≠ row=0）")
+        assertEquals(4f, w1!!, "逐行求值（row=3 → 4）")
+    }
 }
