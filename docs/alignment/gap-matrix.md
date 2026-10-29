@@ -109,7 +109,7 @@
 | CH-041 | `resetData` | Chart.ts:789 | ChartDataStore.reset | B | test | S | 2a |  |
 | CH-042 | `getDataList` | Chart.ts:793 | dataSnapshot.candles | B | test | S | 2a |  |
 | CH-043 | `setDataLoader` | Chart.ts:797 | ChartLoader+HistorySource 构造注入 | B | test+parity | M | 2a | 运行时替换+四 type 适配（init/forward/backward/update） |
-| CH-044 | `createIndicator` | Chart.ts:802 | 门面 createIndicator(name, calcParams, paneId, isStack) 已建 | B | test+parity | M | 2b | isStack 依赖 pane 模型（批次 5） |
+| CH-044 | `createIndicator` | Chart.ts:802 | createIndicator isStack 语义接线：false=替换 pane 内全部非内置实例（上游 Store.addIndicator 同语义）、true=叠加；removeIndicator 改全删匹配 | B | test+parity | M | 2b | isStack 依赖 pane 模型（批次 5） |
 | CH-045 | `overrideIndicator` | Chart.ts:837 | 门面 overrideIndicator(id, calcParams, visible) 已建 | B | test | M | 2b | styles/visible/extendData… |
 | CH-046 | `getIndicators` | Chart.ts:863 | 门面 getIndicators(filter) 已建 | B | test | S | 2b | filter{id,name,paneId,isStack} |
 | CH-047 | `removeIndicator` | Chart.ts:867 | 门面 removeIndicator(filter) 已建 | B | test | M | 2b |  |

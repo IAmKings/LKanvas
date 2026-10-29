@@ -104,6 +104,11 @@ class ChartState(
         styles: Any? = null,
     ): String? {
         val def = registry.get(name) ?: return null
+        // 上游 Store.addIndicator isStack 语义（CH-044 收口）：isStack=false →
+        // 先移除该 pane 全部现有非内置指标（替换），true → 叠加
+        if (!isStack) {
+            removeIndicator(IndicatorFilter(paneId = paneId))
+        }
         val id = "ind_${++indicatorIdSerial}_${name}"
         val inst = IndicatorInstance(id, def, params ?: def.calcParams, paneId, yAxisId, styles)
         indicatorInstances.add(inst)
@@ -112,19 +117,17 @@ class ChartState(
         return id
     }
 
-    /** 实例过滤（上游 IndicatorFilter：id/name/paneId/isStack 任意组合）。 */
+    /** 实例过滤（上游 IndicatorFilter：id/name/paneId 任意组合）。 */
     data class IndicatorFilter(
         val id: String? = null,
         val name: String? = null,
         val paneId: String? = null,
-        val isStack: Boolean? = null,
     )
 
     private fun IndicatorInstance.matches(f: IndicatorFilter): Boolean =
         (f.id == null || id == f.id) &&
             (f.name == null || definition.name == f.name) &&
-            (f.paneId == null || paneId == f.paneId) &&
-            (f.isStack == null || true) // isStack 全量语义在 pane 模型（批次 5），当前恒匹配
+            (f.paneId == null || paneId == f.paneId)
 
     /** 上游 getIndicators(filter?)。 */
     fun getIndicators(filter: IndicatorFilter = IndicatorFilter()): List<IndicatorInstance> =
@@ -144,13 +147,13 @@ class ChartState(
         return true
     }
 
-    /** 上游 removeIndicator(filter)：删除首个匹配；内置默认实例不可删。 */
+    /** 上游 removeIndicator(filter)：删除全部匹配（内置默认实例保护）；上游为 forEach 全删。 */
     fun removeIndicator(filter: IndicatorFilter): Boolean {
-        if (filter.id?.startsWith("builtin-") == true) return false
-        val target = indicatorInstances.firstOrNull {
+        val targets = indicatorInstances.filter {
             it.matches(filter) && !it.id.startsWith("builtin-")
-        } ?: return false
-        indicatorInstances.remove(target)
+        }
+        if (targets.isEmpty()) return false
+        indicatorInstances.removeAll(targets.toSet())
         advanceIndicators(dataSnapshot, null)
         viewRevision++
         return true
