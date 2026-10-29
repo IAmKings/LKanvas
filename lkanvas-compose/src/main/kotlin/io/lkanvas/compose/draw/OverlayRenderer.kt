@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
 import io.lkanvas.core.overlay.OverlayConstraint
+import io.lkanvas.core.figure.Figure
 import io.lkanvas.core.overlay.OverlayGeometry
 import io.lkanvas.core.overlay.OverlayInstance
 import io.lkanvas.core.overlay.OverlayPhase
@@ -114,11 +115,63 @@ object OverlayRenderer {
                 for (i in 1 until px.size) path.lineTo(px[i].x, px[i].y)
                 drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f, pathEffect = dash?.let { PathEffect.dashPathEffect(it) }))
             }
+            // 0.4.x figure 样例：宿主自定义模板经 createPointFigures 钩子返回
+            // Figure 原语描述（UpperCamelCase 类型名 → core Figure 映射）
+            else -> {
+                val def = io.lkanvas.core.overlay.OverlayTemplates[inst.templateName]
+                    ?: io.lkanvas.chart.LkanvasRegistry.getOverlayDefinition(inst.templateName)
+                val figures = def?.createPointFigures(
+                    inst.points, bounds.width, bounds.height,
+                    pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble()) },
+                )
+                if (figures != null) {
+                    for ((figureType, attrs, styles) in figures) {
+                        val figColor = parseFigureColor(styles["color"]) ?: color
+                        val fig = figureFromDescription(figureType, attrs) ?: continue
+                        with(io.lkanvas.compose.draw.FigureRenderer) {
+                            drawFigure(fig, figColor, strokeWidth = styles["lineWidth"]?.toFloatOrNull() ?: 2f)
+                        }
+                    }
+                }
+            }
         }
         // 控制点（非连续模板；选中或创建中）
         val def = io.lkanvas.core.overlay.OverlayTemplates[inst.templateName]
+            ?: io.lkanvas.chart.LkanvasRegistry.getOverlayDefinition(inst.templateName)
         if (def?.continuous != true && (selected || creating)) {
             px.forEach { drawControlPoint(it, theme.overlayPoint) }
+        }
+    }
+
+    /** styles["color"]（'#RRGGBB'）→ Compose Color；非法返回 null（回退主题色）。 */
+    private fun parseFigureColor(hex: String?): Color? {
+        val h = hex?.removePrefix("#") ?: return null
+        if (h.length != 6) return null
+        return runCatching {
+            Color(
+                red = h.substring(0, 2).toInt(16) / 255f,
+                green = h.substring(2, 4).toInt(16) / 255f,
+                blue = h.substring(4, 6).toInt(16) / 255f,
+                alpha = 1f,
+            )
+        }.getOrNull()
+    }
+
+    /** 钩子描述 → core Figure 原语（attrs 按各原语字段序取 Double；缺字段返回 null）。 */
+    private fun figureFromDescription(figureType: String, attrs: List<List<Double>>): Figure? {
+        // 兼容两种 attrs 布局：每字段一子 list（[[v0],[v1],…]）或单子 list 全字段（[[v0,v1,…]]）
+        fun d(i: Int): Double? =
+            attrs.getOrNull(i)?.getOrNull(0) ?: attrs.getOrNull(0)?.getOrNull(i)
+        return when (figureType) {
+            "Circle" -> Figure.Circle(d(0) ?: return null, d(1) ?: return null, d(2) ?: return null)
+            "Line" -> Figure.Line(d(0) ?: return null, d(1) ?: return null, d(2) ?: return null, d(3) ?: return null)
+            "Rect" -> Figure.Rect(d(0) ?: return null, d(1) ?: return null, d(2) ?: return null, d(3) ?: return null)
+            "Polygon" -> Figure.Polygon(attrs.mapNotNull { p ->
+                if (p.size >= 2) io.lkanvas.core.figure.P(p[0], p[1]) else null
+            })
+            "Arc" -> Figure.Arc(d(0) ?: return null, d(1) ?: return null, d(2) ?: return null, d(3) ?: return null, d(4) ?: return null)
+            "Text" -> Figure.Text(d(0) ?: return null, d(1) ?: return null, attrs.getOrNull(2)?.joinToString(",") { v -> v.toString() } ?: "")
+            else -> null
         }
     }
 

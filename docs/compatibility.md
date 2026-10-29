@@ -122,6 +122,7 @@
 | 2026-10-29 | **0.4.0 发版（多轴渲染 Alpha + 性能门槛全绿）**：切版 0.4.0（publishing/LKanvasChart.VERSION/consumer 依赖）；全量回归绿（core+compose 测试 + assembleRelease）；制品发布 build/maven-repo，consumer 仅凭制品重编通过（A-46 保持）；check.py 七面校验通过（E=0）。发版内容：多轴渲染 Alpha（CH-053~056/IND-003 消费端）、tooltip DrawOp 录制回放 + TextMeasurer 缓存 + 时间标签缓存（B-02 帧耗时 -67%）、指标线 native drawLines 批量提交（累计 -67%）、B-03 分批注入（首批可交互 54ms/就绪 1895ms 达标）、视口重绘订阅缺失修复、recompute plotsFor 假列修复；性能门槛 PRD 7.3 全表实测达标（B-01~B-06），余量：R8 口径帧数据、B-05 heap dump 口径、动态 pane/isStack、多轴完整版 |
 | 2026-10-29 | **isStack 语义接线（CH-044 收口，0.4.0 后）**：createIndicator(isStack=false) 先移除该 pane 全部现有非内置实例再创建（上游 Store.addIndicator 同语义）、true 叠加；顺带修 removeIndicator 只删首个匹配→全删匹配（上游 forEach 全删语义）。测试 createIndicator_isStackReplaceAndStack（叠加共存/替换清除/内置保护/跨 pane 隔离）——compose 89 测试全绿 |
 | 2026-10-29 | **诊断可视化（T-30 余量收口）+ 平台 fling 曲线**：诊断——渲染计时接线（lastRenderNanos/renderCount，关闭零开销不变）+ 样例 DiagnosticsPanel（采集开关/summary/最近 12 条环形缓冲/导出 cacheDir），真机实测「计算 0.04ms×33 次；绘制 12.91ms×14 帧」+ 导出写入成功；fling——手写指数衰减替换为平台 OverScroller native spline（RecyclerView 同款，KLineChart 注入、null 回退保 JVM 测试），真机惯性滚动验证通过 |
+| 2026-10-29 | **figure 宿主自定义模板样例（T-30/长尾收口）**：OverlayRenderer 补 createPointFigures 钩子渲染消费（自定义模板 → Figure 原语 → FigureRenderer，styles 色与线宽消费）；钩子签名补 pixelPoints 参数（上游 coordinates 语义——渲染层换算好的控制点像素坐标）；样例 FigureSamples（circle/rect/polygon/arc 四模板注册 + 样例「图例+」按钮编程式创建）；门面 createOverlay 与 OverlayRenderer 模板解析加宿主注册表回退（此前只查 core 内置 16 表，registerOverlay 注册的自定义模板创建即 null）；映射器兼容两种 attrs 布局（每字段一子 list/单子 list 全字段）。真机验证四原语全部正确渲染（紫圆/蓝弧/绿矩形/橙多边形） |
 
 ## 6. 已知问题与后续计划
 

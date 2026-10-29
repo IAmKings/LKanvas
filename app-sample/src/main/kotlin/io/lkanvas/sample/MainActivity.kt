@@ -43,6 +43,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // figure 宿主自定义模板样例注册（T-30 余量：circle/rect/polygon/arc）
+        FigureSamples.registerAll()
         // 性能线 P1（PRD 7.2）：stress 负载模式（Macrobenchmark B-02 扩展负载注入）
         val stress = takeIf { intent?.getBooleanExtra("stress_mode", false) == true }?.let {
             io.lkanvas.sample.StressConfig(
@@ -207,6 +209,33 @@ class MainActivity : ComponentActivity() {
                             onClick = { customLegendOn = !customLegendOn },
                             modifier = Modifier.padding(start = 8.dp),
                         ) { Text(if (customLegendOn) "槽" else "内") }
+                        // figure 样例演示：编程式创建 4 个宿主自定义覆盖物（当前视口范围）
+                        Button(
+                            onClick = {
+                                val candles = state.dataSnapshot.candles
+                                if (candles.isNotEmpty()) {
+                                    val from = state.viewport.scrollIndex
+                                    val to = state.viewport.scrollIndex + state.viewport.visibleCount
+                                    val ts0 = candles[from.toInt().coerceIn(0, candles.size - 1)].timestamp
+                                    val ts1 = candles[to.toInt().coerceIn(0, candles.size - 1)].timestamp
+                                    val mid = (ts0 + ts1) / 2
+                                    // 可见区价格范围（保证映射后的 y 在 pane 内可见）
+                                    val (vlo, vhi) = state.mainPaneRange() ?: return@Button
+                                    val hi = vhi
+                                    val lo = vlo
+                                    val span = hi - lo
+                                    android.util.Log.i(
+                                        "LKanvasFig",
+                                        "circle=${chartFacade.createOverlay(io.lkanvas.chart.OverlayCreate("sample_circle", points = listOf(io.lkanvas.core.overlay.OverlayPoint(mid - 60_000L, lo + span * 0.7), io.lkanvas.core.overlay.OverlayPoint(mid + 60_000L, lo + span * 0.3))))}" +
+                                            " rect=${chartFacade.createOverlay(io.lkanvas.chart.OverlayCreate("sample_rect", points = listOf(io.lkanvas.core.overlay.OverlayPoint(ts0, hi - span * 0.2), io.lkanvas.core.overlay.OverlayPoint(mid, hi))))}" +
+                                            " poly=${chartFacade.createOverlay(io.lkanvas.chart.OverlayCreate("sample_polygon", points = listOf(io.lkanvas.core.overlay.OverlayPoint(ts0, lo + span * 0.2), io.lkanvas.core.overlay.OverlayPoint(mid, lo + span * 0.1), io.lkanvas.core.overlay.OverlayPoint(mid, lo + span * 0.4), io.lkanvas.core.overlay.OverlayPoint(ts0, lo + span * 0.5))))}" +
+                                            " arc=${chartFacade.createOverlay(io.lkanvas.chart.OverlayCreate("sample_arc", points = listOf(io.lkanvas.core.overlay.OverlayPoint(mid, lo + span * 0.6), io.lkanvas.core.overlay.OverlayPoint(ts1, lo + span * 0.9))))}",
+                                    )
+                                    state.notifyOverlayChanged()
+                                }
+                            },
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) { Text("图例+") }
                         // 0.4.0 多轴演示：创建自定义轴 + 绑定 MA(10)（独立值域 + 独立标签列）
                         var multiAxisOn by remember { androidx.compose.runtime.mutableStateOf(false) }
                         Button(

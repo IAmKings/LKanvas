@@ -532,7 +532,10 @@ class LKanvasChart private constructor(
      * - 数组 → 批量，逐一返回（失败位为 null）。
      */
     fun createOverlay(value: OverlayCreate, paneId: String = "main"): String? {
-        val template = io.lkanvas.core.overlay.OverlayTemplates[value.name] ?: return null
+        // 模板解析：core 内置 16 表优先，回退宿主注册表（registerOverlay 注册的自定义模板）
+        val template = io.lkanvas.core.overlay.OverlayTemplates[value.name]
+            ?: LkanvasRegistry.getOverlayDefinition(value.name)
+            ?: return null
         if (value.points.isEmpty()) {
             // 交互式（同门面 currentTool 流程）
             return state.overlays.beginCreate(template)

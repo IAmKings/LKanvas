@@ -59,6 +59,8 @@ interface OverlayDefinition {
         points: List<OverlayPoint>,
         boundingWidth: Double,
         boundingHeight: Double,
+        /** 渲染层换算好的控制点像素坐标 [[x,y],...]（上游 coordinates 语义）。 */
+        pixelPoints: List<List<Double>> = emptyList(),
     ): List<Triple<String, List<List<Double>>, Map<String, String>>>? = null
 
     /** 上游 createXAxisFigures 钩子（x 轴区域附加图形）。 */
