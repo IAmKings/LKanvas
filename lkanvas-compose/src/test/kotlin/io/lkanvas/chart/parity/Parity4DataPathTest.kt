@@ -110,39 +110,39 @@ class Parity4DataPathTest {
         val loader = ScriptedLoader()
         val chart = newChartWith(loader)
         drain()
-        // init：10 根，双向均有更多
+        // init：10 根，双向均有更多——R03 语义：at latest（to==total）且 backward=true
+        // 时自动续拉（上游 _adjustVisibleRange 无"仅手势"限制），首个 BACKWARD 自动发出
         loader.respondInit((0 until 10).map { candle(it * 60_000L, 100.0 + it) }, DataLoadMore(true, true))
         drain()
-        assertEquals(listOf<Pair<DataLoadType, Long?>>(DataLoadType.INIT to null), loader.requests, "仅 INIT")
+        assertEquals(
+            listOf(DataLoadType.INIT to null, DataLoadType.BACKWARD to 540_000L),
+            loader.requests,
+            "init 后自动边界续拉（R03）",
+        )
+
+        // 自动 BACKWARD 响应：backward 停止、forward 保留
+        loader.respondBackward(
+            (0 until 3).map { candle(1_000_000L + it * 60_000L, 200.0 + it) },
+            DataLoadMore(false, true),
+        )
+        drain()
+        assertEquals(13, chart.getDataList().size, "backward 尾追")
 
         // 滚到最左（from==0）→ forward 拉取（上游 _adjustVisibleRange：from===0 && forward）
         chart.scrollToDataIndex(0)
         drain()
-        assertEquals(2, loader.requests.size, "边界触发 FORWARD")
-        assertEquals(DataLoadType.FORWARD, loader.requests[1].first)
+        assertEquals(3, loader.requests.size, "边界触发 FORWARD")
+        assertEquals(DataLoadType.FORWARD, loader.requests[2].first)
 
-        // forward 响应 more(backward=true, forward=false)：头插 5 根更早数据
-        loader.respondForward((0 until 5).map { candle(it * 60_000L - 300_000L, 90.0 + it) }, DataLoadMore(true, false))
+        // forward 响应 more(forward=false)：头插 5 根后同方向停止
+        loader.respondForward((0 until 5).map { candle(it * 60_000L - 300_000L, 90.0 + it) }, DataLoadMore(false, false))
         drain()
-        assertEquals(15, chart.getDataList().size, "forward 头插")
+        assertEquals(18, chart.getDataList().size, "forward 头插")
 
-        // forward 已无更多（同方向 more 更新为 false）→ 再滚到最左不再请求
+        // 再滚到最左：forward 已无更多 → 不再请求；to 钳制后 5 ≠ 18 也不触发 backward
         chart.scrollToDataIndex(0)
         drain()
-        assertEquals(2, loader.requests.size, "more.forward=false 后停止")
-
-        // 滚到最右（to==total）→ backward 拉取
-        chart.scrollToRealTime()
-        drain()
-        assertEquals(3, loader.requests.size, "边界触发 BACKWARD")
-        assertEquals(DataLoadType.BACKWARD, loader.requests[2].first)
-
-        // backward 响应 more(backward=false)：尾追后同方向停止
-        loader.respondBackward((0 until 3).map { candle(1_000_000L + it * 60_000L, 200.0 + it) }, DataLoadMore(false, false))
-        drain()
-        chart.scrollToRealTime()
-        drain()
-        assertEquals(3, loader.requests.size, "more.backward=false 后停止")
+        assertEquals(3, loader.requests.size, "more 双 false 后停止")
 
         LKanvasChart.dispose(chart)
     }
@@ -154,14 +154,14 @@ class Parity4DataPathTest {
         drain()
         loader.respondInit((0 until 10).map { candle(1000L + it * 60_000L, 100.0 + it) }, DataLoadMore(true, true))
         drain()
-        // backward 请求携带末根时间戳；forward 携带首根（上游 _processDataLoad switch）
-        chart.scrollToRealTime()
+        // R03：init 后自动 BACKWARD（at latest 且 backward=true），携带末根时间戳
+        // （上游 _processDataLoad switch：backward 取末根）
         drain()
         assertEquals(1000L + 9 * 60_000L, loader.requests.last().second, "backward=末根时间戳")
-        // 回调 backward（上游 loading 门禁：未回调前后续拉取不重入）
+        // 回调 backward：backward 停止、forward 保留（loading 门禁解除）
         loader.respondBackward(
             (0 until 3).map { candle(600_000L + it * 60_000L, 200.0 + it) },
-            DataLoadMore(true, true),
+            DataLoadMore(false, true),
         )
         drain()
         chart.scrollToDataIndex(0)

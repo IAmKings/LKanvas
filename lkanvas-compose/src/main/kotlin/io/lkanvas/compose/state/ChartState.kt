@@ -852,6 +852,12 @@ class ChartState(
             }
             advanceIndicators(snap, change)
             viewRevision++
+            // R03（复审 2026-10-30）：镜像上游 _addData 尾部 adjustFlag →
+            // _adjustVisibleRange——数据**实际提交**并调整视口后统一发出范围
+            // 变化，经 onVisibleRangeChanged → Store.adjustVisibleRangeBoundary
+            // 形成自动续拉链（loading/more 门禁防重入；INIT 1 根+more=true
+            // 无手势也会填满窗口）
+            emitRangeChange()
             notifyArchiveDirty(hasContent = snap.candles.isNotEmpty() || overlays.all().isNotEmpty())
         }
         scope.launch { engine.run() }
@@ -859,7 +865,9 @@ class ChartState(
 
     private fun adjustViewport(change: AppliedChange, prevCount: Int) {
         when (change.op) {
-            io.lkanvas.core.store.DataOp.RESET -> Unit // layout 已按最新定位
+            // Reset（init/切会话）：回到最新（上游 init 定位语义；layout 的
+            // wasAtLatest 启发式对"旧 scrollIndex + 新数据量"不成立，不能依赖）
+            io.lkanvas.core.store.DataOp.RESET -> viewport.onReset(dataSnapshot.candles.size)
             io.lkanvas.core.store.DataOp.PREPEND_HISTORY -> viewport.onPrepended(change.prependedCount)
             else -> if (change.appendedCount > 0) {
                 viewport.onAppended(change.appendedCount, prevCount, followLatest)

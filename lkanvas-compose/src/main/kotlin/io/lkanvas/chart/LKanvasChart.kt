@@ -423,23 +423,34 @@ class LKanvasChart private constructor(
      */
     private val store: Store = Store(storeHost())
 
+    /**
+     * R02（复审 2026-10-30）：应用动作使用 Store 在检查点解析的 [key]——
+     * 协程执行期**不得**重读 currentKey()（排队中的切换会把旧回调数据
+     * 标记成新品种）。应用为"已受理即返回 true"；数据落库后的范围调整/
+     * 边界续拉由 [ChartState] 的 onSnapshot 统一驱动（R03，镜像上游
+     * _addData → _adjustVisibleRange 提交后链）。
+     */
     private fun storeHost() = object : Store.Host {
-        override fun applyInit(data: List<Candle>): Boolean {
-            scope.launch { state.reset(currentKey(), data) }
+        override fun applyInit(key: MarketKey, data: List<Candle>): Boolean {
+            scope.launch {
+                state.reset(key, data)
+                // init 重载后按上游 _addData init 分支重放右侧留白（应用完成后）
+                offsetRightDistanceInternal?.let { d -> setOffsetRightDistance(d) }
+            }
             return true
         }
 
-        override fun applyBackward(data: List<Candle>): Boolean {
+        override fun applyBackward(key: MarketKey, data: List<Candle>): Boolean {
             scope.launch { state.appendBatch(data) }
             return true
         }
 
-        override fun applyForward(data: List<Candle>): Boolean {
+        override fun applyForward(key: MarketKey, data: List<Candle>): Boolean {
             scope.launch { state.prependHistory(data) }
             return true
         }
 
-        override fun applyUpdate(candle: Candle): Boolean {
+        override fun applyUpdate(key: MarketKey, candle: Candle): Boolean {
             scope.launch { state.upsertLatest(candle) }
             return true
         }
@@ -449,14 +460,6 @@ class LKanvasChart private constructor(
         override fun firstTimestamp(): Long? = state.dataSnapshot.candles.firstOrNull()?.timestamp
 
         override fun lastTimestamp(): Long? = state.dataSnapshot.candles.lastOrNull()?.timestamp
-
-        override fun onDataAdjusted(type: DataLoadType) {
-            // 上游 _addData 成功分支：_adjustVisibleRange + init 时 setOffsetRightDistance 重放；
-            // 本域视口派生与重算由内核在写入路径完成，事件经 onVisibleRangeChanged 自然触发
-            if (type == DataLoadType.INIT) {
-                offsetRightDistanceInternal?.let { d -> setOffsetRightDistance(d) }
-            }
-        }
     }
 
     /** 上游 `setDataLoader(loader)`：经 Store.resetData（退订 → 变更 → 清 loading → init）。 */
@@ -471,9 +474,6 @@ class LKanvasChart private constructor(
     fun resetData() {
         scope.launch { store.resetData() }
     }
-
-    private fun currentKey(): MarketKey =
-        MarketKey(store.symbol?.ticker ?: "UNKNOWN", store.period?.toString() ?: "UNKNOWN")
 
     // ---------- 生命周期 ----------
 

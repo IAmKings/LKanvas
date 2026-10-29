@@ -21,9 +21,12 @@ import io.lkanvas.core.data.Candle
  * - [resetData]：**退订旧上下文 → 配置变更 → 清 loading → init 拉取**（上游
  *   `Store.resetData` 顺序，SLA-006）。
  *
- * 本地增强（上游无，D 类登记 SLA-006）：**请求代次门禁**——每次 [processDataLoad]
- * 递增 [generation] 并捕获，回调与订阅推送校验代次，旧代次回调整体丢弃，
- * 在途切品种时旧数据不会写入新会话（上游依赖退订时序，无门禁）。
+ * 本地增强（上游无，D 类登记 SLA-006/R01/R02）：
+ * - **请求代次门禁**：每次 [processDataLoad] 递增 [generation]，仅丢弃同向在途请求回调；
+ * - **订阅会话代次** [subscriptionGeneration]：仅退订/重置递增——普通分页不使
+ *   同品种实时订阅失效（R01，上游订阅跨分页存活 Store.ts:779）；
+ * - **检查点 key 绑定**：应用动作携带接受时解析的 [MarketKey]（R02），
+ *   宿主异步提交不得重读可变当前上下文。
  *
  * 线程：非线程安全；宿主（门面）负责在单写者上下文中调用（回调可来自任意线程，
  * 由宿主串行化后转发给 [Host] 的应用函数）。
@@ -33,31 +36,34 @@ class Store(private val host: Host) {
     /** 串行化锁：回调可能来自任意线程（loader 异步回调/订阅推送）。 */
     private val lock = Any()
 
-    /** 宿主桥：数据应用与快照查询（由内核状态的实现方提供）。 */
+    /**
+     * 宿主桥：数据应用与快照查询（由内核状态的实现方提供）。
+     *
+     * R02（复审 2026-10-30）：[key] 由 [Store] 在**接受检查的同一锁临界区内**
+     * 解析并随动作传递——宿主的异步应用必须使用该 key，不得在执行期重新读取
+     * 可变当前上下文（否则排队中的切换会把旧回调数据标记成新品种）。
+     */
     interface Host {
         /** init：清空重置并写入初始数据；返回是否接受。 */
-        fun applyInit(data: List<Candle>): Boolean
+        fun applyInit(key: MarketKey, data: List<Candle>): Boolean
 
         /** backward：尾部追加；返回是否接受。 */
-        fun applyBackward(data: List<Candle>): Boolean
+        fun applyBackward(key: MarketKey, data: List<Candle>): Boolean
 
         /** forward：头部前插；返回是否接受。 */
-        fun applyForward(data: List<Candle>): Boolean
+        fun applyForward(key: MarketKey, data: List<Candle>): Boolean
 
         /**
          * update：单根推送——大于末根 push、等于替换、小于忽略（上游 `_addData`
          * 单根分支）；返回是否生效（含 adjustFlag 判定）。
          */
-        fun applyUpdate(candle: Candle): Boolean
+        fun applyUpdate(key: MarketKey, candle: Candle): Boolean
 
         /** 当前数据根数（to===total 判定）。 */
         fun candleCount(): Int
 
         fun firstTimestamp(): Long?
         fun lastTimestamp(): Long?
-
-        /** 成功写入且需要调整视口/重算（上游 `_addData` 尾部 adjustFlag 分支）。 */
-        fun onDataAdjusted(type: DataLoader.DataLoadType)
     }
 
     var dataLoader: DataLoader? = null
@@ -75,8 +81,20 @@ class Store(private val host: Host) {
     var loadMoreBackward = false
         private set
 
-    /** 请求代次（本地增强）：每次拉取递增；回调校验不匹配即丢弃。 */
+    /**
+     * 请求代次（本地增强）：每次拉取递增；**仅**用于丢弃同向在途请求的回调——
+     * FORWARD/BACKWARD 递增不得影响实时订阅（R01，复审 2026-10-30：上游分页
+     * 不替换/废弃同会话订阅，Store.ts:779）。
+     */
     internal var generation = 0L
+        private set
+
+    /**
+     * 订阅会话代次（R01 修复）：仅在退订/重置（[processDataUnsubscribe]）时递增；
+     * 实时订阅回调校验本代次——普通分页请求的 [generation] 递增不再使
+     * 同品种订阅推送失效。
+     */
+    internal var subscriptionGeneration = 0L
         private set
 
     /** 诊断用：当前请求代次（测试探针）。 */
@@ -120,7 +138,8 @@ class Store(private val host: Host) {
         val s = symbol
         val p = period
         if (l != null && s != null && p != null) {
-            generation++ // 使在途回调/旧订阅推送失效（本地代次门禁）
+            generation++ // 使在途回调失效（本地代次门禁）
+            subscriptionGeneration++ // R01：订阅会话代次——仅退订/重置时递增
             l.unsubscribeBar(DataLoader.UnsubscribeBarParams(s, p))
         }
     }
@@ -132,6 +151,10 @@ class Store(private val host: Host) {
         if (loading) return
         loading = true
         val gen = ++generation
+        val subGen = subscriptionGeneration
+        // R02：请求时会话快照——回调的应用动作绑定该 key（检查点解析，
+        // 不在宿主协程执行期重读可变上下文）
+        val requestKey = MarketKey(s.ticker, p.toString())
         val timestamp = when (type) {
             DataLoader.DataLoadType.BACKWARD -> host.lastTimestamp()
             DataLoader.DataLoadType.FORWARD -> host.firstTimestamp()
@@ -146,12 +169,14 @@ class Store(private val host: Host) {
                 callback = { data, more ->
                     if (gen != generation) return@GetBarsParams // 旧代次回调丢弃
                     loading = false
-                    addData(data, type, more)
+                    addData(data, type, more, requestKey)
                     if (type == DataLoader.DataLoadType.INIT) {
                         l.subscribeBar(
                             DataLoader.SubscribeBarParams(s, p) { candle ->
-                                if (gen != generation) return@SubscribeBarParams // 旧订阅推送丢弃
-                                addUpdate(candle)
+                                // R01：校验**订阅会话**代次——分页请求的
+                                // generation 递增不影响同品种实时订阅
+                                if (subGen != subscriptionGeneration) return@SubscribeBarParams
+                                addUpdate(candle, requestKey)
                             },
                         )
                     }
@@ -162,7 +187,15 @@ class Store(private val host: Host) {
 
     // ---------- 写入（上游 _addData 数组分支） ----------
 
-    fun addData(data: List<Candle>, type: DataLoader.DataLoadType, more: DataLoader.DataLoadMore?) = synchronized(lock) {
+    fun addData(
+        data: List<Candle>,
+        type: DataLoader.DataLoadType,
+        more: DataLoader.DataLoadMore?,
+        requestKey: MarketKey? = null,
+    ) = synchronized(lock) {
+        // R02：key 在接受检查的同一锁临界区内确定——排队中的切换在本块
+        // 之后才能改 symbol，应用动作使用检查点绑定的会话 key
+        val key = requestKey ?: MarketKey(symbol?.ticker ?: "UNKNOWN", period?.toString() ?: "UNKNOWN")
         val realMoreBackward = when {
             more == null -> false
             else -> more.backward
@@ -175,36 +208,39 @@ class Store(private val host: Host) {
         var adjustFlag = false
         when (type) {
             DataLoader.DataLoadType.INIT -> {
-                success = host.applyInit(data)
+                success = host.applyInit(key, data)
                 loadMoreBackward = realMoreBackward
                 loadMoreForward = realMoreForward
                 adjustFlag = true
             }
             DataLoader.DataLoadType.BACKWARD -> {
-                success = host.applyBackward(data)
+                success = host.applyBackward(key, data)
                 // 上游 case 'backward'：更新同名 _dataLoadMore.backward
                 loadMoreBackward = realMoreBackward
                 adjustFlag = data.isNotEmpty()
             }
             DataLoader.DataLoadType.FORWARD -> {
-                success = host.applyForward(data)
+                success = host.applyForward(key, data)
                 // 上游 case 'forward'：更新同名 _dataLoadMore.forward
                 loadMoreForward = realMoreForward
                 adjustFlag = data.isNotEmpty()
             }
             DataLoader.DataLoadType.UPDATE -> {
                 // 数组 update（上游 v10 数组分支无 update case；按单根逐条）
-                data.forEach { adjustFlag = addUpdate(it) || adjustFlag }
+                data.forEach { adjustFlag = addUpdate(it, key) || adjustFlag }
                 success = true
             }
         }
-        if (success && adjustFlag) {
-            host.onDataAdjusted(type)
-        }
+        // R03：上游 _addData 尾部 adjustFlag → _adjustVisibleRange 的范围调整
+        // 与边界续拉，由宿主在数据**实际提交完成**后统一执行（onSnapshot 驱动），
+        // 此处不再回调 onDataAdjusted（提交前时机不可靠）
     }
 
     /** 上游 `_addData` 单根分支：大于末根 push（末根右侧留白随动）、等于替换、小于忽略。 */
-    fun addUpdate(candle: Candle): Boolean = synchronized(lock) { host.applyUpdate(candle) }
+    fun addUpdate(candle: Candle, requestKey: MarketKey? = null): Boolean = synchronized(lock) {
+        val key = requestKey ?: MarketKey(symbol?.ticker ?: "UNKNOWN", period?.toString() ?: "UNKNOWN")
+        host.applyUpdate(key, candle)
+    }
 
     // ---------- 边界触发（上游 _adjustVisibleRange 末尾） ----------
 
