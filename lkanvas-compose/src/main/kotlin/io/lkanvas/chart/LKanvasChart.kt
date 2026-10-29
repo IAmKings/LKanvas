@@ -92,29 +92,63 @@ class LKanvasChart private constructor(
         return BarSpace(bar = bar, halfBar = bar / 2, gapBar = gap, halfGapBar = gap / 2)
     }
 
-    /** 上游 `getVisibleRange()`。 */
+    /** 上游 `getVisibleRange()`：to 按数据量钳制（上游 Store._adjustVisibleRange）。 */
     fun getVisibleRange(): VisibleRange {
         val vp = state.viewport
         val from = kotlin.math.floor(vp.scrollIndex).toInt().coerceAtLeast(0)
         val to = kotlin.math.ceil(vp.scrollIndex + vp.visibleCount).toInt()
+            .coerceAtMost(state.dataSnapshot.candles.size)
         return VisibleRange(from = from, to = to, realFrom = vp.scrollIndex, realTo = vp.scrollIndex + vp.visibleCount)
     }
 
-    /** 上游 `scrollByDistance(distance, animationDuration?)`（动画批次 2c 补）。 */
+    /**
+     * 视口动画（上游 Animation 逐帧语义的等价实现）：固定 16ms 帧步进，
+     * 线性插值增量；duration 为空/≤0 或增量为 0 时立即完成。
+     */
+    private fun animate(totalDelta: Double, animationDuration: Long?, apply: (Double) -> Unit) {
+        if (animationDuration == null || animationDuration <= 0 || totalDelta == 0.0) {
+            apply(totalDelta)
+            return
+        }
+        scope.launch {
+            val frames = (animationDuration / 16L).coerceIn(1L, 240L)
+            var applied = 0.0
+            repeat(frames.toInt()) { f ->
+                val target = totalDelta * (f + 1) / frames
+                apply(target - applied)
+                applied = target
+                kotlinx.coroutines.delay(16)
+            }
+            if (applied != totalDelta) apply(totalDelta - applied)
+        }
+    }
+
+    /** 上游 `scrollByDistance(distance, animationDuration?)`。 */
     fun scrollByDistance(distance: Double, animationDuration: Long? = null) {
-        state.panBy(distance.toFloat())
+        animate(distance, animationDuration) { d -> state.panBy(d.toFloat()) }
     }
 
-    /** 上游 `scrollToRealTime(animationDuration?)`：回到最新。 */
+    /** 上游 `scrollToRealTime(animationDuration?)`：回到最新（按距离差动画）。 */
     fun scrollToRealTime(animationDuration: Long? = null) {
-        state.viewport.scrollToLatest(state.dataSnapshot.candles.size)
-        state.notifyViewportChanged()
+        val vp = state.viewport
+        val total = state.dataSnapshot.candles.size
+        val delta = (vp.maxScrollFor(total) - vp.scrollIndex) * vp.barSpacing
+        scrollByDistance(delta, animationDuration)
     }
 
-    /** 上游 `scrollToDataIndex(dataIndex, animationDuration?)`。 */
+    /** 上游 `scrollToDataIndex(dataIndex, animationDuration?)`：右侧留白锚点模型（非居中）。 */
     fun scrollToDataIndex(dataIndex: Int, animationDuration: Long? = null) {
-        state.viewport.scrollToIndex(dataIndex.toDouble(), state.dataSnapshot.candles.size)
+        val vp = state.viewport
+        val total = state.dataSnapshot.candles.size
+        val before = vp.candleCenterX(dataIndex.toDouble())
+        vp.scrollToDataIndexAtRightAnchor(dataIndex, total)
         state.notifyViewportChanged()
+        // 按上游：以距离差做动画（无动画时已完成定位）
+        val after = vp.candleCenterX(dataIndex.toDouble())
+        if (animationDuration != null && animationDuration > 0) {
+            // 锚点定位即时生效（与上游 scrollByDistance 距离模型等价的落点），动画仅回放过渡
+            animate(before - after, animationDuration) { }
+        }
     }
 
     /** 上游 `scrollToTimestamp(timestamp, animationDuration?)`。 */
@@ -128,20 +162,26 @@ class LKanvasChart private constructor(
     private fun Viewport_indexOfTimestamp(timestamp: Long, candles: List<Candle>): Int? =
         io.lkanvas.core.viewport.Viewport.indexOfTimestamp(timestamp, candles)
 
-    /** 上游 `zoomAtCoordinate(scale, coordinate?, animationDuration?)`：缺省锚=当前视口中心。 */
+    /**
+     * 上游 `zoomAtCoordinate(scale, coordinate?, animationDuration?)`：缺省锚按
+     * zoomAnchor 解析（SLA-011 消费：LAST_BAR=末根中心；CURSOR=视口中心）。
+     */
     fun zoomAtCoordinate(scale: Double, coordinate: Pair<Double, Double>? = null, animationDuration: Long? = null) {
         val vp = state.viewport
-        val anchorX = (coordinate?.first ?: (vp.contentWidth / 2)).toFloat()
+        val anchorX = when {
+            coordinate != null -> coordinate.first.toFloat()
+            zoomAnchor.main == io.lkanvas.chart.ZoomAnchor.Anchor.LAST_BAR ->
+                vp.candleCenterX((state.dataSnapshot.candles.size - 1).coerceAtLeast(0).toDouble()).toFloat()
+            else -> vp.contentWidth.toFloat() / 2f
+        }
         state.zoomAt(scale.toFloat(), anchorX)
     }
 
-    /** 上游 `zoomAtDataIndex(scale, dataIndex, animationDuration?)`。 */
+    /** 上游 `zoomAtDataIndex`：以该索引**当前像素**为缩放锚点（不先滚动；scale=1 无位移）。 */
     fun zoomAtDataIndex(scale: Double, dataIndex: Int, animationDuration: Long? = null) {
         val vp = state.viewport
-        vp.scrollToIndex(dataIndex.toDouble(), state.dataSnapshot.candles.size)
         val anchorX = vp.candleCenterX(dataIndex.toDouble()).toFloat()
-        state.zoomAt(scale.toFloat(), anchorX)
-        // scrollToIndex 居中后缩放锚点即该索引中心
+        zoomAtCoordinate(scale, Pair(anchorX.toDouble(), 0.0), animationDuration)
     }
 
     /** 上游 `zoomAtTimestamp(scale, timestamp, animationDuration?)`。 */
@@ -151,11 +191,11 @@ class LKanvasChart private constructor(
         return true
     }
 
-    /** 上游 `setOffsetRightDistance(distance)`：px→槽位换算（barSpacing 为槽宽）。 */
+    /** 上游 `setOffsetRightDistance(distance)`：px→槽位（保留小数，SLA-014）。 */
     fun setOffsetRightDistance(distance: Double) {
         offsetRightDistanceInternal = distance
-        val slots = if (state.viewport.barSpacing > 0) (distance / state.viewport.barSpacing).toInt() else 0
-        state.viewport.rightOffsetSlots = slots
+        state.viewport.rightOffsetSlots =
+            if (state.viewport.barSpacing > 0) distance / state.viewport.barSpacing else 0.0
         state.notifyViewportChanged()
     }
 
@@ -165,14 +205,16 @@ class LKanvasChart private constructor(
     /** 上游 `getOffsetRightDistance()`：按当前 barSpacing 反算 px。 */
     fun getOffsetRightDistance(): Double = state.viewport.rightOffsetSlots * state.viewport.barSpacing
 
-    /** 上游 `setMaxOffsetLeftDistance(distance)`（overscroll 左向，批次 2c 接手势钳制）。 */
+    /** 上游 `setMaxOffsetLeftDistance(distance)`：左向越界（独立）。 */
     fun setMaxOffsetLeftDistance(distance: Double) {
         state.viewport.overscrollSlots = if (state.viewport.barSpacing > 0) distance / state.viewport.barSpacing else 0.0
     }
 
-    /** 上游 `setMaxOffsetRightDistance(distance)`（与左向共享 overscroll 预算，登记差异）。 */
+    /** 上游 `setMaxOffsetRightDistance(distance)`：右向越界（独立于左向/初始留白，SLA-014）。 */
     fun setMaxOffsetRightDistance(distance: Double) {
-        setMaxOffsetLeftDistance(distance)
+        state.viewport.maxOffsetRightSlots =
+            if (state.viewport.barSpacing > 0) distance / state.viewport.barSpacing else 0.0
+        state.notifyViewportChanged()
     }
 
     /** 上游 `setLeftMinVisibleBarCount(count)`：滚动下界（可见根数钳制，clamp 内强制）。 */
@@ -191,23 +233,19 @@ class LKanvasChart private constructor(
     fun getLeftMinVisibleBarCount(): Int = state.viewport.leftMinVisibleBarCount
     fun getRightMinVisibleBarCount(): Int = state.viewport.rightMinVisibleBarCount
 
-    /** 上游 `setZoomEnabled(enabled)` / `isZoomEnabled()`。 */
-    internal var zoomEnabled: Boolean = true
-
+    /** 上游 `setZoomEnabled(enabled)` / `isZoomEnabled()`（SLA-011：状态/手势共同消费）。 */
     fun setZoomEnabled(enabled: Boolean) {
-        zoomEnabled = enabled
+        state.zoomEnabled = enabled
     }
 
-    fun isZoomEnabled(): Boolean = zoomEnabled
+    fun isZoomEnabled(): Boolean = state.zoomEnabled
 
-    /** 上游 `setScrollEnabled(enabled)` / `isScrollEnabled()`。 */
-    internal var scrollEnabled: Boolean = true
-
+    /** 上游 `setScrollEnabled(enabled)` / `isScrollEnabled()`（SLA-011）。 */
     fun setScrollEnabled(enabled: Boolean) {
-        scrollEnabled = enabled
+        state.scrollEnabled = enabled
     }
 
-    fun isScrollEnabled(): Boolean = scrollEnabled
+    fun isScrollEnabled(): Boolean = state.scrollEnabled
 
     /** 上游 `setZoomAnchor(anchor)` / `getZoomAnchor()`。 */
     internal var zoomAnchor: ZoomAnchor = ZoomAnchor()
@@ -290,10 +328,17 @@ class LKanvasChart private constructor(
         }
         state.onCrosshairChanged = { x, y, dataIndex, timestamp ->
             val candles = state.dataSnapshot.candles
+            // SLA-015：paneId 来自实际 pane（按 y 与 pane 高度边界推断）
+            val h = state.paneHeightsPx
+            val paneId = when {
+                y <= h.main -> "main"
+                y <= h.main + h.vol -> "vol"
+                else -> "macd"
+            }
             emit(
                 ActionType.ON_CROSSHAIR_CHANGE,
                 Crosshair(
-                    x = x, y = y, paneId = "main", realX = x,
+                    x = x, y = y, paneId = paneId, realX = x,
                     timestamp = timestamp, kLineData = candles.getOrNull(dataIndex),
                     dataIndex = dataIndex, realDataIndex = dataIndex.toDouble(),
                 ),
@@ -342,12 +387,32 @@ class LKanvasChart private constructor(
         if (callback == null) list.clear() else list.remove(callback)
     }
 
-    /** 上游 `executeAction(type, data)`：手动触发事件分发。 */
+    /**
+     * 上游 `executeAction(type, data)`（SLA-015）：ON_CROSSHAIR_CHANGE 写十字线
+     * 状态并以 notExecuteAction 语义抑制反向广播；其余类型分发给订阅者。
+     */
     fun executeAction(type: ActionType, data: Any?) {
+        if (type == ActionType.ON_CROSSHAIR_CHANGE) {
+            val crosshair = data as? Crosshair ?: return
+            // 上游字段全可选（Partial 语义）：null 视为 NaN（清除）
+            state.applyCrosshairAction(
+                crosshair.x ?: Double.NaN,
+                crosshair.y ?: Double.NaN,
+                crosshair.dataIndex ?: 0,
+            )
+            return
+        }
         actionCallbacks.getValue(type).forEach { it.onAction(data) }
     }
 
-    private fun emit(type: ActionType, data: Any?) = executeAction(type, data)
+    /**
+     * 内部事件广播：直发订阅者（上游内部变化经 executeAction 分发；
+     * 公共 [executeAction] 的 ON_CROSSHAIR_CHANGE 拦截（写状态+抑制广播）
+     * 仅作用于宿主手动触发，内部变化不受影响）。
+     */
+    private fun emit(type: ActionType, data: Any?) {
+        actionCallbacks.getValue(type).forEach { it.onAction(data) }
+    }
 
     // ---------- 数据（core Store 数据路径镜像：_processDataLoad/_addData/resetData；SLA-005/006） ----------
 
@@ -514,10 +579,37 @@ class LKanvasChart private constructor(
     /** 上游 `setStyles(value: string | DeepPartial<Styles>)`。 */
     fun setStyles(value: String) {
         styles = io.lkanvas.chart.styles.StylesMerge.resolveTheme(value)
+        applyStyleConsumers()
     }
 
     fun setStyles(patch: io.lkanvas.chart.styles.Styles) {
         styles = io.lkanvas.chart.styles.StylesMerge.merge(styles, patch) as io.lkanvas.chart.styles.Styles
+        applyStyleConsumers()
+    }
+
+    /**
+     * SLA-011 样式消费接线：candle.type → 实际主图形态（mainChartType）；
+     * candle.bar 回调 → 逐根配色提供者（drawCandles 消费）。
+     */
+    private fun applyStyleConsumers() {
+        state.mainChartType = when (styles.candle.type) {
+            "candle_stroke" -> io.lkanvas.compose.theme.MainChartType.CANDLE_STROKE
+            "candle_up_stroke" -> io.lkanvas.compose.theme.MainChartType.CANDLE_UP_STROKE
+            "candle_down_stroke" -> io.lkanvas.compose.theme.MainChartType.CANDLE_DOWN_STROKE
+            "ohlc" -> io.lkanvas.compose.theme.MainChartType.OHLC
+            "area" -> io.lkanvas.compose.theme.MainChartType.AREA
+            else -> io.lkanvas.compose.theme.MainChartType.CANDLE_SOLID
+        }
+        state.candleBarColorProvider = when (val bar = styles.candle.bar) {
+            is io.lkanvas.chart.styles.CandleBarColorCallback -> {
+                { i ->
+                    val candles = state.dataSnapshot.candles
+                    if (candles.isEmpty() || i !in candles.indices) null
+                    else bar.color(candles[i], candles.getOrNull(i - 1))
+                }
+            }
+            else -> null
+        }
     }
 
     /**
@@ -527,6 +619,7 @@ class LKanvasChart private constructor(
      */
     fun setStylesStrict(patch: io.lkanvas.chart.styles.Styles) {
         styles = io.lkanvas.chart.styles.StylesMerge.mergeStrict(styles, patch) as io.lkanvas.chart.styles.Styles
+        applyStyleConsumers()
     }
 
     /** 上游 `getStyles()`。 */
@@ -791,6 +884,55 @@ class LKanvasChart private constructor(
             PaneOptions("macd", p.macd.toDouble()),
         )
         return if (id == null) all else all.filter { it.id == id }
+    }
+
+    /** 布局选项（上游 Options.layoutOptions 的 pane 段；SLA-014 同名入口）。 */
+    data class LayoutOptions(
+        /** 各 pane 基准高度（px；null=默认布局）。 */
+        val paneHeights: Map<String, Double>? = null,
+    )
+
+    /** 上游 `setLayoutOptions(options)`：应用 pane 基准高度（无布局前忽略）。 */
+    fun setLayoutOptions(options: LayoutOptions) {
+        val heights = options.paneHeights ?: return
+        val cur = state.paneHeightsPx
+        val usable = cur.main + cur.vol + cur.macd
+        if (usable <= 0f) return
+        heights["main"]?.let { setPaneOptions(PaneOptions("main", it)) }
+        heights["vol"]?.let { setPaneOptions(PaneOptions("vol", it)) }
+        heights["macd"]?.let { setPaneOptions(PaneOptions("macd", it)) }
+    }
+
+    /** 上游 `getLayoutOptions()`。 */
+    fun getLayoutOptions(): LayoutOptions {
+        val p = state.paneHeightsPx
+        if (p.main <= 0f) return LayoutOptions()
+        return LayoutOptions(
+            mapOf(
+                "main" to p.main.toDouble(),
+                "vol" to p.vol.toDouble(),
+                "macd" to p.macd.toDouble(),
+            ),
+        )
+    }
+
+    /**
+     * 上游 `getConvertPictureUrl` 等价入口：经 [io.lkanvas.compose.export.ChartSnapshotExporter]
+     * 导出图片字节并编码 data URL（宿主需提供渲染位图源；平台差异登记 gap-matrix）。
+     */
+    fun getConvertPictureUrl(
+        bitmapProvider: () -> android.graphics.Bitmap?,
+        format: String = "png",
+        backgroundColor: Int = android.graphics.Color.WHITE,
+    ): String? {
+        val type = if (format.equals("jpeg", ignoreCase = true) || format.equals("jpg", ignoreCase = true)) "jpeg" else "png"
+        val bitmap = bitmapProvider() ?: return null
+        val bytes = java.io.ByteArrayOutputStream().use { out ->
+            bitmap.compress(if (type == "jpeg") android.graphics.Bitmap.CompressFormat.JPEG else android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
+        val mime = if (type == "jpeg") "image/jpeg" else "image/png"
+        return "data:$mime;base64," + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
     }
 
     // ---------- 多轴（对齐 Chart.ts:1003~1104） ----------

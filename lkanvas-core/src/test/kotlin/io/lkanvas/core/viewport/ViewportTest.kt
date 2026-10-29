@@ -110,7 +110,7 @@ class ViewportTest {
 
     @Test
     fun `末根缩放保持末根可见位置`() {
-        val vp = Viewport(barSpacing = 8.0, rightOffsetSlots = 2).apply { setup(360.0, 400) }
+        val vp = Viewport(barSpacing = 8.0, rightOffsetSlots = 2.0).apply { setup(360.0, 400) }
         val lastX = vp.candleCenterX(399.0)
         vp.zoomAtLatest(2.0, 400)
         // 末根锚点缩放后末根仍在原像素位置附近（作为锚点）

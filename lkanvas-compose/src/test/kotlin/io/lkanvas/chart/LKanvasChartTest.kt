@@ -149,16 +149,27 @@ class LKanvasChartTest {
     @Test
     fun `subscribe_execute_unsubscribe事件恰好一次`() {
         val chart = newChart()
+        chart.setSymbol(SymbolInfo("T"))
+        chart.setPeriod(Period.ofMinutes(1))
+        chart.setDataLoader(object : DataLoader {
+            override fun getBars(params: GetBarsParams) {
+                if (params.type == DataLoadType.INIT) {
+                    params.callback((0 until 50).map { c(it.toLong(), 100.0) }, DataLoadMore.NONE)
+                }
+            }
+        })
+        drain()
         val seen = mutableListOf<Any?>()
         val cb = ActionCallback { seen.add(it) }
         chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE, cb)
-        val crosshair = Crosshair(x = 10.0, y = 20.0, paneId = "main", timestamp = 5L)
-        chart.executeAction(ActionType.ON_CROSSHAIR_CHANGE, crosshair)
-        assertEquals(listOf<Any?>(crosshair), seen, "恰好一次")
+        // 上游语义（SLA-015）：内部十字线变化广播订阅者；executeAction 抑制反向广播
+        chart.state.showCrosshairAt(10f, 20f)
+        drain()
+        assertEquals(1, seen.size, "内部变化恰好一次")
 
         chart.unsubscribeAction(ActionType.ON_CROSSHAIR_CHANGE, cb)
-        chart.executeAction(ActionType.ON_CROSSHAIR_CHANGE, crosshair)
-        assertEquals(1, seen.size, "退订后不再接收")
+        chart.executeAction(ActionType.ON_CROSSHAIR_CHANGE, Crosshair(x = 10.0, y = 20.0, paneId = "main", timestamp = 5L))
+        assertEquals(1, seen.size, "退订后 executeAction 也不再接收（抑制广播）")
 
         // unsubscribe(type) 清空整类
         chart.subscribeAction(ActionType.ON_ZOOM, ActionCallback { })
@@ -228,10 +239,12 @@ class LKanvasChartTest {
             }
         })
         drain()
+        chart.state.onLayout(300f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        chart.setOffsetRightDistance(0.0)
         chart.scrollToDataIndex(150)
         drain()
         val vr = chart.getVisibleRange()
-        assertTrue(vr.from <= 150 && 150 <= vr.to, "索引进入可见区")
+        assertTrue(vr.from <= 150 && 150 <= vr.to, "索引进入可见区（右锚模型：目标索引在右缘）")
         chart.zoomAtDataIndex(1.5, 150)
         drain()
         assertTrue(chart.getBarSpace().bar > 8.0, "放大后 barSpacing 增大")

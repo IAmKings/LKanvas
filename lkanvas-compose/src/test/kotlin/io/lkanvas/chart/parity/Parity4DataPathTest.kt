@@ -98,6 +98,8 @@ class Parity4DataPathTest {
         chart.setSymbol(SymbolInfo("A"))
         chart.setPeriod(Period.ofMinutes(1))
         chart.setDataLoader(loader)
+        // 布局：barSpacing=8、内容宽 80 → 可见 10 根（边界判定需真实可见区）
+        chart.state.onLayout(80f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
         return chart
     }
 

@@ -338,6 +338,18 @@ class ChartState(
      */
     var mainAxisReverse: Boolean = false
 
+    /** SLA-011：滚动开关（手势与程序化 panBy 共同遵守；上游 Store.scroll 检查）。 */
+    var scrollEnabled: Boolean = true
+
+    /** SLA-011：缩放开关（手势与程序化 zoomAt 共同遵守；上游 Store.zoomAt 检查）。 */
+    var zoomEnabled: Boolean = true
+
+    /**
+     * SLA-011：逐根 candle 配色回调（上游 candle.bar 回调消费路径）；
+     * 由门面 setStyles 接线（参数=数据索引，null=用主题静态配色）。
+     */
+    var candleBarColorProvider: ((Int) -> io.lkanvas.chart.styles.CandleBarColor?)? = null
+
     /**
      * y 像素 → 主 pane 数值（SLA-012 统一轴模型：与绘制同用 YAxisMath +
      * effectiveMainAxisSpec，log/percentage/custom 一致；reverse 逆映射）。
@@ -470,6 +482,26 @@ class ChartState(
             }
         }
         return io.lkanvas.core.overlay.OverlayPoint(candle.timestamp, value)
+    }
+
+    /**
+     * SLA-015：executeAction(ON_CROSSHAIR_CHANGE) 的状态写入（上游
+     * setCrosshair(data, { notExecuteAction: true }) —— 写状态、抑制反向广播）。
+     */
+    fun applyCrosshairAction(x: Double, y: Double, dataIndex: Int) {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return
+        if (x.isNaN() || y.isNaN()) {
+            crosshairPosition = null
+            viewRevision++
+            return
+        }
+        val idx = dataIndex.coerceIn(candles.indices)
+        crosshairPosition = androidx.compose.ui.geometry.Offset(
+            viewport.candleCenterX(idx.toDouble()).toFloat(),
+            y.toFloat().coerceIn(0f, paneHeightsPx.main + paneHeightsPx.vol + paneHeightsPx.macd),
+        )
+        viewRevision++
     }
 
     /** candle 点击事件（PRD R-10）。 */
@@ -689,6 +721,7 @@ class ChartState(
 
     /** 平移（px；手势层调用）。 */
     fun panBy(deltaX: Float) {
+        if (!scrollEnabled) return // SLA-011：开关在共用执行入口检查
         viewport.scrollBy(deltaX.toDouble(), dataSnapshot.candles.size)
         viewRevision++
         emitRangeChange()
@@ -697,6 +730,7 @@ class ChartState(
 
     /** 以触点为锚缩放。 */
     fun zoomAt(scale: Float, anchorX: Float) {
+        if (!zoomEnabled) return // SLA-011：开关在共用执行入口检查
         val prev = viewport.barSpacing
         viewport.zoomBy(scale.toDouble(), anchorX.toDouble(), dataSnapshot.candles.size)
         viewRevision++
@@ -707,7 +741,10 @@ class ChartState(
 
     private fun emitRangeChange() {
         val from = kotlin.math.floor(viewport.scrollIndex).toInt().coerceAtLeast(0)
+        // 上游 _adjustVisibleRange：to 超出数据量时钳制（SLA-005 边界判定与
+        // getVisibleRange 同口径）
         val to = kotlin.math.ceil(viewport.scrollIndex + viewport.visibleCount).toInt()
+            .coerceAtMost(dataSnapshot.candles.size)
         onVisibleRangeChanged?.invoke(from, to, viewport.scrollIndex, viewport.scrollIndex + viewport.visibleCount)
     }
 

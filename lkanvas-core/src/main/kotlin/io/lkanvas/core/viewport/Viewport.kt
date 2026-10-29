@@ -19,8 +19,12 @@ class Viewport(
     var barSpacing: Double = DEFAULT_BAR_SPACING,
     var minBarSpacing: Double = DEFAULT_MIN_BAR_SPACING,
     var maxBarSpacing: Double = DEFAULT_MAX_BAR_SPACING,
-    var rightOffsetSlots: Int = DEFAULT_RIGHT_OFFSET_SLOTS,
+    /** 右侧初始留白（槽位，可为小数——上游 offsetRightDistance 保持 double，SLA-014）。 */
+    var rightOffsetSlots: Double = DEFAULT_RIGHT_OFFSET_SLOTS.toDouble(),
+    /** 左向最大越界（槽位；上游 setMaxOffsetLeftDistance，独立于右向）。 */
     var overscrollSlots: Double = DEFAULT_OVERSCROLL_SLOTS,
+    /** 右向最大越界（槽位；上游 setMaxOffsetRightDistance，独立于左向/初始留白）。 */
+    var maxOffsetRightSlots: Double = DEFAULT_OVERSCROLL_SLOTS,
 ) {
 
     /** 左边缘逻辑索引（可为小数）。 */
@@ -156,10 +160,21 @@ class Viewport(
 
     /** 有效右侧留白槽位：不超过可视区一半，避免小视口下数据被留白推出屏幕。 */
     private fun effectiveRightSlots(): Double =
-        if (visibleCount <= 0.0) 0.0 else minOf(rightOffsetSlots.toDouble(), visibleCount / 2.0)
+        if (visibleCount <= 0.0) 0.0 else minOf(rightOffsetSlots, visibleCount / 2.0)
 
     private fun maxScroll(dataCount: Int): Double =
-        (dataCount + effectiveRightSlots() - visibleCount).coerceAtLeast(minScroll(dataCount))
+        (dataCount + maxOf(effectiveRightSlots(), maxOffsetRightSlots.coerceAtMost(visibleCount / 2.0)) - visibleCount)
+            .coerceAtLeast(minScroll(dataCount))
+
+    /** 上游 scrollToDataIndex 模型：目标索引置于右侧留白锚点（距右缘 rightOffset 处，非居中）。 */
+    fun scrollToDataIndexAtRightAnchor(index: Int, dataCount: Int) {
+        // 有效右留白（与 maxScroll 同封顶：min(rightOffsetSlots, 可见区/2)）
+        scrollIndex = index - visibleCount + effectiveRightSlots()
+        clamp(dataCount)
+    }
+
+    /** 末端滚动边界（公开只读；门面 scrollToRealTime 距离差计算用）。 */
+    fun maxScrollFor(dataCount: Int): Double = maxScroll(dataCount)
 
     /** 左侧最小可见 bar 数（上游 setLeftMinVisibleBarCount；0=不限制）。 */
     var leftMinVisibleBarCount: Int = 0

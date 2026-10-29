@@ -396,11 +396,17 @@ object PaneRenderers {
         val gap = (vp.barSpacing * state.gapRatio).coerceAtMost(vp.barSpacing - 1.0).coerceAtLeast(0.0)
         val bodyWidth = (vp.barSpacing - gap).coerceAtLeast(1.0)
         val type = state.mainChartType
+        // SLA-011：candle.bar 回调 → 逐根配色（上游 CandleBarColorCallback 消费）
+        val barColorProvider = state.candleBarColorProvider
         for (i in visible.indices) {
             val c = visible[i]
             val x = vp.candleCenterX((firstIndex + i).toDouble())
             val up = c.close > c.open
+            val cb = barColorProvider?.invoke(firstIndex + i)
             val color = when {
+                cb != null && c.close > c.open -> io.lkanvas.compose.theme.StylesThemeBridge.parse(cb.upColor)
+                cb != null && c.close < c.open -> io.lkanvas.compose.theme.StylesThemeBridge.parse(cb.downColor)
+                cb != null -> io.lkanvas.compose.theme.StylesThemeBridge.parse(cb.noChangeColor)
                 c.close > c.open -> theme.upColor
                 c.close < c.open -> theme.downColor
                 else -> theme.noChangeColor
