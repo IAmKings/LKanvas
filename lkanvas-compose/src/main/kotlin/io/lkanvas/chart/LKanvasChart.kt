@@ -985,6 +985,10 @@ class LKanvasChart private constructor(
         if (paneId !in knownPanes) return null
         val id = yAxis.id ?: "yAxis_${++yAxisSerial}"
         if (yAxes.containsKey(id)) return id
+        // SLA-010：注册轴模板用于构造轴（extension/yaxis 注册表；customAxis 优先）
+        val templateSpec = yAxis.template
+            ?.let { io.lkanvas.core.extension.yaxis.YAxisTemplates.get(it) }
+            ?.createSpec()
         yAxes[id] = YAxisInfo(
             id = id,
             name = yAxis.name,
@@ -997,7 +1001,12 @@ class LKanvasChart private constructor(
             needWidget = yAxis.needWidget ?: true,
             isDefault = false,
             customAxis = yAxis.customAxis,
+            templateSpec = templateSpec,
         )
+        // SLA-010：main pane 的模板轴直接进入主轴规格（logarithm/percentage 等生效）
+        if (paneId == "main" && templateSpec != null && templateSpec != io.lkanvas.core.axis.YAxisSpec.Normal) {
+            state.mainAxisSpec = templateSpec
+        }
         syncExtraAxes()
         state.notifyViewportChanged()
         return id

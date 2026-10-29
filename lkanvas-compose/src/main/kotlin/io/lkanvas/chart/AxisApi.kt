@@ -25,6 +25,8 @@ data class AxisGap(
  */
 data class YAxisOverride(
     val id: String? = null,
+    /** 上游轴模板名（extension/y-axis 注册表键；normal/logarithm/percentage/宿主注册）。 */
+    val template: String? = null,
     val name: String? = null,
     val paneId: String? = null,
     val reverse: Boolean? = null,
@@ -73,4 +75,6 @@ data class YAxisInfo(
     val isDefault: Boolean,
     /** 0.5.x：自定义值变换（见 [YAxisOverride.customAxis]）。 */
     val customAxis: io.lkanvas.core.axis.CustomYAxis? = null,
+    /** SLA-010：按注册模板构造的轴规格（extension/yaxis；customAxis 未指定时生效）。 */
+    val templateSpec: io.lkanvas.core.axis.YAxisSpec? = null,
 )

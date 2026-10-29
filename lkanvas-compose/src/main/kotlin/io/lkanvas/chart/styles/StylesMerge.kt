@@ -27,7 +27,25 @@ object StylesMerge {
 /** 上游 extension/styles：light/dark 主题注册表（默认样式之上的色板覆盖）。 */
 object StylesThemes {
 
-    val light: Styles = Styles()
+    /**
+     * 上游 `extension/styles/light.ts` 镜像：在 getDefaultStyles() 基础上应用
+     * light 覆盖路径（与基础默认不同的字段：crosshair text 边框/背景 #686D76）。
+     * SLA-016：StylesDefaultsTest 逐字段 diff 守护。
+     */
+    val light: Styles = run {
+        val base = Styles()
+        val ch = base.crosshair
+        base.copy(
+            crosshair = ch.copy(
+                horizontal = ch.horizontal.copy(
+                    text = ch.horizontal.text.copy(borderColor = "#686D76", backgroundColor = "#686D76"),
+                ),
+                vertical = ch.vertical.copy(
+                    text = ch.vertical.text.copy(borderColor = "#686D76", backgroundColor = "#686D76"),
+                ),
+            ),
+        )
+    }
 
     val dark: Styles = Styles(
         grid = Styles().grid.copy(horizontal = LineStyle(color = "#33353D", style = "dashed"), vertical = LineStyle(color = "#33353D", style = "dashed")),

@@ -10,7 +10,7 @@
 
 | 上游文件 | 本地文件（0.6.0 目标） | 现本地文件（迁移前） | 必要差异 | 状态 |
 |---|---|---|---|---|
-| `Store.ts` | `lkanvas-core/.../store/Store.kt` | `ChartDataStore.kt`+`ChartEngine.kt`+`ChartLoader.kt`+`Viewport.kt` 分散 | 会话代次门禁为本地增强（D，SLA-006）；Viewport 数学保留为内部助手 | 已声明 |
+| `Store.ts`（数据路径段） | `lkanvas-core/.../store/Store.kt`（0.6.0 已落地：load/addData/resetData/边界触发/代次门禁） | `ChartDataStore.kt`（会话门禁）与 `ChartEngine.kt`（计算编排）保留为内核 | 数据路径补丁→Store.kt 局部移植（Parity4） | 行为通过 |
 | `Chart.ts` | `lkanvas-compose/.../chart/LKanvasChart.kt`（门面方法集逐一对齐） | 同名（方法语义待对齐） | Android 无 DOM：init(state)、Compose 组合 | 已声明 |
 | `Event.ts`+`Eventful.ts` | `lkanvas-core/.../store/ChartEvents.kt` | 门面 actionCallbacks | notExecuteAction 抑制语义（SLA-015） | 已声明 |
 | `Options.ts` | `lkanvas-compose/.../chart/ChartOptions.kt`（对齐字段集） | 同名 | 平台适配 | 已声明 |
@@ -24,10 +24,10 @@
 | `component/Overlay.ts` | `lkanvas-core/.../component/Overlay.kt` | `OverlayManager.kt`+`OverlayApi.kt` | 生命周期/类型/模板合一 | 已声明 |
 | `component/Axis.ts`+`XAxis.ts`+`YAxis.ts` | `lkanvas-core/.../component/{Axis,XAxis,YAxis}.kt` | `YAxisSpec.kt`+`LinearYAxis.kt`+`AxisApi.kt` | 轴实例持有映射并被绘制/转换共消费（SLA-010/012） | 已声明 |
 | `component/Figure.ts` | `lkanvas-core/.../component/Figure.kt` | `Figures.kt`（core）+`FigureRenderer.kt`（compose） | Canvas→Compose 绘制 | 已声明 |
-| `extension/indicator/*.ts`（27） | `lkanvas-core/.../extension/indicator/` 上游同名 27 文件 + `Index.kt` | `BuiltInIndicators.kt`+`WindowIndicators.kt`+`OscillatorIndicators.kt`+`RecursiveIndicators.kt` | calc 逐行对照；oracle 27/27 | 已声明 |
-| `extension/overlay/*.ts`（16） | `lkanvas-core/.../extension/overlay/` 上游同名 16 文件 + `Index.kt` | `OverlayTemplates.kt` | 模板钩子唯一执行来源（SLA-013）；`OverlayGeometry.kt` 保留为共享几何助手 | 已声明 |
-| `extension/figure/*.ts`（7+index） | `lkanvas-core/.../extension/figure/` 同名 7 文件 + `Index.kt` | `Figures.kt` 合并 | Canvas→Compose | 已声明 |
-| `extension/y-axis/{normal,logarithm,percentage}.ts` | `lkanvas-core/.../extension/yaxis/` 同名 3 文件 + `Index.kt` | `YAxisSpec.kt` 内置枚举 | 模板按名构造轴实例（SLA-010） | 已声明 |
+| `extension/indicator/*.ts`（27） | `lkanvas-core/.../extension/indicator/` 上游同名 27 文件 + `Index.kt`（0.6.0 已落地） | 4 个合并文件已删除 | calc 逐行对照；oracle 27/27 + DualPathParityTest 双路径 | 行为通过 |
+| `extension/overlay/*.ts`（16） | `lkanvas-core/.../extension/overlay/` 上游同名 16 文件 + `Index.kt`（0.6.0 已落地） | `OverlayTemplates.kt` 已删除（契约移 OverlayDefinition.kt） | 渲染/命中/手势共表（Parity5）；`OverlayGeometry.kt` 保留为共享几何助手 | 行为通过 |
+| `extension/figure/index.ts`（注册表） | `lkanvas-core/.../extension/figure/Index.kt`（0.6.0：类型+命中开关注册表） | 原语在 `core/figure/Figures.kt`、绘制在平台层 `FigureRenderer.kt`（单一 when，稳定） | 图形绘制为平台关注点，注册/命中经共表；逐文件拆分不带来补丁映射收益（登记决策） | 已接线 |
+| `extension/y-axis/{normal,logarithm,percentage}.ts` | `lkanvas-core/.../extension/yaxis/` 3 模板 + `Index.kt`（0.6.0 已落地，createYAxis 消费 template） | `YAxisSpec.kt` 保留为规格/数学 | 模板按名构造轴实例并进主轴规格（Parity6） | 行为通过 |
 | `extension/x-axis/normal.ts` | `lkanvas-core/.../extension/xaxis/Normal.kt` + `Index.kt` | `ChartState.xAxisState` | — | 已声明 |
 | `extension/i18n/{en-US,zh-CN}.ts` | `lkanvas-core/.../extension/i18n/` 同名 + `Index.kt` | `ChartLocale.kt` | registerLocale 消费（SLA-004） | 已声明 |
 | `extension/styles/{light,dark}.ts` | `lkanvas-core/.../extension/styles/` 同名 + `Index.kt` | `StylesDefaults.kt`/`ChartTheme.kt` 默认值 | 默认值 fixture 与上游 diff（SLA-016） | 已声明 |

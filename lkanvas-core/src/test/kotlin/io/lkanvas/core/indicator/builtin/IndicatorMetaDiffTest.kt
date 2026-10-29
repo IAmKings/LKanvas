@@ -146,13 +146,12 @@ class IndicatorMetaDiffTest {
     @Test
     fun `shouldOhlc与shouldFormatBigNumber与上游一致`() {
         val tsMeta = loadTsMeta()
-        // Kotlin 侧未单独建模 shouldOhlc/shouldFormatBigNumber 字段——
-        // 对齐批次 3 将其加入 IndicatorDefinition。此处先登记当前分布：
-        val expectOhlc = defs.filterValues { d -> tsMeta[d.name]!!.shouldOhlc }.keys
-        assertEquals(setOf("MA", "BBI", "BOLL", "EMA", "SMA", "SAR"), expectOhlc, "上游 shouldOhlc 分布")
-        val expectBig = defs.filterValues { d -> tsMeta[d.name]!!.shouldFormatBigNumber }.keys
-        assertEquals(setOf("VOL"), expectBig, "上游 shouldFormatBigNumber 分布")
-        // TODO(批次3-1)：IndicatorDefinition 增补 shouldOhlc/shouldFormatBigNumber 后改为逐模板断言
+        // SLA-016：逐模板读取 Kotlin 属性断言（不再从 fixture 自构造集合）
+        for ((name, def) in defs) {
+            val meta = tsMeta[name]!!
+            assertEquals(meta.shouldOhlc, def.shouldOhlc, "$name shouldOhlc")
+            assertEquals(meta.shouldFormatBigNumber, def.shouldFormatBigNumber, "$name shouldFormatBigNumber")
+        }
     }
 
     @Test
@@ -163,9 +162,9 @@ class IndicatorMetaDiffTest {
             val tsKeys = meta.figures
             val ktKeys = def.plotsFor(def.calcParams).map { it.key }
             if (meta.hasFigureFunctionCall) {
-                // 函数调用型 figure（如 VOL 的 volume）返回值置于数组末尾，
-                // Kotlin plotsFor 同样将 bar/特殊 plot 放最后——集合相等断言
-                assertEquals(tsKeys.toSet(), ktKeys.toSet(), "$name figures 键集合")
+                // SLA-016：函数型 figure（如 VOL：ma 前置动态列 + volume 殿后）
+                // 同样按**顺序**断言——动态列数 = calcParams 个数，bar 列在末位
+                assertEquals(tsKeys, ktKeys, "$name figures keys+顺序（含函数型）")
             } else {
                 assertEquals(tsKeys, ktKeys, "$name figures keys+顺序")
             }

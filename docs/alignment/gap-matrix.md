@@ -392,21 +392,21 @@
 | ID | 审计发现 | 处理批次 | 备注 | 状态 |
 |---|---|---|---|---|
 | SLA-001 | 验收工具只证台账覆盖，不证实现一致 | 06 | check.py v4 四态校验 + structure-map.md | 已接线 |
-| SLA-002 | 指标执行模型 Scratch 状态机，无可对照 calc | 06 | calc 规范入口 + Scratch 优化双路径互验 | 已声明 |
-| SLA-003 | 动态 pane/通用绘制被固定三 pane 替代 | 06 | 默认 pane 语义、PRICE 过滤、vol/macd 通用化 | 已声明 |
-| SLA-004 | 全局模板注册与创建路径断开 | 06 | 指标路径统一注册源；轴/locale 注册消费 | 已声明 |
-| SLA-005 | 门面分页无触发入口，more 方向交叉 | 06 | Store 镜像 _adjustVisibleRange 边界触发 | 已声明 |
-| SLA-006 | 切品种无退订/清 loading/代次，串品种 | 06 | Store resetData 顺序 + 请求代次门禁 | 已声明 |
-| SLA-007 | 指标 CRUD 默认实例/批量/替换语义 | 06 | 严格上游默认（破坏性变更已批准） | 已声明 |
-| SLA-008 | 参数改变未按实例重生成输出列 | 06 | plotsFor 已修（4a58aea），补守护测试 | 已声明 |
+| SLA-002 | 指标执行模型 Scratch 状态机，无可对照 calc | 06 | calc 规范入口=全量路径 + 27 模板逐行镜像；IndicatorEngine.kt + extension/indicator/*.kt；DualPathParityTest + BuiltinIndicatorOracleTest | 行为通过 |
+| SLA-003 | 动态 pane/通用绘制被固定三 pane 替代 | 06 | PRICE 过滤移除、vol/macd 通用化、动态 pane；ChartState.kt + PaneRenderers.kt；Parity7PaneRenderTest | 行为通过 |
+| SLA-004 | 全局模板注册与创建路径断开 | 06 | 注册/创建/渲染/命中共用同一表；extension/indicator/Index.kt + extension/overlay/Index.kt；Parity5OverlayHooksTest + LkanvasRegistryTest | 行为通过 |
+| SLA-005 | 门面分页无触发入口，more 方向交叉 | 06 | 同名方向更新 + 边界触发；core/store/Store.kt；Parity4DataPathTest | 行为通过 |
+| SLA-006 | 切品种无退订/清 loading/代次，串品种 | 06 | resetData 顺序 + 请求代次门禁（本地增强）；core/store/Store.kt；Parity4DataPathTest | 行为通过 |
+| SLA-007 | 指标 CRUD 默认实例/批量/替换语义 | 06 | 无默认实例/全删/严格默认/全字段 override；ChartState.kt；LKanvasChartCrudTest + AxisAndInstanceFieldsTest | 行为通过 |
+| SLA-008 | 参数改变未按实例重生成输出列 | 06 | recompute 按 plotsFor(params)；IndicatorEngine.kt；DualPathParityTest + BurstAndLifecycleTest | 行为通过 |
 | SLA-009 | Styles 默认值被误当未提供 | 06 | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Merge.kt + lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesMerge.kt + StylesMergeTest 显式默认恢复用例 | 行为通过 |
-| SLA-010 | 多轴只管理记录，未进坐标/渲染链 | 06 | 主轴覆写入链、createYAxis 校验 pane | 已声明 |
-| SLA-011 | 开关/格式/部分 Styles 无消费者 | 06 | scroll/zoom 开关、格式链、candle.type、逐根回调 | 已声明 |
-| SLA-012 | 数据与像素转换未共用绘制轴模型 | 06 | 单一轴实例 + ConvertFilter | 已声明 |
-| SLA-013 | 覆盖物模板回调未执行，交互创建丢配置 | 06 | 模板钩子唯一执行来源 + 命中/事件回退注册表 | 已声明 |
-| SLA-014 | 视口与公共 API 契约差异（7 子项） | 06 | 锚点/边界/动画/钳制/layoutOptions | 已声明 |
-| SLA-015 | executeAction 与事件 payload 语义 | 06 | 十字线写入 + 抑制广播 + 嵌套 payload | 已声明 |
-| SLA-016 | 测试不足为结构/逻辑发布门禁 | 06 | 差分套件 + 逐模板属性断言 + 补丁演练 | 已声明 |
+| SLA-010 | 多轴只管理记录，未进坐标/渲染链 | 06 | 主轴覆写入链 + createYAxis pane 校验 + 绑定轴转换；LKanvasChart.kt + ChartState.kt；Parity6AxisConvertTest | 行为通过 |
+| SLA-011 | 开关/格式/部分 Styles 无消费者 | 06 | scroll/zoomEnabled 共用入口 + candle.type/逐根回调/格式链；ChartState.kt + LKanvasChart.applyStyleConsumers；Parity8ViewportEventsTest + TooltipAndCallbacksTest | 行为通过 |
+| SLA-012 | 数据与像素转换未共用绘制轴模型 | 06 | mainPaneYOf=YAxisMath 统一映射 + ConvertFilter；ChartState.kt；Parity6AxisConvertTest | 行为通过 |
+| SLA-013 | 覆盖物模板回调未执行，交互创建丢配置 | 06 | 模板命中/钩子执行 + 交互创建配置先行应用；OverlayRenderer.kt + LKanvasChart.createOverlay；Parity5OverlayHooksTest | 行为通过 |
+| SLA-014 | 视口与公共 API 契约差异（7 子项） | 06 | 锚点/右锚/独立边界/动画/钳制/layoutOptions/getConvertPictureUrl；Viewport.kt + LKanvasChart.kt；Parity8ViewportEventsTest | 行为通过 |
+| SLA-015 | executeAction 与事件 payload 语义 | 06 | 十字线写入+抑制广播，内部 emit 直发；LKanvasChart.kt + ChartState.applyCrosshairAction；Parity8ViewportEventsTest | 行为通过 |
+| SLA-016 | 测试不足为结构/逻辑发布门禁 | 06 | 逐模板属性+顺序断言 + parity-4~8 差分 + 演练 4 真实补丁；IndicatorMetaDiffTest + StylesDefaultsTest + Parity4~8 + docs/upstream-sync.md 演练 4 | 行为通过 |
 
 ## 统计
 

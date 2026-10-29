@@ -27,6 +27,46 @@ class StylesDefaultsTest {
 
     private fun assertNotNullField(any: Any) = assertTrue(any != null)
 
+    /**
+     * SLA-016：上游 `extension/styles/light.ts` 全量覆盖路径逐字段 diff
+     *（不再只抽查手写常量——覆盖路径全部断言）。
+     */
+    @Test
+    fun `light主题覆盖路径逐字段对齐上游light_ts`() {
+        val light = StylesThemes.light
+        // grid.horizontal/vertical.color
+        assertEquals("#EDEDED", light.grid.horizontal.color)
+        assertEquals("#EDEDED", light.grid.vertical.color)
+        // candle.priceMark.high/low.color
+        assertEquals("#76808F", light.candle.priceMark.high.color)
+        assertEquals("#76808F", light.candle.priceMark.low.color)
+        // candle.tooltip.rect/title/legend
+        assertEquals("#FEFEFE", light.candle.tooltip.rect.color)
+        assertEquals("#F2F3F5", light.candle.tooltip.rect.borderColor)
+        assertEquals("#76808F", light.candle.tooltip.title.color)
+        assertEquals("#76808F", light.candle.tooltip.legend.color)
+        // indicator.tooltip.title/legend
+        assertEquals("#76808F", light.indicator.tooltip.title.color)
+        assertEquals("#76808F", light.indicator.tooltip.legend.color)
+        // xAxis/yAxis axisLine/tickText/tickLine
+        // xAxis/yAxis 结构一致（分别断言，避免类型推断为 Any）
+        assertEquals("#DDDDDD", light.xAxis.axisLine.color)
+        assertEquals("#76808F", light.xAxis.tickText.color)
+        assertEquals("#DDDDDD", light.xAxis.tickLine.color)
+        assertEquals("#DDDDDD", light.yAxis.axisLine.color)
+        assertEquals("#76808F", light.yAxis.tickText.color)
+        assertEquals("#DDDDDD", light.yAxis.tickLine.color)
+        // separator
+        assertEquals("#DDDDDD", light.separator.color)
+        // crosshair horizontal/vertical line+text
+        assertEquals("#76808F", light.crosshair.horizontal.line.color)
+        assertEquals("#686D76", light.crosshair.horizontal.text.borderColor)
+        assertEquals("#686D76", light.crosshair.horizontal.text.backgroundColor)
+        assertEquals("#76808F", light.crosshair.vertical.line.color)
+        assertEquals("#686D76", light.crosshair.vertical.text.borderColor)
+        assertEquals("#686D76", light.crosshair.vertical.text.backgroundColor)
+    }
+
     @Test
     fun `candle默认值对齐上游getDefaultCandleStyle`() {
         val c = CandleStyle()
