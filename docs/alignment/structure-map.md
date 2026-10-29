@@ -38,11 +38,11 @@
 
 | 上游符号（Store.ts） | 本地符号 | 差异 | 验证用例 | 状态 |
 |---|---|---|---|---|
-| `_processDataLoad(type)` | Store.processDataLoad | loading 门禁一致；init/forward/backward 三分支 | Parity4PaginationTest | 已声明 |
-| `_addData backward/forward`（同名方向 more 更新） | Store.addData | 消除交叉赋值 | Parity4PaginationTest.moreDirection | 已声明 |
-| `_adjustVisibleRange` 末尾边界触发 | Store 内视口调整钩子 | from==0&&more.forward→forward；to==total&&more.backward→backward | Parity4PaginationTest.boundaryTrigger | 已声明 |
-| `resetData`（退订→改配置→清 loading→init） | Store.resetData | + 本地增强：请求代次门禁（D 类登记） | Parity4SymbolSwitchTest | 已声明 |
-| `_processDataUnsubscribe` | Store.unsubscribeBar | 切换与 destroy 两路径生效 | Parity4SymbolSwitchTest.unsubscribeOrder | 已声明 |
+| `_processDataLoad(type)` | Store.processDataLoad | loading 门禁一致；init/forward/backward 三分支 | Parity4DataPathTest | 已声明 |
+| `_addData backward/forward`（同名方向 more 更新） | Store.addData | 消除交叉赋值 | Parity4DataPathTest | 已声明 |
+| `_adjustVisibleRange` 末尾边界触发 | Store 内视口调整钩子 | from==0&&more.forward→forward；to==total&&more.backward→backward | Parity4DataPathTest | 已声明 |
+| `resetData`（退订→改配置→清 loading→init） | Store.resetData | + 本地增强：请求代次门禁（D 类登记） | Parity4DataPathTest | 已声明 |
+| `_processDataUnsubscribe` | Store.unsubscribeBar | 切换与 destroy 两路径生效 | Parity4DataPathTest | 已声明 |
 
 ## 3. 符号级映射 — 指标模板（Phase 3 逐个回填；27 文件）
 
@@ -55,7 +55,26 @@
 | `simpleMovingAverage.ts` | `extension/indicator/SimpleMovingAverage.kt` | 已声明 |
 | `movingAverageConvergenceDivergence.ts` | `extension/indicator/MovingAverageConvergenceDivergence.kt` | 已声明 |
 | `volume.ts` | `extension/indicator/Volume.kt` | 已声明 |
-| （其余 22 个模板 Phase 3 拆分时逐行登记） | | 已声明 |
+| `awesomeOscillator.ts` | `extension/indicator/AwesomeOscillator.kt` | 已声明 |
+| `bias.ts` | `extension/indicator/Bias.kt` | 已声明 |
+| `brar.ts` | `extension/indicator/Brar.kt` | 已声明 |
+| `bullAndBearIndex.ts` | `extension/indicator/BullAndBearIndex.kt` | 已声明 |
+| `commodityChannelIndex.ts` | `extension/indicator/CommodityChannelIndex.kt` | 已声明 |
+| `currentRatio.ts` | `extension/indicator/CurrentRatio.kt` | 已声明 |
+| `differentOfMovingAverage.ts` | `extension/indicator/DifferentOfMovingAverage.kt` | 已声明 |
+| `directionalMovementIndex.ts` | `extension/indicator/DirectionalMovementIndex.kt` | 已声明 |
+| `easeOfMovementValue.ts` | `extension/indicator/EaseOfMovementValue.kt` | 已声明 |
+| `momentum.ts` | `extension/indicator/Momentum.kt` | 已声明 |
+| `onBalanceVolume.ts` | `extension/indicator/OnBalanceVolume.kt` | 已声明 |
+| `priceAndVolumeTrend.ts` | `extension/indicator/PriceAndVolumeTrend.kt` | 已声明 |
+| `psychologicalLine.ts` | `extension/indicator/PsychologicalLine.kt` | 已声明 |
+| `rateOfChange.ts` | `extension/indicator/RateOfChange.kt` | 已声明 |
+| `relativeStrengthIndex.ts` | `extension/indicator/RelativeStrengthIndex.kt` | 已声明 |
+| `stoch.ts` | `extension/indicator/Stoch.kt` | 已声明 |
+| `stopAndReverse.ts` | `extension/indicator/StopAndReverse.kt` | 已声明 |
+| `tripleExponentiallySmoothedAverage.ts` | `extension/indicator/TripleExponentiallySmoothedAverage.kt` | 已声明 |
+| `volumeRatio.ts` | `extension/indicator/VolumeRatio.kt` | 已声明 |
+| `williamsR.ts` | `extension/indicator/WilliamsR.kt` | 已声明 |
 
 ## 4. 平台替代映射（不镜像文件的职责对照，Phase 6 回填）
 

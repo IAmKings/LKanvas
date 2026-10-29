@@ -126,6 +126,28 @@ def parse_matrix():
     return rows
 
 
+def validate_structure_map():
+    """R12：structure-map.md 引用的测试类/文件必须真实存在。"""
+    smap = ROOT / 'docs/alignment/structure-map.md'
+    if not smap.exists():
+        return
+    text = smap.read_text()
+    test_files = set()
+    for p in (ROOT / 'lkanvas-core/src/test').rglob('*.kt'):
+        test_files.add(p.stem)
+    for p in (ROOT / 'lkanvas-compose/src/test').rglob('*.kt'):
+        test_files.add(p.stem)
+    for m in re.finditer(r'Parity\d+\w*Test', text):
+        if m.group(0) not in test_files:
+            err(f"structure-map: 引用的测试类不存在: {m.group(0)}")
+    for m in re.finditer(r'lkanvas-[\w-]+/[\w/.-]+\.kt', text):
+        tok = m.group(0)
+        if '/' in tok and not (ROOT / tok).exists():
+            err(f"structure-map: 引用文件不存在: {tok}")
+    if '待登记' in text or '待回填' in text:
+        err("structure-map: 存在「待登记/待回填」占位（映射台账必须完整）")
+
+
 def collect_kt_files():
     files = {}
     for base in ('lkanvas-core', 'lkanvas-compose'):
@@ -147,8 +169,10 @@ def validate_states(rows, kt_files):
             err(f"矩阵:{r['line']} 状态列非法（{sorted(STATES)}）: {r['id']} = {s!r}")
             continue
         by_state[s] += 1
-        if r['id'].startswith('SLA-') or s == '—':
+        if s == '—':
             continue
+        # R12（复审 2026-10-30）：SLA 行不再豁免证据检查——
+        # 行为通过须引用真实存在的 .kt 与 *Test（与能力行同口径）
         if s in WIRED_STATES:
             kt_tokens = re.findall(r'[\w][\w/.-]*\.kt', r['text'])
             if not kt_tokens:

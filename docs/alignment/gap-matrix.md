@@ -391,12 +391,12 @@
 
 | ID | 审计发现 | 处理批次 | 备注 | 状态 |
 |---|---|---|---|---|
-| SLA-001 | 验收工具只证台账覆盖，不证实现一致 | 06 | check.py v4 四态校验 + structure-map.md | 已接线 |
+| SLA-001 | 验收工具只证台账覆盖，不证实现一致 | 06 | tools/alignment/check.py v4（四态+引用校验+structure-map 校验+SLA 行纳入证据检查）+ docs/alignment/structure-map.md；演练 5 守护 lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt | 行为通过 |
 | SLA-002 | 指标执行模型 Scratch 状态机，无可对照 calc | 06 | calc 规范入口=全量路径 + 27 模板逐行镜像；IndicatorEngine.kt + extension/indicator/*.kt；DualPathParityTest + BuiltinIndicatorOracleTest | 行为通过 |
 | SLA-003 | 动态 pane/通用绘制被固定三 pane 替代 | 06 | PRICE 过滤移除、vol/macd 通用化、动态 pane；ChartState.kt + PaneRenderers.kt；Parity7PaneRenderTest | 行为通过 |
-| SLA-004 | 全局模板注册与创建路径断开 | 06 | 注册/创建/渲染/命中共用同一表；extension/indicator/Index.kt + extension/overlay/Index.kt；Parity5OverlayHooksTest + LkanvasRegistryTest | 行为通过 |
-| SLA-005 | 门面分页无触发入口，more 方向交叉 | 06 | 同名方向更新 + 边界触发；core/store/Store.kt；Parity4DataPathTest | 行为通过 |
-| SLA-006 | 切品种无退订/清 loading/代次，串品种 | 06 | resetData 顺序 + 请求代次门禁（本地增强）；core/store/Store.kt；Parity4DataPathTest | 行为通过 |
+| SLA-004 | 全局模板注册与创建路径断开 | 06 | 注册/创建/渲染/命中共用同一表；lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/Index.kt + lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/overlay/Index.kt；Parity5OverlayHooksTest + LkanvasRegistryTest | 行为通过 |
+| SLA-005 | 门面分页无触发入口，more 方向交叉 | 06 | 同名方向更新 + 边界触发；lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt；Parity4DataPathTest | 行为通过 |
+| SLA-006 | 切品种无退订/清 loading/代次，串品种 | 06 | resetData 顺序 + 请求代次门禁（本地增强）；lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt；Parity4DataPathTest | 行为通过 |
 | SLA-007 | 指标 CRUD 默认实例/批量/替换语义 | 06 | 无默认实例/全删/严格默认/全字段 override；ChartState.kt；LKanvasChartCrudTest + AxisAndInstanceFieldsTest | 行为通过 |
 | SLA-008 | 参数改变未按实例重生成输出列 | 06 | recompute 按 plotsFor(params)；IndicatorEngine.kt；DualPathParityTest + BurstAndLifecycleTest | 行为通过 |
 | SLA-009 | Styles 默认值被误当未提供 | 06 | lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Merge.kt + lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesMerge.kt + StylesMergeTest 显式默认恢复用例 | 行为通过 |
@@ -406,8 +406,28 @@
 | SLA-013 | 覆盖物模板回调未执行，交互创建丢配置 | 06 | 模板命中/钩子执行 + 交互创建配置先行应用；OverlayRenderer.kt + LKanvasChart.createOverlay；Parity5OverlayHooksTest | 行为通过 |
 | SLA-014 | 视口与公共 API 契约差异（7 子项） | 06 | 锚点/右锚/独立边界/动画/钳制/layoutOptions/getConvertPictureUrl；Viewport.kt + LKanvasChart.kt；Parity8ViewportEventsTest | 行为通过 |
 | SLA-015 | executeAction 与事件 payload 语义 | 06 | 十字线写入+抑制广播，内部 emit 直发；LKanvasChart.kt + ChartState.applyCrosshairAction；Parity8ViewportEventsTest | 行为通过 |
-| SLA-016 | 测试不足为结构/逻辑发布门禁 | 06 | 逐模板属性+顺序断言 + parity-4~8 差分 + 演练 4 真实补丁；IndicatorMetaDiffTest + StylesDefaultsTest + Parity4~8 + docs/upstream-sync.md 演练 4 | 行为通过 |
+| SLA-016 | 测试不足为结构/逻辑发布门禁 | 06 | lkanvas-core/src/test/kotlin/io/lkanvas/core/indicator/builtin/IndicatorMetaDiffTest.kt + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/styles/StylesDefaultsTest.kt + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity9DataPipelineTest.kt + docs/upstream-sync.md 演练 5 | 行为通过 |
 
 ## 统计
 
 **本文不手写统计**——数字由 `tools/alignment/check.py` 输出（分类/批次计数 + 完整性校验），避免 v1 手写失真。校验失败（格式违规/方法缺行/枚举非法）即退出非 0。
+
+
+## 14. 复审追踪（structure-logic-audit-2026-10-30.zh-CN.md R01-R14；0.7.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| R01 | 分页使实时订阅失效 | 07 | lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt subscriptionGeneration（仅退订/重置递增） | 行为通过 |
+| R02 | 旧回调数据写入新品种 | 07 | Store.kt 检查点 key 绑定（Host.apply* 带 MarketKey）+ Parity9DataPipelineTest | 行为通过 |
+| R03 | 数据提交后无范围调整链 | 07 | ChartState onSnapshot 尾部 emitRangeChange → adjustVisibleRangeBoundary 自动续拉 + viewport.onReset 修复 | 行为通过 |
+| R04 | 局部 Styles patch 重置其他分支 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesPatch.kt（全可空镜像树 + applyTo） | 行为通过 |
+| R05 | absolute 语义错误/paneId 不参与 | 07 | LKanvasChart convert 镜像 Chart.ts:1201-1262 + ChartState paneBounds/paneValueToY/paneValueAt | 行为通过 |
+| R06 | 轴注册两套表/额外轴改主轴 | 07 | ChartState extraYAxisSpec + effectiveExtraAxisSpec + syncExtraAxes 全 pane + LkanvasRegistry 委托 core 表 | 行为通过 |
+| R07 | pane 查询/覆写三 pane 模型 | 07 | ChartState.paneList() 单一来源 + getPaneOptions/setPaneOptions 遍历 + mainPaneOverride | 行为通过 |
+| R08 | 柱图画折线/visible 未过滤 | 07 | PaneRenderers.drawInstanceFigures + drawBarPlots（PlotType 分发）+ attrs 消费 | 行为通过 |
+| R09 | 覆盖物名称分支/pane 未进绘制 | 07 | 16 模板 createPointFigures 迁入 + OverlayRenderer 统一执行（无名称分支）+ effectivePaneId 上下文 | 行为通过 |
+| R10 | Crosshair null/可选字段语义 | 07 | executeAction null 清除 + x 推导索引 + paneIdAt 实际布局 + mainPaneValueAt 同源标签 | 行为通过 |
+| R11 | 动画空实现/布局缩减 | 07 | scrollToDataIndex 距离动画 + zoomAtCoordinate 逐帧增量 + LayoutOptions barSpaceLimit/paneDragEnabled + backgroundColor | 行为通过 |
+| R12 | check.py SLA 豁免/台账坏引用 | 07 | tools/alignment/check.py SLA 行纳入证据检查 + structure-map 校验 + 台账修正（Parity4 类名/22 模板占位/循环引用） | 行为通过 |
+| R13 | 演练缺 before/after 证据 | 07 | 演练 5（upstream-sync.md）：临时分支 before 2 失败 → 最小 diff → after 转绿 | 行为通过 |
+| R14 | arc 端点容差缺失 | 07 | lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt FigureHit Arc 分支端点距离容差（采纳 e829f30e） | 行为通过 |
