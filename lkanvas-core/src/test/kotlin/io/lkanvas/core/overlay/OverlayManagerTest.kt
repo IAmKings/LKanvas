@@ -1,5 +1,6 @@
 package io.lkanvas.core.overlay
 
+import io.lkanvas.core.extension.overlay.SegmentDefinition
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

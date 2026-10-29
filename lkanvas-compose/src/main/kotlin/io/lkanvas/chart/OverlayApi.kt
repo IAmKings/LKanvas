@@ -1,7 +1,7 @@
 package io.lkanvas.chart
 
 import io.lkanvas.core.overlay.OverlayPoint
-import io.lkanvas.core.overlay.OverlayTemplates
+import io.lkanvas.core.extension.overlay.OverlayTemplates
 
 /**
  * 覆盖物操作 API——对齐上游 `createOverlay/getOverlays/overrideOverlay/removeOverlay`

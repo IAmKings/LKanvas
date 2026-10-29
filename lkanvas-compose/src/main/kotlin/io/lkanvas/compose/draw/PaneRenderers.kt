@@ -111,7 +111,7 @@ object PaneRenderers {
                         ),
                     )
                 } else {
-                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
+                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow, styleOverrideOf = styleOverrideFor(inst))
                 }
                 paletteIdx += res.result.keys.size
             }
@@ -170,7 +170,7 @@ object PaneRenderers {
                             ),
                         )
                     } else {
-                        drawLinePlots(res, state.viewport, range, ay, theme.linePalette, paletteOffset = axPalette, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
+                        drawLinePlots(res, state.viewport, range, ay, theme.linePalette, paletteOffset = axPalette, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow, styleOverrideOf = styleOverrideFor(inst))
                     }
                     axPalette += res.result.keys.size
                 }
@@ -342,7 +342,7 @@ object PaneRenderers {
                         ),
                     )
                 } else {
-                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow)
+                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow, styleOverrideOf = styleOverrideFor(inst))
                 }
                 paletteIdx += res.result.keys.size
             }
@@ -595,27 +595,25 @@ object PaneRenderers {
         // 连续段（NaN 断开）各一次 drawLines；线段重复端点语义与 lineTo 一致。
         val lineKeys = keys ?: result.result.keys.filterNot { it in skipKeys }
         val eff = if (dashed) dashedEffect() else null
+        // 预计算恒定项：candleCenterX = barSpacing*(i - scrollIndex + 0.5)
+        val barSpacing = vp.barSpacing.toFloat()
+        val x0 = ((0 - vp.scrollIndex + 0.5) * vp.barSpacing).toFloat()
         for ((idx, key) in lineKeys.withIndex()) {
             val column = result.result[key]
             val baseColor = palette[(idx + paletteOffset) % palette.size]
-            // 批次 8d：PlotDef.styles 行级回调（(index, row) -> {"color":...,"lineWidth":...}）
-            var overrideColor: Color? = null
-            var overrideWidth: Float? = null
-            if (styleOverrideOf != null) {
-                val mid = (range.first + range.last) / 2
-                val (c0, w0) = styleOverrideOf(key, mid)
-                overrideColor = c0
-                overrideWidth = w0
+            // SLA-013/IND：PlotDef.styles 行级回调**逐行求值**（(row, params) ->
+            // {"color":...,"lineWidth":...}；无回调时整列走单组快速路径）
+            data class Seg(val color: Color, val width: Float) {
+                var arr = FloatArray(64)
+                var pos = 0
             }
-            val color = overrideColor ?: baseColor
-            val width = overrideWidth ?: lineSizePx
-            // 预计算恒定项：candleCenterX = barSpacing*(i - scrollIndex + 0.5)
-            val barSpacing = vp.barSpacing.toFloat()
-            val x0 = ((0 - vp.scrollIndex + 0.5) * vp.barSpacing).toFloat()
+            val groups = LinkedHashMap<Seg, Unit>()
+            fun segFor(color: Color, width: Float): Seg =
+                groups.keys.firstOrNull { it.color == color && it.width == width } ?: Seg(color, width).also { groups[it] = Unit }
+            val fastSeg = Seg(baseColor, lineSizePx)
+            groups[fastSeg] = Unit
             var lastX = Float.NaN
             var lastY = Float.NaN
-            var seg = FloatArray(64)
-            var segPos = 0
             var prevWasFinite = false
             for (i in range.first..range.last) {
                 val v = column[i]
@@ -625,34 +623,69 @@ object PaneRenderers {
                 }
                 val x = x0 + barSpacing * i
                 val yy = y(v).toFloat()
-                // drawLines 每 4 float 为一条线段 (start,end)：连续区每步 push
-                // (last, cur) 保证相邻点两两成段（错位会产生隔点「虚线」）
                 if (prevWasFinite) {
-                    if (segPos + 4 > seg.size) seg = seg.copyOf(seg.size * 2)
-                    seg[segPos++] = lastX; seg[segPos++] = lastY
-                    seg[segPos++] = x; seg[segPos++] = yy
+                    // 逐行求值样式：线段 (i-1, i) 的样式由后行决定
+                    val seg = if (styleOverrideOf != null) {
+                        val (c0, w0) = styleOverrideOf(key, i)
+                        segFor(c0 ?: baseColor, w0 ?: lineSizePx)
+                    } else {
+                        fastSeg
+                    }
+                    if (seg.pos + 4 > seg.arr.size) seg.arr = seg.arr.copyOf(seg.arr.size * 2)
+                    seg.arr[seg.pos++] = lastX; seg.arr[seg.pos++] = lastY
+                    seg.arr[seg.pos++] = x; seg.arr[seg.pos++] = yy
                 }
                 lastX = x
                 lastY = yy
                 prevWasFinite = true
             }
-            if (segPos >= 4) {
-                // T-34：native drawLines 一次 JNI 提交整列折线
-                drawIntoCanvas { canvas ->
-                    val p2 = android.graphics.Paint().apply {
-                        this.strokeWidth = width
-                        this.color = color.toArgb()
-                        this.style = android.graphics.Paint.Style.STROKE
-                        this.strokeCap = android.graphics.Paint.Cap.ROUND
-                        eff?.let { this.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 4f), 0f) }
+            // T-34：native drawLines 按样式组批量提交（无回调时恰为单组=原快速路径）
+            for (seg in groups.keys) {
+                if (seg.pos >= 4) {
+                    drawIntoCanvas { canvas ->
+                        val p2 = android.graphics.Paint().apply {
+                            this.strokeWidth = seg.width
+                            this.color = seg.color.toArgb()
+                            this.style = android.graphics.Paint.Style.STROKE
+                            this.strokeCap = android.graphics.Paint.Cap.ROUND
+                            eff?.let { this.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 4f), 0f) }
+                        }
+                        canvas.nativeCanvas.drawLines(seg.arr, 0, seg.pos, p2)
                     }
-                    canvas.nativeCanvas.drawLines(seg, 0, segPos, p2)
                 }
             }
             // Styles indicator.lastValueMark.show：线末端值点
             if (lastValueMark && !lastX.isNaN()) {
-                drawCircle(color, radius = 2.5f, center = Offset(lastX, lastY))
+                val (c0, w0) = if (styleOverrideOf != null) styleOverrideOf(key, range.last) else null to null
+                drawCircle(c0 ?: baseColor, radius = 2.5f, center = Offset(lastX, lastY))
             }
+        }
+    }
+
+    /**
+     * 实例 PlotDef.styles → drawLinePlots 行级样式回调（SLA-013/IND 消费链）。
+     * PlotDef.styles 协议：`(row: Int, params: List<Double>) -> Map<String,String>`
+     * 或 `(row: Int) -> Map<String,String>`；null=无覆盖。
+     */
+    fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int) -> Pair<Color?, Float?>)? {
+        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+        if (plots.values.all { it.styles == null }) return null
+        return { key, row ->
+            val stylesVal = plots[key]?.styles
+            val map: Map<*, *>? = when (stylesVal) {
+                null -> null
+                is Function2<*, *, *> ->
+                    @Suppress("UNCHECKED_CAST")
+                    (stylesVal as (Int, List<Double>) -> Any?)(row, inst.params) as? Map<*, *>
+                is Function1<*, *> ->
+                    @Suppress("UNCHECKED_CAST")
+                    (stylesVal as (Int) -> Any?)(row) as? Map<*, *>
+                is Map<*, *> -> stylesVal
+                else -> null
+            }
+            val color = map?.get("color")?.toString()?.let { io.lkanvas.compose.theme.StylesThemeBridge.parse(it) }
+            val width = map?.get("lineWidth")?.let { (it as? Number)?.toFloat() ?: it.toString().toFloatOrNull() }
+            color to width
         }
     }
 

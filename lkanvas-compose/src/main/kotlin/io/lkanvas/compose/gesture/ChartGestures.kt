@@ -22,7 +22,7 @@ internal object OverlayEventDispatch {
 
     /** 模板查询（含内置 16 模板）。 */
     fun templateOf(state: ChartState, instanceId: String?): io.lkanvas.core.overlay.OverlayDefinition? =
-        state.overlays.get(instanceId ?: return null)?.let { io.lkanvas.core.overlay.OverlayTemplates[it.templateName] }
+        state.overlays.get(instanceId ?: return null)?.let { io.lkanvas.core.extension.overlay.OverlayTemplates[it.templateName] }
 
     fun onClick(state: ChartState, id: String?, x: Float, y: Float) {
         templateOf(state, id)?.onClick?.invoke(id!!, -1, x.toDouble(), y.toDouble())

@@ -3,7 +3,7 @@ package io.lkanvas.core.archive
 import io.lkanvas.core.overlay.OverlayInstance
 import io.lkanvas.core.overlay.OverlayPhase
 import io.lkanvas.core.overlay.OverlayPoint
-import io.lkanvas.core.overlay.OverlayTemplates
+import io.lkanvas.core.extension.overlay.OverlayTemplates
 import io.lkanvas.core.store.MarketKey
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

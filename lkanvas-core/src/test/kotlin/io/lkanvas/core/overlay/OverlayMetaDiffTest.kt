@@ -6,6 +6,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import io.lkanvas.core.extension.overlay.OverlayTemplates
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -46,7 +47,7 @@ class OverlayMetaDiffTest {
         return out
     }
 
-    private val defs: Map<String, OverlayDefinition> = OverlayTemplates.all
+    private val defs: Map<String, OverlayDefinition> = io.lkanvas.core.extension.overlay.OverlayTemplates.let { table -> table.supported().mapNotNull { table[it] }.associateBy { it.name } }
 
     @Test
     fun `16模板全部覆盖且name集合一致`() {

@@ -3,7 +3,7 @@ package io.lkanvas.compose.state
 import io.lkanvas.core.archive.ChartArchive
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.overlay.OverlayPoint
-import io.lkanvas.core.overlay.OverlayTemplates
+import io.lkanvas.core.extension.overlay.OverlayTemplates
 import io.lkanvas.core.store.MarketKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch

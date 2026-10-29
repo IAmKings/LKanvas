@@ -308,7 +308,7 @@ class ChartState(
 
     /** 进入当前工具的创建模式（16 种模板通用入口）。 */
     fun beginCreateOverlay(): Boolean =
-        overlays.beginCreate(io.lkanvas.core.overlay.OverlayTemplates[currentTool] ?: io.lkanvas.core.overlay.SegmentDefinition) != null
+        overlays.beginCreate(io.lkanvas.core.extension.overlay.OverlayTemplates[currentTool] ?: io.lkanvas.core.extension.overlay.SegmentDefinition) != null
 
     /** 连续模板（brush）显式完成创建。 */
     fun finishCreateOverlay(): Boolean {
@@ -375,8 +375,16 @@ class ChartState(
         return androidx.compose.ui.geometry.Offset(x.toFloat(), y.toFloat())
     }
 
-    /** 像素 → 锚点（按磁吸模式吸附；PRD R-09）。 */
-    fun overlayPointFromPx(x: Float, y: Float): io.lkanvas.core.overlay.OverlayPoint? {
+    /**
+     * 像素 → 锚点（按磁吸模式吸附；PRD R-09）。
+     * [sensitivityPx]：磁吸灵敏度（上游 modeSensitivity，默认 8px）——WEAK 模式下
+     * 仅当目标像素与最近 OHLC 像素距离 ≤ 灵敏度时吸附（SLA-013 消费）。
+     */
+    fun overlayPointFromPx(
+        x: Float,
+        y: Float,
+        sensitivityPx: Double = 8.0,
+    ): io.lkanvas.core.overlay.OverlayPoint? {
         val candles = dataSnapshot.candles
         if (candles.isEmpty()) return null
         val idx = viewport.logicalIndexAt(x.toDouble()).roundToInt().coerceIn(candles.indices)
@@ -384,8 +392,22 @@ class ChartState(
         val value = when (overlays.magnetMode) {
             io.lkanvas.core.overlay.MagnetMode.NORMAL ->
                 mainPaneValueAt(y) ?: candle.close
-            io.lkanvas.core.overlay.MagnetMode.WEAK ->
-                mainPaneValueAt(y) ?: candle.close
+            io.lkanvas.core.overlay.MagnetMode.WEAK -> {
+                val raw = mainPaneValueAt(y) ?: candle.close
+                // 弱磁吸：与最近 OHLC 的像素距离在灵敏度内才吸附
+                val nearest = listOf(candle.open, candle.high, candle.low, candle.close).minByOrNull {
+                    kotlin.math.abs(it - raw)
+                } ?: raw
+                val nearestPx = mainPaneYOf(nearest)
+                val rawPx = mainPaneYOf(raw)
+                if (nearestPx != null && rawPx != null &&
+                    kotlin.math.abs(nearestPx - rawPx) <= sensitivityPx
+                ) {
+                    nearest
+                } else {
+                    raw
+                }
+            }
             io.lkanvas.core.overlay.MagnetMode.STRONG -> {
                 val raw = mainPaneValueAt(y) ?: candle.close
                 // 吸附到最近 OHLC

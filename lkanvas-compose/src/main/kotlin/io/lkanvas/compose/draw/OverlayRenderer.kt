@@ -31,6 +31,19 @@ object OverlayRenderer {
     /** 控制点命中半径（px，扩大可触达区域）。 */
     const val POINT_HIT_RADIUS = 18f
 
+    /** 实例级 styles 协议：Map 的 "color"（'#RRGGBB'）/ "lineWidth"（SLA-013 消费）。 */
+    internal fun stylesColor(inst: OverlayInstance): Color? {
+        val map = inst.styles as? Map<*, *> ?: return null
+        val raw = map["color"]?.toString() ?: return null
+        return parseFigureColor(raw)
+    }
+
+    internal fun stylesLineWidth(inst: OverlayInstance): Float? {
+        val map = inst.styles as? Map<*, *> ?: return null
+        val raw = map["lineWidth"] ?: return null
+        return (raw as? Number)?.toFloat() ?: raw.toString().toFloatOrNull()
+    }
+
     /** 主 pane 像素边界（bounds 参数由 KLineChart 传入）。 */
     fun DrawScope.drawOverlays(
         state: ChartState,
@@ -45,7 +58,8 @@ object OverlayRenderer {
             if (!inst.visible) continue
             if (inst.points.isEmpty()) continue
             val selected = inst.id == state.overlays.selectedId
-            val color = if (selected) theme.overlayPoint else theme.overlayLine
+            // SLA-013：实例级 styles 覆盖主题色
+            val color = if (selected) theme.overlayPoint else (stylesColor(inst) ?: theme.overlayLine)
             drawTemplate(state, inst, bounds, color, selected, creatingId == inst.id, theme, text)
         }
     }
@@ -62,8 +76,9 @@ object OverlayRenderer {
     ) {
         val px = inst.points.mapNotNull { state.overlayPointToPx(it) }
         val dash = if (creating) floatArrayOf(8f, 6f) else null
+        val lineWidth = stylesLineWidth(inst) ?: 2f
         fun line(a: Offset, b: Offset) = drawLine(
-            color, a, b, strokeWidth = 2f, cap = StrokeCap.Round,
+            color, a, b, strokeWidth = lineWidth, cap = StrokeCap.Round,
             pathEffect = dash?.let { PathEffect.dashPathEffect(it) },
         )
         fun seg(s: Pair<Offset, Offset>) = line(s.first, s.second)
@@ -118,7 +133,7 @@ object OverlayRenderer {
             // 0.4.x figure 样例：宿主自定义模板经 createPointFigures 钩子返回
             // Figure 原语描述（UpperCamelCase 类型名 → core Figure 映射）
             else -> {
-                val def = io.lkanvas.core.overlay.OverlayTemplates[inst.templateName]
+                val def = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName]
                     ?: io.lkanvas.chart.LkanvasRegistry.getOverlayDefinition(inst.templateName)
                 val figures = def?.createPointFigures(
                     inst.points, bounds.width, bounds.height,
@@ -136,7 +151,7 @@ object OverlayRenderer {
             }
         }
         // 控制点（非连续模板；选中或创建中）
-        val def = io.lkanvas.core.overlay.OverlayTemplates[inst.templateName]
+        val def = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName]
             ?: io.lkanvas.chart.LkanvasRegistry.getOverlayDefinition(inst.templateName)
         if (def?.continuous != true && (selected || creating)) {
             px.forEach { drawControlPoint(it, theme.overlayPoint) }
@@ -185,8 +200,8 @@ object OverlayRenderer {
         creating: Boolean,
     ) {
         if (points.size < 2) return
-        val levels = OverlayGeometry.fibonacciLevels(points[0].value, points[1].value, io.lkanvas.core.overlay.FibonacciLineDefinition.ratios)
-        val ratios = io.lkanvas.core.overlay.FibonacciLineDefinition.ratios
+        val levels = OverlayGeometry.fibonacciLevels(points[0].value, points[1].value, io.lkanvas.core.extension.overlay.FibonacciLineDefinition.ratios)
+        val ratios = io.lkanvas.core.extension.overlay.FibonacciLineDefinition.ratios
         for ((i, value) in levels.withIndex()) {
             val y = state.mainPaneYOf(value) ?: continue
             if (y < bounds.top || y > bounds.bottom) continue
@@ -259,18 +274,18 @@ object OverlayRenderer {
         val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneBottom.toDouble())
         val all = state.overlays.all().filter { it.visible && it.phase != OverlayPhase.CREATING }
         val selectedId = state.overlays.selectedId
-        // 1) 控制点（仅选中实例；连续模板无控制点编辑）
+        // 1) 控制点（仅选中实例；连续模板无控制点编辑；fixedZLevel 不随选中浮起）
         for (inst in all) {
-            if (inst.id != selectedId || inst.locked) continue
-            if (io.lkanvas.core.overlay.OverlayTemplates[inst.templateName]?.continuous == true) continue
+            if (inst.id != selectedId || inst.locked || inst.fixedZLevel) continue
+            if (io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName]?.continuous == true) continue
             inst.points.forEachIndexed { i, p ->
                 val px = state.overlayPointToPx(p) ?: return@forEachIndexed
                 if (hypot(px.x - x, px.y - y) <= POINT_HIT_RADIUS) return OverlayHit(inst.id, i, false)
             }
         }
-        // 2) 选中对象的线身
+        // 2) 选中对象的线身（fixedZLevel=true 层级固定：不享受选中优先，SLA-013）
         for (inst in all) {
-            if (inst.id != selectedId) continue
+            if (inst.id != selectedId || inst.fixedZLevel) continue
             if (hitBody(state, inst, x, y, bounds)) {
                 return OverlayHit(inst.id, null, wholeDrag = !inst.locked)
             }
@@ -336,9 +351,84 @@ object OverlayRenderer {
             "brush" -> {
                 (0 until px.size - 1).map { px[it] to px[it + 1] }
             }
-            else -> emptyList()
+            else -> {
+                // SLA-013：自定义模板经 createPointFigures 描述图形命中
+                // （渲染/命中共用同一钩子产物；checkEventOn=false 不参与命中）
+                return hitTemplateFigures(inst, x, y, px)
+            }
         }
         return segments.any { (a, b) -> distanceToSegment(x, y, a, b) <= HIT_RADIUS }
+    }
+
+    /**
+     * 自定义模板命中：执行模板 createPointFigures（与渲染同参），对描述的
+     * Line/Rect/Polygon/Circle/Arc/Text 做半径 HIT_RADIUS 的邻近判定。
+     */
+    private fun hitTemplateFigures(
+        inst: OverlayInstance,
+        x: Float,
+        y: Float,
+        px: List<Offset>,
+    ): Boolean {
+        val template = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName] ?: return false
+        if (!template.checkEventOn) return false
+        val figures = template.createPointFigures(
+            inst.points,
+            0.0, 0.0,
+            pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble()) },
+        ) ?: return false
+        for ((type, attrs, _) in figures) {
+            fun d(i: Int): Float? =
+                (attrs.getOrNull(i)?.getOrNull(0) ?: attrs.getOrNull(0)?.getOrNull(i))?.toFloat()
+            when (type) {
+                "Line" -> {
+                    val a = d(0) ?: continue
+                    val b = d(1) ?: continue
+                    val c = d(2) ?: continue
+                    val e = d(3) ?: continue
+                    if (distanceToSegment(x, y, Offset(a, b), Offset(c, e)) <= HIT_RADIUS) return true
+                }
+                "Circle" -> {
+                    val cx = d(0) ?: continue
+                    val cy = d(1) ?: continue
+                    val r = d(2) ?: continue
+                    if (hypot(x - cx, y - cy) <= r + HIT_RADIUS) return true
+                }
+                "Rect" -> {
+                    val l = d(0) ?: continue
+                    val t = d(1) ?: continue
+                    val r = d(2) ?: continue
+                    val b = d(3) ?: continue
+                    val inX = x >= minOf(l, r) - HIT_RADIUS && x <= maxOf(l, r) + HIT_RADIUS
+                    val inY = y >= minOf(t, b) - HIT_RADIUS && y <= maxOf(t, b) + HIT_RADIUS
+                    if (inX && inY) return true
+                }
+                "Polygon" -> {
+                    val edges = ArrayList<Pair<Offset, Offset>>(attrs.size)
+                    for (k in attrs.indices) {
+                        val p0 = attrs[k]
+                        val p1 = attrs[(k + 1) % attrs.size]
+                        if (p0.size >= 2 && p1.size >= 2) {
+                            edges.add(Offset(p0[0].toFloat(), p0[1].toFloat()) to Offset(p1[0].toFloat(), p1[1].toFloat()))
+                        }
+                    }
+                    if (edges.any { (a, b) -> distanceToSegment(x, y, a, b) <= HIT_RADIUS }) return true
+                }
+                "Arc" -> {
+                    // 弧命中取外接圆近似
+                    val cx = d(0) ?: continue
+                    val cy = d(1) ?: continue
+                    val r = d(2) ?: continue
+                    if (hypot(x - cx, y - cy) <= r + HIT_RADIUS) return true
+                }
+                "Text" -> {
+                    val tx = d(0) ?: continue
+                    val ty = d(1) ?: continue
+                    if (hypot(x - tx, y - ty) <= HIT_RADIUS) return true
+                }
+            }
+        }
+        return false
     }
 
     private fun fibonacciHitLines(
@@ -347,7 +437,7 @@ object OverlayRenderer {
         bounds: OverlayGeometry.Bounds,
     ): List<Pair<Offset, Offset>> {
         if (inst.points.size < 2) return emptyList()
-        val levels = OverlayGeometry.fibonacciLevels(inst.points[0].value, inst.points[1].value, io.lkanvas.core.overlay.FibonacciLineDefinition.ratios)
+        val levels = OverlayGeometry.fibonacciLevels(inst.points[0].value, inst.points[1].value, io.lkanvas.core.extension.overlay.FibonacciLineDefinition.ratios)
         return levels.mapNotNull { value ->
             val y = state.mainPaneYOf(value) ?: return@mapNotNull null
             if (y < bounds.top || y > bounds.bottom) return@mapNotNull null

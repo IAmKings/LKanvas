@@ -27,7 +27,12 @@ class LkanvasRegistryTest {
 
     @Test
     fun `16覆盖物预注册且registerOverlay语义一致`() {
-        assertEquals(16, LkanvasRegistry.getSupportedOverlays().size)
+        // 全局统一表：16 内置全部在册（宿主/其他测试注册可追加，断言包含关系）
+        val builtins = listOf("segment", "straightLine", "rayLine", "horizontalRayLine", "horizontalSegment",
+            "horizontalStraightLine", "verticalRayLine", "verticalSegment", "verticalStraightLine",
+            "parallelStraightLine", "priceChannelLine", "fibonacciLine", "priceLine",
+            "simpleAnnotation", "simpleTag", "brush")
+        assertTrue(LkanvasRegistry.getSupportedOverlays().containsAll(builtins), "16 内置覆盖物在册")
         val custom = object : io.lkanvas.core.overlay.OverlayDefinition {
             override val name = "customTool"
             override val pointCount = 2

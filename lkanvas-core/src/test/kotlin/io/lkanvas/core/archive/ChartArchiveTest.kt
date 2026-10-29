@@ -4,7 +4,7 @@ import io.lkanvas.core.overlay.OverlayInstance
 import io.lkanvas.core.overlay.OverlayManager
 import io.lkanvas.core.overlay.OverlayPhase
 import io.lkanvas.core.overlay.OverlayPoint
-import io.lkanvas.core.overlay.OverlayTemplates
+import io.lkanvas.core.extension.overlay.OverlayTemplates
 import io.lkanvas.core.store.MarketKey
 import kotlin.test.Test
 import kotlin.test.assertEquals

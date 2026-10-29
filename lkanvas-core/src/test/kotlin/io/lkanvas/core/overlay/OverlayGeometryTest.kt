@@ -1,5 +1,10 @@
 package io.lkanvas.core.overlay
 
+import io.lkanvas.core.extension.overlay.BrushDefinition
+import io.lkanvas.core.extension.overlay.FibonacciLineDefinition
+import io.lkanvas.core.extension.overlay.SegmentDefinition
+import io.lkanvas.core.extension.overlay.OverlayTemplates
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -15,7 +20,12 @@ class OverlayGeometryTest {
 
     @Test
     fun `16种模板全部登记且控制点数与上游一致`() {
-        assertEquals(16, OverlayTemplates.all.size)
+        // 全局统一表：16 内置全部在册（断言包含，跨测试注册可追加）
+        val builtinNames = listOf("segment", "straightLine", "rayLine", "horizontalRayLine", "horizontalSegment",
+            "horizontalStraightLine", "verticalRayLine", "verticalSegment", "verticalStraightLine",
+            "parallelStraightLine", "priceChannelLine", "fibonacciLine", "priceLine",
+            "simpleAnnotation", "simpleTag", "brush")
+        assertTrue(OverlayTemplates.supported().containsAll(builtinNames), "16 内置覆盖物在册")
         val expectPoints = mapOf(
             "segment" to 2,
             "straightLine" to 2,

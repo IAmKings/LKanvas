@@ -544,12 +544,25 @@ class LKanvasChart private constructor(
      */
     fun createOverlay(value: OverlayCreate, paneId: String = "main"): String? {
         // 模板解析：core 内置 16 表优先，回退宿主注册表（registerOverlay 注册的自定义模板）
-        val template = io.lkanvas.core.overlay.OverlayTemplates[value.name]
+        val template = io.lkanvas.core.extension.overlay.OverlayTemplates[value.name]
             ?: LkanvasRegistry.getOverlayDefinition(value.name)
             ?: return null
         if (value.points.isEmpty()) {
-            // 交互式（同门面 currentTool 流程）
-            return state.overlays.beginCreate(template)
+            // 交互式（同门面 currentTool 流程）；SLA-013：创建配置**先行应用**到
+            // 创建中实例（上游 createOverlay 无 points 分支同样应用全部字段），
+            // 交互完成（或取消）后配置保持生效
+            val id = state.overlays.beginCreate(template) ?: return null
+            val inst = state.overlays.get(id) ?: return null
+            inst.paneIdOverride = paneId
+            value.groupId?.let { inst.groupId = it }
+            value.extendData.forEach { (k, v) -> inst.extensionData[k] = v }
+            inst.locked = value.lock
+            inst.visible = value.visible
+            inst.zIndex = value.zLevel
+            inst.modeSensitivity = value.modeSensitivity
+            value.styles?.let { inst.styles = it }
+            state.notifyOverlayChanged()
+            return id
         }
         // 编程式：begin+逐点+显式完成（continuous）或自动完成（定步数）
         val id = state.overlays.beginCreate(template) ?: return null

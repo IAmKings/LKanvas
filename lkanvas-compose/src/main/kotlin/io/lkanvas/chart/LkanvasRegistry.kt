@@ -4,7 +4,7 @@ import io.lkanvas.core.i18n.ChartLocale
 import io.lkanvas.core.indicator.IndicatorDefinition
 import io.lkanvas.core.indicator.IndicatorRegistry
 import io.lkanvas.core.overlay.OverlayDefinition
-import io.lkanvas.core.overlay.OverlayTemplates
+import io.lkanvas.core.extension.overlay.OverlayTemplates
 
 /**
  * 顶层注册 API——对齐上游 `index.ts` 的 register 系 / getSupported 系同名函数
@@ -47,9 +47,6 @@ object LkanvasRegistry {
         "DMA" to { io.lkanvas.core.extension.indicator.DifferentOfMovingAverageIndicator() },
     )
 
-    /** 全局覆盖物模板注册表（16 内置已预注册）。 */
-    private val overlays = LinkedHashMap<String, OverlayDefinition>(OverlayTemplates.all)
-
     /** 全局文案注册表（zh-CN/en-US 已预注册）。 */
     val locales = LinkedHashMap<String, ChartLocale>().apply {
         put("zh-CN", ChartLocale.ZH_CN)
@@ -68,18 +65,20 @@ object LkanvasRegistry {
     fun getSupportedIndicators(): List<String> =
         io.lkanvas.core.extension.indicator.IndicatorTemplates.supported()
 
-    /** 上游 `registerOverlay(template)`。 */
-    fun registerOverlay(template: OverlayDefinition, replace: Boolean = false): Boolean {
-        if (!replace && overlays.containsKey(template.name)) return false
-        overlays[template.name] = template
-        return true
-    }
+    /**
+     * 上游 `registerOverlay(template)`：写入 core 全局覆盖物表（SLA-004/013 统一源：
+     * 创建/渲染/命中/手势事件共用同一张表）。
+     */
+    fun registerOverlay(template: OverlayDefinition, replace: Boolean = false): Boolean =
+        io.lkanvas.core.extension.overlay.OverlayTemplates.register(template, replace)
 
     /** 上游 `getSupportedOverlays()`。 */
-    fun getSupportedOverlays(): List<String> = overlays.keys.toList()
+    fun getSupportedOverlays(): List<String> =
+        io.lkanvas.core.extension.overlay.OverlayTemplates.supported()
 
     /** 上游 `getOverlayClass(name)` 等价：返回模板定义。 */
-    fun getOverlayDefinition(name: String): OverlayDefinition? = overlays[name]
+    fun getOverlayDefinition(name: String): OverlayDefinition? =
+        io.lkanvas.core.extension.overlay.OverlayTemplates.getDefinition(name)
 
     /** 上游 `registerLocale(name, locale)`。 */
     fun registerLocale(name: String, locale: ChartLocale) {

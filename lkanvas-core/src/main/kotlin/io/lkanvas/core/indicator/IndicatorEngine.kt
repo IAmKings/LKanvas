@@ -115,11 +115,11 @@ interface IndicatorDefinition {
     val shouldUpdate: Boolean get() = true
 
     /**
-     * 上游 createTooltipDataSource：自定义 tooltip 数据源回调。
+     * 上游 createTooltipDataSource：自定义 tooltip 数据源回调（同步，上游同款）。
      * 签名：(dataList, crosshairDataIndex) -> Map<key, displayValue>；
-     * null=使用 figures 默认数据（绘制端消费）。
+     * null=使用 figures 默认数据。TooltipRenderer 消费（SLA-013/IND）。
      */
-    val createTooltipDataSource: (suspend (List<io.lkanvas.core.data.Candle>, Int) -> Map<String, String>)? get() = null
+    val createTooltipDataSource: ((List<io.lkanvas.core.data.Candle>, Int) -> Map<String, String>)? get() = null
 
     /**
      * 上游 draw：完全自定义绘制回调（绕过 figures 渲染管线）。

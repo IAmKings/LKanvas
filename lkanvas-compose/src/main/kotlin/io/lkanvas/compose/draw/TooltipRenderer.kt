@@ -104,9 +104,18 @@ object TooltipRenderer {
                 "(${inst.params.joinToString(",") { trimNum(it) }})"
             } else ""
             val legendColor = StylesThemeBridge.parse(styles.indicator.tooltip.legend.color)
-            val rows = res.result.keys.mapIndexed { k, key ->
-                val v = res.result[key].getOrNull(idx) ?: Double.NaN
-                LegendRow(key, text.price(v), legendColor, theme.linePalette[k % theme.linePalette.size])
+            // SLA-013/IND：createTooltipDataSource 消费——非空时以模板自定义数据源
+            // 替代 figures 默认行（上游 IndicatorTooltipView.createTooltipDataSource 语义）
+            val customSource = inst.definition.createTooltipDataSource?.invoke(state.dataSnapshot.candles, idx)
+            val rows = if (customSource != null) {
+                customSource.entries.mapIndexed { k, entry ->
+                    LegendRow(entry.key, entry.value, legendColor, theme.linePalette[k % theme.linePalette.size])
+                }
+            } else {
+                res.result.keys.mapIndexed { k, key ->
+                    val v = res.result[key].getOrNull(idx) ?: Double.NaN
+                    LegendRow(key, text.price(v), legendColor, theme.linePalette[k % theme.linePalette.size])
+                }
             }
             groups += IndicatorGroup(name + params, rows)
         }

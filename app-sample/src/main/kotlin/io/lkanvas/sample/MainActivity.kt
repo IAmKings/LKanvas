@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
                         Modifier.fillMaxWidth().padding(8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
                     ) {
                         // 画线工具循环（16 种，T-20/21/22）
-                        val tools = io.lkanvas.core.overlay.OverlayTemplates.all.keys.toList()
+                        val tools = io.lkanvas.core.extension.overlay.OverlayTemplates.all.keys.toList()
                         Button(
                             onClick = {
                                 val next = tools[(tools.indexOf(state.currentTool) + 1) % tools.size]
