@@ -105,6 +105,8 @@ fun KLineChart(
             // 订阅视口/覆盖物版本（P1 修复）：纯 scrollIndex/barSpacing 变化
             // 无任何 snapshot state 变化也必须触发重绘（静态数据下平移/缩放）
             @Suppress("UNUSED_VARIABLE") val renderRevision = state.viewRevision + state.overlayRevision
+            // T-30 余量：渲染计时（诊断开启时才记录，关闭零开销）
+            val renderStart = if (state.diagnostics.isEnabled()) System.nanoTime() else 0L
             with(ChartRenderer) {
                 render(
                     state = state,
@@ -123,6 +125,10 @@ fun KLineChart(
                     ),
                     textMeasurer = textMeasurer,
                 )
+            }
+            if (renderStart != 0L) {
+                state.diagnostics.lastRenderNanos.set(System.nanoTime() - renderStart)
+                state.diagnostics.renderCount.incrementAndGet()
             }
         }
         // 宿主图例插槽（叠加在图表顶部；R-11「Compose slot 或事件实现宿主定制」）

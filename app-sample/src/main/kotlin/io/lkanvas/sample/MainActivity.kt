@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
             val chartFacade = remember { io.lkanvas.chart.LKanvasChart.init(state) }
             var showIndicatorPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             var showStylesPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
+            var showDiagPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
             LaunchedEffect(state, stress) { feed.start(state, stress, chartFacade) }
             // 左缘分页：滚动到边缘时补充更早历史（锚点保持由 core 保证）
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
                 Column(modifier = Modifier.statusBarsPadding()) {
                     // —— 批次 6 余量：周期 tab + 指标面板（对齐上游 demo 信息架构） ——
                     val currentPeriod = remember { androidx.compose.runtime.mutableStateOf(Period(Period.PeriodType.MINUTE)) }
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState())) {
                         val periods: List<Pair<String, Period>> = listOf(
                             "1m" to Period(Period.PeriodType.MINUTE),
                             "5m" to Period(Period.PeriodType.MINUTE, 5 * 60_000L),
@@ -96,12 +97,19 @@ class MainActivity : ComponentActivity() {
                         }
                         Spacer(Modifier.weight(1f))
                         Button(onClick = { showIndicatorPanel = !showIndicatorPanel }) { Text("指标") }
+                        Button(
+                            onClick = { showDiagPanel = !showDiagPanel },
+                            modifier = Modifier.padding(start = 4.dp),
+                        ) { Text("诊") }
                     }
                     if (showIndicatorPanel) {
                         IndicatorPanel(facade = chartFacade, onClose = { showIndicatorPanel = false })
                     }
                     if (showStylesPanel) {
                         StylesPanel(facade = chartFacade, onClose = { showStylesPanel = false })
+                    }
+                    if (showDiagPanel) {
+                        DiagnosticsPanel(facade = chartFacade, onClose = { showDiagPanel = false })
                     }
                     // 门面 Styles 消费：resolveTheme 从 styles 树推导主题快照
                     val facadeTheme = remember(chartFacade.getStyles()) { chartFacade.resolveTheme() }
