@@ -166,6 +166,52 @@ class AxisAndInstanceFieldsTest {
         assertTrue(updated.fixedZLevel)
     }
 
+    // ---------- 0.5.x 多轴完整版：自定义变换轴 ----------
+
+    /** log10 变换轴（宿主自定义 CustomYAxis 契约实现）。 */
+    private val log10Axis = object : io.lkanvas.core.axis.CustomYAxis {
+        override fun valueToReal(value: Double): Double =
+            if (value < 0) -kotlin.math.log10(1 - value) else kotlin.math.log10(1 + value)
+        override fun realToValue(real: Double): Double =
+            if (real < 0) 1 - Math.pow(10.0, -real) else Math.pow(10.0, real) - 1
+    }
+
+    @Test
+    fun customTransformAxis_syncsAndProjects() {
+        val chart = newChart()
+        val st = chart.state
+        // 建带 customAxis 的轴 → 同步到渲染消费源
+        chart.createYAxis(YAxisOverride(id = "ax_log", customAxis = log10Axis))
+        assertTrue(st.extraYAxisCustom.containsKey("ax_log"))
+        // override 不带 customAxis → 按上游 merge 语义保留（null=未提供不可区分清除）
+        chart.overrideYAxis(YAxisOverride(id = "ax_log"))
+        assertTrue(st.extraYAxisCustom.containsKey("ax_log"), "override 保留 custom")
+        // 提供新 customAxis → 覆盖
+        chart.overrideYAxis(YAxisOverride(id = "ax_log", customAxis = log10Axis))
+        assertTrue(st.extraYAxisCustom.containsKey("ax_log"), "override 覆盖 custom")
+        // removeYAxis → 清理
+        chart.removeYAxis(YAxisFilter(id = "ax_log"))
+        assertTrue(st.extraYAxisCustom["ax_log"] == null, "移除后 custom 清理")
+        // 重建并投影校验：值域经 log10 后压缩（万级价格 → real 域 ~4）
+        chart.createYAxis(YAxisOverride(id = "ax_log2", customAxis = log10Axis))
+        kotlinx.coroutines.runBlocking {
+            st.reset(
+                io.lkanvas.core.store.MarketKey("T", "1m"),
+                listOf(candleOf(1, 9999.0), candleOf(2, 10000.0), candleOf(3, 10001.0)),
+            )
+        }
+        chart.createIndicator("MA", calcParams = listOf(2.0), yAxisId = "ax_log2")
+        val (alo, ahi) = st.extraAxisRange("ax_log2", 0, 2)!!
+        assertTrue(ahi > 9900, "原始值域（万级）：$alo~$ahi")
+        // log10 real 域显著压缩：realRange 上界 ≈ log10(10001+1) ≈ 4.0
+        val (rf, rt) = io.lkanvas.core.axis.YAxisMath.realRange(
+            io.lkanvas.core.axis.YAxisSpec.Custom(log10Axis), alo, ahi,
+        )
+        assertTrue(rt < 5.0 && rt > 3.0, "log10 real 域上界 ≈4：$rf~$rt")
+        assertTrue(rt - rf < 0.01, "万级窄幅 → real 域极窄（变换生效）")
+        LKanvasChart.dispose(chart)
+    }
+
     // ---------- 0.5.x 动态副图 pane ----------
 
     @Test

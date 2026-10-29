@@ -542,6 +542,9 @@ class ChartState(
      */
     var extraYAxisMeta by androidx.compose.runtime.mutableStateOf(emptyMap<String, Boolean>())
 
+    /** 0.5.x 多轴完整版：自定义变换轴（axisId → CustomYAxis；渲染按 Custom spec 映射）。 */
+    var extraYAxisCustom by androidx.compose.runtime.mutableStateOf(emptyMap<String, io.lkanvas.core.axis.CustomYAxis>())
+
     /**
      * 自定义轴 [axisId] 的独立值域：绑定该轴的全部指标在可见区 [from,to] 的
      * 值 min/max（NaN 跳过）。无绑定/无有效值返回 null（渲染跳过该轴）。

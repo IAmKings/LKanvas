@@ -130,9 +130,23 @@ object PaneRenderers {
             val colX = extraAxisCols.getOrNull(ai) ?: continue
             val (alo, ahi) = state.extraAxisRange(axisId, range.first, range.last) ?: continue
             val reversed = extraAxes[axisId] == true
-            val (ylo, yhi) = if (reversed) ahi to alo else alo to ahi
-            val ay: (Double) -> Double = { v ->
-                LinearYAxis.valueToY(v, ylo, yhi, top.toDouble(), bottom.toDouble())
+            val customSpec = state.extraYAxisCustom[axisId]?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
+            // Custom 变换轴：值经变换投影到 real 域再线性映射；刻度经 customTicks（A-18 净化内建）
+            val rlo: Double
+            val rhi: Double
+            val ay: (Double) -> Double
+            var customTicks: io.lkanvas.core.axis.AxisTicks? = null
+            if (customSpec != null) {
+                val (rf, rt) = YAxisMath.realRange(customSpec, alo, ahi)
+                rlo = if (reversed) rt else rf
+                rhi = if (reversed) rf else rt
+                ay = { v -> LinearYAxis.valueToY(YAxisMath.valueToReal(customSpec, v), rlo, rhi, top.toDouble(), bottom.toDouble()) }
+                customTicks = YAxisMath.ticks(customSpec, alo, ahi, 5)
+            } else {
+                val (ylo, yhi) = if (reversed) ahi to alo else alo to ahi
+                rlo = ylo
+                rhi = yhi
+                ay = { v -> LinearYAxis.valueToY(v, ylo, yhi, top.toDouble(), bottom.toDouble()) }
             }
             clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
                 var axPalette = ai * 3
@@ -160,13 +174,23 @@ object PaneRenderers {
             }
             // 轴标签（该轴绑定指标首色，独立 gutter 列）
             val axisColor = theme.linePalette[(ai * 3) % theme.linePalette.size]
-            val ticks = LinearYAxis.ticks(ylo, yhi, 5)
             var lastTop = Float.NEGATIVE_INFINITY
-            for (t in ticks) {
-                val ty = LinearYAxis.valueToY(t, ylo, yhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
-                if (ty < lastTop + 2f || ty < legendHeight) continue
-                drawText(text, text.price(t), Offset(colX, ty), axisColor)
-                lastTop = ty
+            if (customTicks != null) {
+                for (t in customTicks.ticks) {
+                    val ty = LinearYAxis.valueToY(t.real, rlo, rhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
+                    if (ty < lastTop + 2f || ty < legendHeight) continue
+                    drawText(text, t.text, Offset(colX, ty), axisColor)
+                    lastTop = ty
+                }
+            } else {
+                val (ylo, yhi) = if (reversed) ahi to alo else alo to ahi
+                val ticks = LinearYAxis.ticks(ylo, yhi, 5)
+                for (t in ticks) {
+                    val ty = LinearYAxis.valueToY(t, ylo, yhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
+                    if (ty < lastTop + 2f || ty < legendHeight) continue
+                    drawText(text, text.price(t), Offset(colX, ty), axisColor)
+                    lastTop = ty
+                }
             }
         }
         drawAxisTicks(text, theme, axisTicks, yReal, contentRight, clipTop = legendHeight)

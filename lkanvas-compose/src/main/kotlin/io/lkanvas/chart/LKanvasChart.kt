@@ -771,9 +771,9 @@ class LKanvasChart private constructor(
     /** 上游 `createYAxis(yAxis)`：登记轴实例，返回 id（重复 id 幂等返回）。 */
     /** 0.4.0 多轴渲染：把自定义轴（paneId=main）同步到 ChartState（渲染消费源）。 */
     private fun syncExtraAxes() {
-        state.extraYAxisMeta = yAxes.values
-            .filter { it.id != "main" && it.paneId == "main" }
-            .associate { it.id to it.reverse }
+        val mains = yAxes.values.filter { it.id != "main" && it.paneId == "main" }
+        state.extraYAxisMeta = mains.associate { it.id to it.reverse }
+        state.extraYAxisCustom = mains.mapNotNull { a -> a.customAxis?.let { a.id to it } }.toMap()
     }
 
     fun createYAxis(yAxis: YAxisOverride): String? {
@@ -792,6 +792,7 @@ class LKanvasChart private constructor(
             gap = yAxis.gap ?: AxisGap(),
             needWidget = yAxis.needWidget ?: true,
             isDefault = false,
+            customAxis = yAxis.customAxis,
         )
         syncExtraAxes()
         state.notifyViewportChanged()

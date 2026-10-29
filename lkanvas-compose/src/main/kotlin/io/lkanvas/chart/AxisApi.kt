@@ -33,6 +33,12 @@ data class YAxisOverride(
     val scrollZoomEnabled: Boolean? = null,
     val gap: AxisGap? = null,
     val needWidget: Boolean? = null,
+    /**
+     * 自定义值变换（上游 AxisTemplate 的 valueToRealValue/realToValue/displayValueToText
+     * 组合桥接为 core [io.lkanvas.core.axis.CustomYAxis] 契约）；非空时该轴按
+     * Custom spec 映射（绑定指标的值经变换后投影，刻度经 customTicks/净化生成）。
+     */
+    val customAxis: io.lkanvas.core.axis.CustomYAxis? = null,
 )
 
 /** 上游 `YAxisFilter`：paneId/id/name 过滤组合。 */
@@ -65,4 +71,6 @@ data class YAxisInfo(
     val needWidget: Boolean,
     /** 是否 pane 默认轴（主 pane 默认轴不可删除，上游 isDefaultYAxis 语义）。 */
     val isDefault: Boolean,
+    /** 0.5.x：自定义值变换（见 [YAxisOverride.customAxis]）。 */
+    val customAxis: io.lkanvas.core.axis.CustomYAxis? = null,
 )
