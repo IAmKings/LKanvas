@@ -540,7 +540,16 @@ class ChartState(
      * 门面 createYAxis/removeYAxis/overrideYAxis 同步；仅 paneId=main 的轴进入渲染。
      * 绑定该轴的指标（IndicatorInstance.yAxisId）用独立值域映射并获独立标签列。
      */
-    var extraYAxisMeta by androidx.compose.runtime.mutableStateOf(emptyMap<String, Boolean>())
+    var extraYAxisMeta by androidx.compose.runtime.mutableStateOf(emptyMap<String, ExtraAxisMeta>())
+
+    /** 0.5.x 多轴完整版：自定义轴渲染元数据（position/inside 消费标签列位置）。 */
+    data class ExtraAxisMeta(
+        val reverse: Boolean = false,
+        /** 上游 inside：标签画 pane 内右缘（右对齐）而非独立 gutter 列。 */
+        val inside: Boolean = false,
+        /** 上游 position LEFT：标签画 pane 内左缘（right 轴位置与独立列等价，登记）。 */
+        val positionLeft: Boolean = false,
+    )
 
     /** 0.5.x 多轴完整版：自定义变换轴（axisId → CustomYAxis；渲染按 Custom spec 映射）。 */
     var extraYAxisCustom by androidx.compose.runtime.mutableStateOf(emptyMap<String, io.lkanvas.core.axis.CustomYAxis>())

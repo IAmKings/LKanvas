@@ -166,6 +166,24 @@ class AxisAndInstanceFieldsTest {
         assertTrue(updated.fixedZLevel)
     }
 
+    // ---------- 0.5.x 多轴完整版：position/inside 元数据 ----------
+
+    @Test
+    fun extraAxisMeta_positionInsideSynced() {
+        val chart = newChart()
+        val st = chart.state
+        chart.createYAxis(YAxisOverride(id = "ax_in", inside = true))
+        chart.createYAxis(YAxisOverride(id = "ax_left", position = AxisPosition.LEFT))
+        chart.createYAxis(YAxisOverride(id = "ax_right"))
+        assertTrue(st.extraYAxisMeta["ax_in"]!!.inside, "inside 同步")
+        assertTrue(st.extraYAxisMeta["ax_left"]!!.positionLeft, "LEFT 同步")
+        assertTrue(!st.extraYAxisMeta["ax_right"]!!.inside && !st.extraYAxisMeta["ax_right"]!!.positionLeft, "right 默认独立列")
+        // override 翻转
+        chart.overrideYAxis(YAxisOverride(id = "ax_right", inside = true))
+        assertTrue(st.extraYAxisMeta["ax_right"]!!.inside, "override 翻转 inside")
+        LKanvasChart.dispose(chart)
+    }
+
     // ---------- 0.5.x 多轴完整版：自定义变换轴 ----------
 
     /** log10 变换轴（宿主自定义 CustomYAxis 契约实现）。 */
@@ -191,7 +209,7 @@ class AxisAndInstanceFieldsTest {
         assertTrue(st.extraYAxisCustom.containsKey("ax_log"), "override 覆盖 custom")
         // removeYAxis → 清理
         chart.removeYAxis(YAxisFilter(id = "ax_log"))
-        assertTrue(st.extraYAxisCustom["ax_log"] == null, "移除后 custom 清理")
+        assertTrue(st.extraYAxisCustom["ax_log"] === null, "移除后 custom 清理")
         // 重建并投影校验：值域经 log10 后压缩（万级价格 → real 域 ~4）
         chart.createYAxis(YAxisOverride(id = "ax_log2", customAxis = log10Axis))
         kotlinx.coroutines.runBlocking {
@@ -327,7 +345,7 @@ class AxisAndInstanceFieldsTest {
         // 创建自定义轴 → 同步到渲染消费源
         val ax = chart.createYAxis(YAxisOverride(id = "ax1", reverse = true))!!
         assertTrue(state.extraYAxisMeta.keys.contains("ax1"))
-        assertEquals(true, state.extraYAxisMeta["ax1"])
+        assertEquals(true, state.extraYAxisMeta["ax1"]?.reverse)
         // 移除 → 同步清空
         assertTrue(chart.removeYAxis(YAxisFilter(id = ax)))
         assertTrue(state.extraYAxisMeta.isEmpty())

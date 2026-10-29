@@ -89,7 +89,10 @@ object ChartRenderer {
         // 0.4.0 多轴：自定义轴标签列坐标（主轴列右侧依次向右；主轴列宽 = tagWidth+8）
         val extraAxisCols = if (params.extraAxisColW > 0f && state.extraYAxisMeta.isNotEmpty()) {
             val mainCol = text.tagWidth + 8f
-            state.extraYAxisMeta.keys.mapIndexed { i, _ -> contentRight + mainCol + i * params.extraAxisColW }
+            // 0.5.x：仅独立列轴占位（inside/LEFT 轴画 pane 内右缘）
+            state.extraYAxisMeta.values
+                .filter { !it.inside && !it.positionLeft }
+                .mapIndexed { i, _ -> contentRight + mainCol + i * params.extraAxisColW }
         } else emptyList()
         with(PaneRenderers) {
             drawMainPane(state, theme, 0f, contentRight, mainTop, mainBottom, text, crosshair, legendHeight, extraAxisCols = extraAxisCols)

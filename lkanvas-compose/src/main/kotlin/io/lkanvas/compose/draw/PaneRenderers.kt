@@ -126,10 +126,13 @@ object PaneRenderers {
         // 0.4.0 多轴渲染（CH-053~056/IND-003 消费端）：绑定自定义轴的指标用
         // 独立值域映射，轴标签画在各自 gutter 列（reverse 翻转值域方向）
         val extraAxes = state.extraYAxisMeta
+        var colIdx = 0
         for ((ai, axisId) in extraAxes.keys.withIndex()) {
-            val colX = extraAxisCols.getOrNull(ai) ?: continue
+            val meta = extraAxes[axisId] ?: continue
+            val inPane = meta.inside || meta.positionLeft
+            val colX = if (inPane) -1f else extraAxisCols.getOrNull(colIdx++) ?: continue
             val (alo, ahi) = state.extraAxisRange(axisId, range.first, range.last) ?: continue
-            val reversed = extraAxes[axisId] == true
+            val reversed = meta.reverse
             val customSpec = state.extraYAxisCustom[axisId]?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
             // Custom 变换轴：值经变换投影到 real 域再线性映射；刻度经 customTicks（A-18 净化内建）
             val rlo: Double
@@ -172,14 +175,15 @@ object PaneRenderers {
                     axPalette += res.result.keys.size
                 }
             }
-            // 轴标签（该轴绑定指标首色，独立 gutter 列）
+            // 轴标签（独立 gutter 列；inside/LEFT 轴画 pane 内右缘右对齐）
             val axisColor = theme.linePalette[(ai * 3) % theme.linePalette.size]
             var lastTop = Float.NEGATIVE_INFINITY
+            fun labelX(v: String): Float = if (colX < 0f) contentRight - text.measureWidth(v) - 6f else colX
             if (customTicks != null) {
                 for (t in customTicks.ticks) {
                     val ty = LinearYAxis.valueToY(t.real, rlo, rhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
                     if (ty < lastTop + 2f || ty < legendHeight) continue
-                    drawText(text, t.text, Offset(colX, ty), axisColor)
+                    drawText(text, t.text, Offset(labelX(t.text), ty), axisColor)
                     lastTop = ty
                 }
             } else {
@@ -188,7 +192,8 @@ object PaneRenderers {
                 for (t in ticks) {
                     val ty = LinearYAxis.valueToY(t, ylo, yhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
                     if (ty < lastTop + 2f || ty < legendHeight) continue
-                    drawText(text, text.price(t), Offset(colX, ty), axisColor)
+                    val s0 = text.price(t)
+                    drawText(text, s0, Offset(labelX(s0), ty), axisColor)
                     lastTop = ty
                 }
             }

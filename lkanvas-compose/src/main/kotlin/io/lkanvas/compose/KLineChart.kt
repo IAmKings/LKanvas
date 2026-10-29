@@ -59,7 +59,7 @@ fun KLineChart(
         androidx.compose.ui.unit.Dp(44f).toPx() * fontScale
     }
     val gutterW = with(density) { config.rightAxisGutter.toPx() * fontScale } +
-        state.extraYAxisMeta.size * extraAxisColW
+        state.extraYAxisMeta.values.count { !it.inside && !it.positionLeft } * extraAxisColW
     val legendTextSizePx = with(density) { config.legendTextSize.toPx() }
     val textSizePx = with(density) { config.axisTextSize.toPx() }
 

@@ -772,7 +772,13 @@ class LKanvasChart private constructor(
     /** 0.4.0 多轴渲染：把自定义轴（paneId=main）同步到 ChartState（渲染消费源）。 */
     private fun syncExtraAxes() {
         val mains = yAxes.values.filter { it.id != "main" && it.paneId == "main" }
-        state.extraYAxisMeta = mains.associate { it.id to it.reverse }
+        state.extraYAxisMeta = mains.associate {
+            it.id to io.lkanvas.compose.state.ChartState.ExtraAxisMeta(
+                reverse = it.reverse,
+                inside = it.inside,
+                positionLeft = it.position == AxisPosition.LEFT,
+            )
+        }
         state.extraYAxisCustom = mains.mapNotNull { a -> a.customAxis?.let { a.id to it } }.toMap()
     }
 
