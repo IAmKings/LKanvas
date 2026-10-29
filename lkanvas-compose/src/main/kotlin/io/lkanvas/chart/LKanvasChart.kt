@@ -390,26 +390,48 @@ class LKanvasChart private constructor(
     // ---------- 指标（对齐 Chart.ts 指标组） ----------
 
     /**
-     * 上游 `createIndicator(value, isStack?)`：按模板名创建实例并全量计算，
-     * 返回 instanceId（未知模板返回 null）。
+     * 上游 `createIndicator(value, isStack?)`（SLA-007 严格语义）：
+     * - paneId 缺省 = 自动生成新指标 pane（并自动建 pane，上游 _createPane）；
+     * - isStack 缺省 false（替换目标 pane 既有指标，上游 addIndicator）；
+     * - id 提供且已存在同 id 实例 → 返回 null（上游同名过滤去重）。
      */
     fun createIndicator(
         name: String,
         calcParams: List<Double>? = null,
-        paneId: String = "main",
-        isStack: Boolean = true,
+        paneId: String? = null,
+        isStack: Boolean = false,
         yAxisId: String = "main",
         styles: Any? = null,
+        id: String? = null,
     ): String? {
-        val id = state.createIndicator(name, calcParams, paneId, isStack, yAxisId, styles)
-        // 0.5.x 动态副图：paneId 非内置时自动创建 pane（布局随 relayout 扩展）
-        if (id != null && paneId !in setOf("main", "vol", "macd")) {
-            ensureExtraPane(paneId)
+        val created = state.createIndicator(name, calcParams, paneId, isStack, yAxisId, styles, id)
+        // 0.5.x 动态副图：解析后的 paneId 非内置时自动创建 pane（布局随 relayout 扩展）
+        val resolvedPaneId = created?.let { state.getIndicatorByInstanceId(it)?.paneId }
+        if (resolvedPaneId != null && resolvedPaneId !in setOf("main", "vol", "macd")) {
+            ensureExtraPane(resolvedPaneId)
         }
-        return id
+        return created
     }
 
-    /** 上游 `overrideIndicator`：字段级覆盖（calcParams/visible）。 */
+    /**
+     * 上游 `overrideIndicator`（SLA-007 全字段）：按 filter 定位全部匹配实例，
+     * 非空字段覆盖。
+     */
+    fun overrideIndicator(
+        filter: ChartState.IndicatorFilter,
+        calcParams: List<Double>? = null,
+        visible: Boolean? = null,
+        styles: Any? = null,
+        shortName: String? = null,
+        paneId: String? = null,
+        yAxisId: String? = null,
+        zLevel: Int? = null,
+        extendData: Map<String, Any?>? = null,
+    ): Boolean = state.overrideIndicator(
+        filter, calcParams, visible, styles, shortName, paneId, yAxisId, zLevel, extendData,
+    )
+
+    /** 上游 `overrideIndicator` 按 id 简写。 */
     fun overrideIndicator(id: String, calcParams: List<Double>? = null, visible: Boolean? = null): Boolean =
         state.overrideIndicator(id, calcParams, visible)
 

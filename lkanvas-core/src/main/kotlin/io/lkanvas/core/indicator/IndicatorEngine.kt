@@ -128,6 +128,28 @@ interface IndicatorDefinition {
      */
     val draw: ((IndicatorDrawContext) -> Unit)? get() = null
 
+    /**
+     * 上游模板 `calc(dataList, indicator)` 的规范全量入口（SLA-002 结构对齐核心）：
+     * 逐根产出输出行（figure key → 值；未预热/缺失**省略键**，即 NaN），
+     * 返回列表长度必须等于 [candles].size。
+     *
+     * 引擎全量路径（[IndicatorEngine.recompute]）执行本函数——上游公式补丁
+     * 可按行直接移植；输出键顺序以 [plotsFor]`(params)` 为准。
+     *
+     * 默认实现 = Scratch 折叠（宿主自定义模板未覆写 calc 时仍可用）；
+     * 内置 27 模板逐一覆写为上游镜像，calc ≡ Scratch 折叠的一致性由
+     * DualPathParityTest 在全部 27 模板上验证（SLA-002 验收）。
+     */
+    fun calc(candles: List<Candle>, params: List<Double>): List<Map<String, Double>> {
+        var scratch = initScratch(params)
+        val rows = ArrayList<Map<String, Double>>(candles.size)
+        for (i in candles.indices) {
+            scratch = stepScratch(scratch, candles, params, i)
+            rows.add(rowFromScratch(scratch, candles, params, i))
+        }
+        return rows
+    }
+
     /** 空数据的初始私有状态。 */
     fun initScratch(params: List<Double>): Any?
 
@@ -170,22 +192,39 @@ class IndicatorDrawContext(
 
 /**
  * 指标实例（PRD 4.1）：携带参数、独立计算状态；实例之间不共享可变状态。
+ * paneId/yAxisId/styles 与 shortName/precision/zLevel/extendData 支持实例级
+ * 覆盖（上游 overrideIndicator 字段面，SLA-007）。
  */
 class IndicatorInstance(
     val id: String,
     val definition: IndicatorDefinition,
     params: List<Double> = definition.calcParams,
-    /** 所属 pane（上游 Indicator.paneId；默认 main）。 */
-    val paneId: String = "main",
+    /** 所属 pane（上游 Indicator.paneId；创建时由门面解析，缺省为新指标 pane）。 */
+    var paneId: String = "main",
     /** 绑定 Y 轴（上游 Indicator.yAxisId；默认主轴 main，依赖多轴 CH-053~057）。 */
-    val yAxisId: String = "main",
+    var yAxisId: String = "main",
     /** 上游 Indicator.styles：实例级样式覆盖（宿主自定义结构，绘制端消费）。 */
-    val styles: Any? = null,
+    var styles: Any? = null,
 ) {
     var params: List<Double> = params
         private set
 
     var visible: Boolean = definition.visible
+
+    /** 上游 Indicator.shortName 实例级覆盖（null=用模板默认；图例/tooltip 消费）。 */
+    var shortNameOverride: String? = null
+
+    /** 上游 Indicator.precision 实例级覆盖（null=用模板默认）。 */
+    var precisionOverride: Int? = null
+
+    /** 上游 Indicator.zLevel 实例级覆盖（null=用模板默认）。 */
+    var zLevelOverride: Int? = null
+
+    /** 上游 Indicator.extendData：实例级扩展数据（宿主自定义）。 */
+    val extendData: LinkedHashMap<String, Any?> = LinkedHashMap()
+
+    /** 显示名（上游 displayName 语义：shortName 覆盖优先）。 */
+    fun displayName(): String = shortNameOverride ?: definition.shortName
 
     /** 最近一次计算结果（版本由引擎外部的门禁管理）。 */
     var state: IndicatorResultState? = null
@@ -235,20 +274,30 @@ enum class ComputeMode { FULL, INCREMENTAL_REPLACE, INCREMENTAL_APPEND, FULL_FAL
  */
 object IndicatorEngine {
 
-    /** 全量计算（fold 模型，公式与上游逐位对照由 fixtures 保证）。 */
+    /**
+     * 全量计算：输出列由规范入口 [IndicatorDefinition.calc] 产出（上游模板
+     * calc 镜像，公式补丁可直接移植）；Scratch 折叠仅为增量推进建立边界状态
+     * （SLA-002：calc ≡ Scratch 双路径互验由 DualPathParityTest 保证）。
+     */
     fun recompute(definition: IndicatorDefinition, params: List<Double>, candles: List<Candle>): IndicatorResultState {
         // PRD R-08：实际输出列以 plotsFor(params) 为准（实例参数个数可与默认不同；
         // 用 definition.plots 会在自定义参数实例上留下永久 NaN 假列）
         val plots = definition.plotsFor(params)
         val columns = HashMap<String, DoubleArray>(plots.size * 2)
         for (p in plots) columns[p.key] = DoubleArray(candles.size) { Double.NaN }
+        val rows = definition.calc(candles, params)
+        require(rows.size == candles.size) {
+            "calc 行数(${rows.size}) 必须等于数据根数(${candles.size})：${definition.name}"
+        }
+        for ((i, row) in rows.withIndex()) {
+            for ((k, v) in row) columns.getValue(k)[i] = v
+        }
+        // Scratch 边界状态（增量 advance 的折叠起点）
         var scratch: Any? = definition.initScratch(params)
         var scratchPrev: Any? = null
         for (i in candles.indices) {
             scratchPrev = scratch
             scratch = definition.stepScratch(scratch, candles, params, i)
-            val row = definition.rowFromScratch(scratch, candles, params, i)
-            for ((k, v) in row) columns.getValue(k)[i] = v
         }
         return IndicatorResultState(
             definitionName = definition.name,

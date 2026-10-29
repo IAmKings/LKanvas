@@ -1,5 +1,7 @@
 package io.lkanvas.core.indicator.builtin
 
+import io.lkanvas.core.extension.indicator.*
+
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull

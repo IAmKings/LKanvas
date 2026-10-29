@@ -3,9 +3,9 @@ package io.lkanvas.core.diagnostics
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.indicator.ChangeKind
 import io.lkanvas.core.indicator.IndicatorEngine
-import io.lkanvas.core.indicator.builtin.MacdIndicator
-import io.lkanvas.core.indicator.builtin.MovingAverageIndicator
-import io.lkanvas.core.indicator.builtin.VolumeIndicator
+import io.lkanvas.core.extension.indicator.MacdIndicator
+import io.lkanvas.core.extension.indicator.MovingAverageIndicator
+import io.lkanvas.core.extension.indicator.VolumeIndicator
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

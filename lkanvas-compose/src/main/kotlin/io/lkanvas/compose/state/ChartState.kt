@@ -13,9 +13,9 @@ import io.lkanvas.core.indicator.IndicatorEngine
 import io.lkanvas.core.indicator.IndicatorInstance
 import io.lkanvas.core.indicator.IndicatorRegistry
 import io.lkanvas.core.indicator.IndicatorResultState
-import io.lkanvas.core.indicator.builtin.MacdIndicator
-import io.lkanvas.core.indicator.builtin.MovingAverageIndicator
-import io.lkanvas.core.indicator.builtin.VolumeIndicator
+import io.lkanvas.core.extension.indicator.MacdIndicator
+import io.lkanvas.core.extension.indicator.MovingAverageIndicator
+import io.lkanvas.core.extension.indicator.VolumeIndicator
 import io.lkanvas.core.store.ChangeResult
 import io.lkanvas.core.store.DataSnapshot
 import io.lkanvas.core.store.MarketKey
@@ -46,34 +46,8 @@ class ChartState(
     val viewport = Viewport()
 
     val registry = IndicatorRegistry().apply {
-        // 全部 27 内置模板注册（对齐上游 init 内置指标集）
-        register(io.lkanvas.core.indicator.builtin.MovingAverageIndicator())
-        register(io.lkanvas.core.indicator.builtin.VolumeIndicator())
-        register(io.lkanvas.core.indicator.builtin.MacdIndicator())
-        register(io.lkanvas.core.indicator.builtin.ExponentialMovingAverageIndicator())
-        register(io.lkanvas.core.indicator.builtin.SimpleMovingAverageIndicator())
-        register(io.lkanvas.core.indicator.builtin.BollingerBandsIndicator())
-        register(io.lkanvas.core.indicator.builtin.BullAndBearIndexIndicator())
-        register(io.lkanvas.core.indicator.builtin.BiasIndicator())
-        register(io.lkanvas.core.indicator.builtin.AwesomeOscillatorIndicator())
-        register(io.lkanvas.core.indicator.builtin.MomentumIndicator())
-        register(io.lkanvas.core.indicator.builtin.RateOfChangeIndicator())
-        register(io.lkanvas.core.indicator.builtin.PsychologicalLineIndicator())
-        register(io.lkanvas.core.indicator.builtin.StochIndicator())
-        register(io.lkanvas.core.indicator.builtin.RelativeStrengthIndexIndicator())
-        register(io.lkanvas.core.indicator.builtin.WilliamsRIndicator())
-        register(io.lkanvas.core.indicator.builtin.CommodityChannelIndexIndicator())
-        register(io.lkanvas.core.indicator.builtin.DirectionalMovementIndexIndicator())
-        register(io.lkanvas.core.indicator.builtin.BrarIndicator())
-        register(io.lkanvas.core.indicator.builtin.CurrentRatioIndicator())
-        register(io.lkanvas.core.indicator.builtin.VolumeRatioIndicator())
-        register(io.lkanvas.core.indicator.builtin.EaseOfMovementValueIndicator())
-        register(io.lkanvas.core.indicator.builtin.StopAndReverseIndicator())
-        register(io.lkanvas.core.indicator.builtin.TrixIndicator())
-        register(io.lkanvas.core.indicator.builtin.OnBalanceVolumeIndicator())
-        register(io.lkanvas.core.indicator.builtin.PriceAndVolumeTrendIndicator())
-        register(io.lkanvas.core.indicator.builtin.AveragePriceIndicator())
-        register(io.lkanvas.core.indicator.builtin.DifferentOfMovingAverageIndicator())
+        // 图表级扩展注册表（宿主按图注册；内置 27 模板统一走全局
+        // IndicatorTemplates——上游 Store 创建查同一注册入口，SLA-004）
     }
 
     private val engine = ChartEngine(
@@ -81,40 +55,46 @@ class ChartState(
         computeDispatcher = Dispatchers.Default,
     )
 
-    /** 默认实例：主图 MA、VOL、MACD（对齐上游 init 默认）；用户实例追加到列表。 */
-    internal val maInstance = IndicatorInstance("builtin-ma", registry.get("MA")!!)
-    internal val volInstance = IndicatorInstance("builtin-vol", registry.get("VOL")!!)
-    internal val macdInstance = IndicatorInstance("builtin-macd", registry.get("MACD")!!)
-
-    /** 全部参与计算的实例（顺序即计算顺序；线程：主线程修改、快照回调遍历）。 */
-    private val indicatorInstances = CopyOnWriteArrayList(listOf(maInstance, volInstance, macdInstance))
+    /**
+     * 上游 v10.1.0 严格语义（SLA-007）：图表初始化**不创建**任何默认指标实例
+     * （上游 Chart.ts init 仅建 candle/x-axis pane）；示例需要的 MA/VOL/MACD
+     * 由宿主/示例显式 createIndicator。
+     */
+    private val indicatorInstances = CopyOnWriteArrayList<IndicatorInstance>()
 
     private var indicatorIdSerial = 0
+    private var indicatorPaneSerial = 0
 
     /**
-     * 创建指标实例（上游 createIndicator 语义）：返回 instanceId；同名注册冲突
-     * 或未知模板返回 null。isStack=true 时加入主 pane 叠加（Alpha 全部叠加主 pane 语义）。
+     * 创建指标实例（上游 Chart.createIndicator + Store.addIndicator 语义，SLA-007）：
+     * - 未知模板返回 null（模板查图表级 registry → 全局 IndicatorTemplates 统一源）；
+     * - paneId 缺省 = 生成新指标 pane id（上游 createId(INDICATOR)）；
+     * - isStack 缺省 false（非叠加=先清空目标 pane 再创建，上游 Store.addIndicator）；
+     * - 调用方提供 id 且已存在同 id 实例 → 返回 null（上游同名过滤命中即 false）。
      */
     fun createIndicator(
         name: String,
         params: List<Double>? = null,
-        paneId: String = "main",
-        isStack: Boolean = true,
+        paneId: String? = null,
+        isStack: Boolean = false,
         yAxisId: String = "main",
         styles: Any? = null,
+        id: String? = null,
     ): String? {
-        val def = registry.get(name) ?: return null
-        // 上游 Store.addIndicator isStack 语义（CH-044 收口）：isStack=false →
-        // 先移除该 pane 全部现有非内置指标（替换），true → 叠加
+        val def = registry.get(name)
+            ?: io.lkanvas.core.extension.indicator.IndicatorTemplates.get(name)
+            ?: return null
+        if (id != null && indicatorInstances.any { it.id == id }) return null
+        val resolvedPaneId = paneId ?: "pane_indicator_${++indicatorPaneSerial}"
         if (!isStack) {
-            removeIndicator(IndicatorFilter(paneId = paneId))
+            removeIndicator(IndicatorFilter(paneId = resolvedPaneId))
         }
-        val id = "ind_${++indicatorIdSerial}_${name}"
-        val inst = IndicatorInstance(id, def, params ?: def.calcParams, paneId, yAxisId, styles)
+        val instanceId = id ?: "ind_${++indicatorIdSerial}_${name}"
+        val inst = IndicatorInstance(instanceId, def, params ?: def.calcParams, resolvedPaneId, yAxisId, styles)
         indicatorInstances.add(inst)
         advanceIndicators(dataSnapshot, null)
         viewRevision++
-        return id
+        return instanceId
     }
 
     /** 实例过滤（上游 IndicatorFilter：id/name/paneId 任意组合）。 */
@@ -137,21 +117,45 @@ class ChartState(
     fun getIndicatorByInstanceId(id: String): IndicatorInstance? =
         indicatorInstances.firstOrNull { it.id == id }
 
-    /** 上游 overrideIndicator（字段级覆盖：calcParams/visible）。 */
-    fun overrideIndicator(id: String, params: List<Double>? = null, visible: Boolean? = null): Boolean {
-        val inst = getIndicatorByInstanceId(id) ?: return false
-        params?.let { inst.updateParams(it) }
-        visible?.let { inst.visible = it }
+    /**
+     * 上游 overrideIndicator（SLA-007 全字段）：按 filter 定位**全部**匹配实例，
+     * 非空字段覆盖（params/visible/styles/shortName/paneId/yAxisId/zLevel/extendData）。
+     */
+    fun overrideIndicator(
+        filter: IndicatorFilter,
+        params: List<Double>? = null,
+        visible: Boolean? = null,
+        styles: Any? = null,
+        shortName: String? = null,
+        paneId: String? = null,
+        yAxisId: String? = null,
+        zLevel: Int? = null,
+        extendData: Map<String, Any?>? = null,
+    ): Boolean {
+        val targets = indicatorInstances.filter { it.matches(filter) }
+        if (targets.isEmpty()) return false
+        for (inst in targets) {
+            params?.let { inst.updateParams(it) }
+            visible?.let { inst.visible = it }
+            styles?.let { inst.styles = it }
+            shortName?.let { inst.shortNameOverride = it }
+            paneId?.let { inst.paneId = it }
+            yAxisId?.let { inst.yAxisId = it }
+            zLevel?.let { inst.zLevelOverride = it }
+            extendData?.let { ext -> inst.extendData.putAll(ext) }
+        }
         advanceIndicators(dataSnapshot, null)
         viewRevision++
         return true
     }
 
-    /** 上游 removeIndicator(filter)：删除全部匹配（内置默认实例保护）；上游为 forEach 全删。 */
+    /** 上游 overrideIndicator(id) 简写（filter=仅 id）。 */
+    fun overrideIndicator(id: String, params: List<Double>? = null, visible: Boolean? = null): Boolean =
+        overrideIndicator(IndicatorFilter(id = id), params = params, visible = visible)
+
+    /** 上游 removeIndicator(filter)：删除全部匹配（上游 forEach 全删，无内置保护）。 */
     fun removeIndicator(filter: IndicatorFilter): Boolean {
-        val targets = indicatorInstances.filter {
-            it.matches(filter) && !it.id.startsWith("builtin-")
-        }
+        val targets = indicatorInstances.filter { it.matches(filter) }
         if (targets.isEmpty()) return false
         indicatorInstances.removeAll(targets.toSet())
         advanceIndicators(dataSnapshot, null)
@@ -272,12 +276,7 @@ class ChartState(
         try {
             overlays.restoreFrom(archive.overlays)
             archive.indicatorParams.forEach { (name, params) ->
-                when (name) {
-                    "MA" -> maInstance.updateParams(params)
-                    "VOL" -> volInstance.updateParams(params)
-                    "MACD" -> macdInstance.updateParams(params)
-                    else -> getIndicators(IndicatorFilter(name = name)).forEach { it.updateParams(params) }
-                }
+                getIndicators(IndicatorFilter(name = name)).forEach { it.updateParams(params) }
             }
             val anchor = archive.viewportAnchor
             if (anchor != null && dataSnapshot.candles.isNotEmpty()) {
@@ -773,11 +772,15 @@ class ChartState(
                 }
             }
         }
-        maResult = maInstance.state
-        volResult = volInstance.state
-        macdResult = macdInstance.state
+        maResult = resultOfName("MA")
+        volResult = resultOfName("VOL")
+        macdResult = resultOfName("MACD")
         indicatorResultsRevision++
     }
+
+    /** 第一个可见的同名模板实例结果（缺省实例取消后由宿主创建的实例顶替）。 */
+    private fun resultOfName(name: String): IndicatorResultState? =
+        indicatorInstances.firstOrNull { it.visible && it.definition.name == name }?.state
 
     /** 用户实例结果版本（渲染层读取触发叠加重绘）。 */
     var indicatorResultsRevision by mutableIntStateOf(0)
@@ -790,11 +793,18 @@ class ChartState(
                 it.definition.series == io.lkanvas.core.indicator.IndicatorSeries.PRICE && it.state != null
         }
 
-    /** VOL pane 实例（第一个可见 volume 系；缺省内置）。 */
-    fun volumePaneResult(): IndicatorResultState? = volInstance.state
+    /** VOL pane 实例结果（绑定 vol pane 的 volume 系；回退 VOLUME 模板实例）。 */
+    fun volumePaneResult(): IndicatorResultState? =
+        indicatorInstances.firstOrNull {
+            it.visible && it.paneId == "vol" &&
+                it.definition.series == io.lkanvas.core.indicator.IndicatorSeries.VOLUME && it.state != null
+        }?.state ?: resultOfName("VOL")
 
-    /** MACD pane 实例（第一个可见 normal 系；缺省内置）。 */
-    fun macdPaneResult(): IndicatorResultState? = macdInstance.state
+    /** MACD pane 实例结果（绑定 macd pane 的实例；回退 MACD 模板实例）。 */
+    fun macdPaneResult(): IndicatorResultState? =
+        indicatorInstances.firstOrNull {
+            it.visible && it.paneId == "macd" && it.state != null
+        }?.state ?: resultOfName("MACD")
 
     // ---------- 布局回填 ----------
 

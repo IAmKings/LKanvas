@@ -57,6 +57,12 @@ class MainActivity : ComponentActivity() {
             val feed = remember { LocalFeed() }
             val state = remember { ChartState() }
             val chartFacade = remember { io.lkanvas.chart.LKanvasChart.init(state) }
+            // 上游 v10.1.0 严格语义：图表不预置指标；示例显式创建 MA/VOL/MACD
+            LaunchedEffect(chartFacade) {
+                chartFacade.createIndicator("MA", paneId = "main", isStack = true)
+                chartFacade.createIndicator("VOL", paneId = "vol")
+                chartFacade.createIndicator("MACD", paneId = "macd")
+            }
             var showIndicatorPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             var showStylesPanel by remember { androidx.compose.runtime.mutableStateOf(false) }
             var showDiagPanel by remember { androidx.compose.runtime.mutableStateOf(false) }

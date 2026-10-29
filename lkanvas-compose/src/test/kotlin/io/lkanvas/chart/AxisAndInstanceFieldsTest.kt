@@ -315,22 +315,20 @@ class AxisAndInstanceFieldsTest {
     @Test
     fun createIndicator_isStackReplaceAndStack() {
         val chart = newChart()
-        // isStack=true（默认）：同 pane 叠加两个自定义实例
+        // isStack=true：同 pane 叠加两个实例
         val a = chart.createIndicator("MA", calcParams = listOf(5.0), paneId = "main", isStack = true)!!
         val b = chart.createIndicator("MA", calcParams = listOf(10.0), paneId = "main", isStack = true)!!
         val mainAfterStack = chart.getIndicators(ChartState.IndicatorFilter(paneId = "main"))
         assertTrue(mainAfterStack.any { it.id == a } && mainAfterStack.any { it.id == b }, "叠加：两实例共存")
-        // isStack=false：清空该 pane 自定义实例后创建（内置 MA/VOL/MACD 保护不受影响）
-        val builtins = chart.getIndicators().count { it.id.startsWith("builtin-") }
+        // isStack=false（上游缺省）：清空该 pane 全部实例后创建（上游 Store.addIndicator 语义）
         val c = chart.createIndicator("MA", calcParams = listOf(20.0), paneId = "main", isStack = false)!!
         val mainAfterReplace = chart.getIndicators(ChartState.IndicatorFilter(paneId = "main"))
         assertTrue(mainAfterReplace.any { it.id == c }, "替换：新实例存在")
-        assertTrue(mainAfterReplace.none { it.id == a || it.id == b }, "替换：旧自定义实例被清除")
-        assertEquals(builtins, chart.getIndicators().count { it.id.startsWith("builtin-") }, "内置保护实例不受影响")
-        // 不同 pane 不受影响（内置三实例按 Alpha 语义均在 main；vol pane 放一个自定义实例验证隔离）
+        assertTrue(mainAfterReplace.none { it.id == a || it.id == b }, "替换：旧实例被清除")
+        // 不同 pane 不受替换影响（vol pane 放一个实例验证隔离）
         val volInst = chart.createIndicator("MA", calcParams = listOf(8.0), paneId = "vol", isStack = true)!!
         chart.createIndicator("MA", calcParams = listOf(30.0), paneId = "main", isStack = false)
-        assertTrue(chart.getIndicators(ChartState.IndicatorFilter(paneId = "vol")).any { it.id == volInst }, "vol pane 自定义实例不受 main 替换影响")
+        assertTrue(chart.getIndicators(ChartState.IndicatorFilter(paneId = "vol")).any { it.id == volInst }, "vol pane 实例不受 main 替换影响")
         LKanvasChart.dispose(chart)
     }
 

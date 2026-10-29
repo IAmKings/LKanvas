@@ -3,10 +3,10 @@ package io.lkanvas.core.store
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.indicator.ChangeKind
 import io.lkanvas.core.indicator.IndicatorEngine
-import io.lkanvas.core.indicator.builtin.MacdIndicator
-import io.lkanvas.core.indicator.builtin.MovingAverageIndicator
-import io.lkanvas.core.indicator.builtin.StopAndReverseIndicator
-import io.lkanvas.core.indicator.builtin.TrixIndicator
+import io.lkanvas.core.extension.indicator.MacdIndicator
+import io.lkanvas.core.extension.indicator.MovingAverageIndicator
+import io.lkanvas.core.extension.indicator.StopAndReverseIndicator
+import io.lkanvas.core.extension.indicator.TrixIndicator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

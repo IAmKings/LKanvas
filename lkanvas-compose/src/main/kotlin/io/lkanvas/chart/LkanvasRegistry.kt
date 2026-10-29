@@ -18,42 +18,34 @@ object LkanvasRegistry {
 
     /** 27 内置指标模板工厂（避免全局注册表与实例注册表共享可变状态）。 */
     internal val BUILT_IN_INDICATOR_FACTORIES: Map<String, () -> IndicatorDefinition> = mapOf(
-        "MA" to { io.lkanvas.core.indicator.builtin.MovingAverageIndicator() },
-        "VOL" to { io.lkanvas.core.indicator.builtin.VolumeIndicator() },
-        "MACD" to { io.lkanvas.core.indicator.builtin.MacdIndicator() },
-        "EMA" to { io.lkanvas.core.indicator.builtin.ExponentialMovingAverageIndicator() },
-        "SMA" to { io.lkanvas.core.indicator.builtin.SimpleMovingAverageIndicator() },
-        "BOLL" to { io.lkanvas.core.indicator.builtin.BollingerBandsIndicator() },
-        "BBI" to { io.lkanvas.core.indicator.builtin.BullAndBearIndexIndicator() },
-        "BIAS" to { io.lkanvas.core.indicator.builtin.BiasIndicator() },
-        "AO" to { io.lkanvas.core.indicator.builtin.AwesomeOscillatorIndicator() },
-        "MTM" to { io.lkanvas.core.indicator.builtin.MomentumIndicator() },
-        "ROC" to { io.lkanvas.core.indicator.builtin.RateOfChangeIndicator() },
-        "PSY" to { io.lkanvas.core.indicator.builtin.PsychologicalLineIndicator() },
-        "KDJ" to { io.lkanvas.core.indicator.builtin.StochIndicator() },
-        "RSI" to { io.lkanvas.core.indicator.builtin.RelativeStrengthIndexIndicator() },
-        "WR" to { io.lkanvas.core.indicator.builtin.WilliamsRIndicator() },
-        "CCI" to { io.lkanvas.core.indicator.builtin.CommodityChannelIndexIndicator() },
-        "DMI" to { io.lkanvas.core.indicator.builtin.DirectionalMovementIndexIndicator() },
-        "BRAR" to { io.lkanvas.core.indicator.builtin.BrarIndicator() },
-        "CR" to { io.lkanvas.core.indicator.builtin.CurrentRatioIndicator() },
-        "VR" to { io.lkanvas.core.indicator.builtin.VolumeRatioIndicator() },
-        "EMV" to { io.lkanvas.core.indicator.builtin.EaseOfMovementValueIndicator() },
-        "SAR" to { io.lkanvas.core.indicator.builtin.StopAndReverseIndicator() },
-        "TRIX" to { io.lkanvas.core.indicator.builtin.TrixIndicator() },
-        "OBV" to { io.lkanvas.core.indicator.builtin.OnBalanceVolumeIndicator() },
-        "PVT" to { io.lkanvas.core.indicator.builtin.PriceAndVolumeTrendIndicator() },
-        "AVP" to { io.lkanvas.core.indicator.builtin.AveragePriceIndicator() },
-        "DMA" to { io.lkanvas.core.indicator.builtin.DifferentOfMovingAverageIndicator() },
+        "MA" to { io.lkanvas.core.extension.indicator.MovingAverageIndicator() },
+        "VOL" to { io.lkanvas.core.extension.indicator.VolumeIndicator() },
+        "MACD" to { io.lkanvas.core.extension.indicator.MacdIndicator() },
+        "EMA" to { io.lkanvas.core.extension.indicator.ExponentialMovingAverageIndicator() },
+        "SMA" to { io.lkanvas.core.extension.indicator.SimpleMovingAverageIndicator() },
+        "BOLL" to { io.lkanvas.core.extension.indicator.BollingerBandsIndicator() },
+        "BBI" to { io.lkanvas.core.extension.indicator.BullAndBearIndexIndicator() },
+        "BIAS" to { io.lkanvas.core.extension.indicator.BiasIndicator() },
+        "AO" to { io.lkanvas.core.extension.indicator.AwesomeOscillatorIndicator() },
+        "MTM" to { io.lkanvas.core.extension.indicator.MomentumIndicator() },
+        "ROC" to { io.lkanvas.core.extension.indicator.RateOfChangeIndicator() },
+        "PSY" to { io.lkanvas.core.extension.indicator.PsychologicalLineIndicator() },
+        "KDJ" to { io.lkanvas.core.extension.indicator.StochIndicator() },
+        "RSI" to { io.lkanvas.core.extension.indicator.RelativeStrengthIndexIndicator() },
+        "WR" to { io.lkanvas.core.extension.indicator.WilliamsRIndicator() },
+        "CCI" to { io.lkanvas.core.extension.indicator.CommodityChannelIndexIndicator() },
+        "DMI" to { io.lkanvas.core.extension.indicator.DirectionalMovementIndexIndicator() },
+        "BRAR" to { io.lkanvas.core.extension.indicator.BrarIndicator() },
+        "CR" to { io.lkanvas.core.extension.indicator.CurrentRatioIndicator() },
+        "VR" to { io.lkanvas.core.extension.indicator.VolumeRatioIndicator() },
+        "EMV" to { io.lkanvas.core.extension.indicator.EaseOfMovementValueIndicator() },
+        "SAR" to { io.lkanvas.core.extension.indicator.StopAndReverseIndicator() },
+        "TRIX" to { io.lkanvas.core.extension.indicator.TrixIndicator() },
+        "OBV" to { io.lkanvas.core.extension.indicator.OnBalanceVolumeIndicator() },
+        "PVT" to { io.lkanvas.core.extension.indicator.PriceAndVolumeTrendIndicator() },
+        "AVP" to { io.lkanvas.core.extension.indicator.AveragePriceIndicator() },
+        "DMA" to { io.lkanvas.core.extension.indicator.DifferentOfMovingAverageIndicator() },
     )
-
-    /** 全局指标模板注册表（27 内置已预注册）。 */
-    val indicators = IndicatorRegistry().apply {
-        // 预注册 27 内置（与 ChartState.registry 初始一致；自定义指标经 registerIndicator 追加）
-        BUILT_IN_INDICATOR_FACTORIES.forEach { (name, factory) ->
-            if (get(name) == null) register(factory())
-        }
-    }
 
     /** 全局覆盖物模板注册表（16 内置已预注册）。 */
     private val overlays = LinkedHashMap<String, OverlayDefinition>(OverlayTemplates.all)
@@ -64,12 +56,17 @@ object LkanvasRegistry {
         put("en-US", ChartLocale.EN_US)
     }
 
-    /** 上游 `registerIndicator(template)`：同名冲突返回 false（需宿主显式 replace）。 */
+    /**
+     * 上游 `registerIndicator(template)`：写入 core 全局模板表（SLA-004 统一源：
+     * 注册与图表创建共用同一张表，既有/新建图表均可创建）。
+     * 同名冲突返回 false（需宿主显式 replace；上游为直接覆盖，差异登记 R-14）。
+     */
     fun registerIndicator(template: IndicatorDefinition, replace: Boolean = false): Boolean =
-        indicators.register(template, replace)
+        io.lkanvas.core.extension.indicator.IndicatorTemplates.register(template, replace)
 
     /** 上游 `getSupportedIndicators()`。 */
-    fun getSupportedIndicators(): List<String> = indicators.all().map { it.name }
+    fun getSupportedIndicators(): List<String> =
+        io.lkanvas.core.extension.indicator.IndicatorTemplates.supported()
 
     /** 上游 `registerOverlay(template)`。 */
     fun registerOverlay(template: OverlayDefinition, replace: Boolean = false): Boolean {

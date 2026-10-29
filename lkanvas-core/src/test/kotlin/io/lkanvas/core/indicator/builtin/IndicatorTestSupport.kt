@@ -1,5 +1,6 @@
 package io.lkanvas.core.indicator.builtin
 
+import io.lkanvas.core.extension.indicator.*
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.indicator.ChangeKind
 import io.lkanvas.core.indicator.IndicatorDefinition

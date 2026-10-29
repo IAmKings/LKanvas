@@ -60,13 +60,16 @@ class LKanvasChartCrudTest {
     @Test
     fun `createIndicator按名创建返回instanceId且结果就绪`() {
         val chart = newChartWithData()
+        // 上游 v10.1.0 严格语义：初始化不预置指标实例
+        assertEquals(0, chart.getIndicators().size, "上游 init 无默认指标")
         val id = chart.createIndicator("EMA")
         assertTrue(id != null && id.startsWith("ind_"))
         val list = chart.getIndicators(ChartState.IndicatorFilter(name = "EMA"))
         assertEquals(1, list.size)
         assertEquals(120, list[0].state?.computedCount, "创建即全量计算")
-        // 内置三个仍在
-        assertEquals(4, chart.getIndicators().size)
+        assertEquals(1, chart.getIndicators().size)
+        // 上游默认语义：paneId 缺省 = 新指标 pane（自动建 pane）
+        assertTrue(chart.getIndicatorByInstanceId(id!!)!!.paneId.startsWith("pane_indicator_"), "缺省新建指标 pane")
         LKanvasChart.dispose(chart)
     }
 
@@ -88,7 +91,7 @@ class LKanvasChartCrudTest {
         val inst = chart.getIndicatorByInstanceId(id)!!
         assertEquals(listOf(30.0, 3.0), inst.params)
         assertFalse(inst.visible)
-        // 内置实例不可删
+        // 上游严格语义：不存在内置保护实例（builtin-ma 不存在 → false）
         assertFalse(chart.removeIndicator(ChartState.IndicatorFilter(id = "builtin-ma")))
         // 用户实例可删
         assertTrue(chart.removeIndicator(ChartState.IndicatorFilter(id = id)))
@@ -161,7 +164,8 @@ class LKanvasChartCrudTest {
     fun `用户指标叠加进主pane结果列表`() {
         val chart = newChartWithData()
         val before = chart.state.mainPaneIndicatorResults().size
-        chart.createIndicator("BOLL")
+        // 上游语义：显式 isStack=true 才叠加进指定 pane（缺省进新指标 pane）
+        chart.createIndicator("BOLL", paneId = "main", isStack = true)
         drain()
         assertEquals(before + 1, chart.state.mainPaneIndicatorResults().size, "price 系实例进入主 pane")
         LKanvasChart.dispose(chart)

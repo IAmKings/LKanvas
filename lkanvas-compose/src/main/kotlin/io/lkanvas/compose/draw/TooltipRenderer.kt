@@ -99,7 +99,7 @@ object TooltipRenderer {
         for (inst in state.mainPaneIndicatorResults()) {
             val res = inst.state ?: continue
             val titleStyle = styles.indicator.tooltip.title
-            val name = if (titleStyle.show && titleStyle.showName) inst.definition.shortName else ""
+            val name = if (titleStyle.show && titleStyle.showName) inst.displayName() else ""
             val params = if (titleStyle.show && titleStyle.showParams && inst.params.isNotEmpty()) {
                 "(${inst.params.joinToString(",") { trimNum(it) }})"
             } else ""

@@ -20,7 +20,7 @@ class LkanvasRegistryTest {
 
     @Test
     fun `registerIndicator同名冲突与显式替换`() {
-        val custom = io.lkanvas.core.indicator.builtin.MovingAverageIndicator()
+        val custom = io.lkanvas.core.extension.indicator.MovingAverageIndicator()
         assertFalse(LkanvasRegistry.registerIndicator(custom), "同名首次注册冲突")
         assertTrue(LkanvasRegistry.registerIndicator(custom, replace = true), "显式替换成功")
     }

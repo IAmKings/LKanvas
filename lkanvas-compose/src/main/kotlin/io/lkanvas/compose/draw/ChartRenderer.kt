@@ -304,7 +304,7 @@ object ChartRenderer {
             for ((k, key) in res.result.keys.withIndex()) {
                 val v = res.result[key].getOrNull(idx) ?: Double.NaN
                 val color = theme.linePalette[(li + k) % theme.linePalette.size]
-                val label = "${inst.definition.shortName} ${text.price(v)}"
+                val label = "${inst.displayName()} ${text.price(v)}"
                 if (lx > contentWidth - 40f) break
                 drawText(text, label, Offset(lx, ly), color)
                 li++
