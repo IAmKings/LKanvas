@@ -60,6 +60,7 @@ class Parity5OverlayHooksTest {
             boundingWidth: Double,
             boundingHeight: Double,
             pixelPoints: List<List<Double>>,
+            extendData: Map<String, String>,
         ): List<Triple<String, List<List<Double>>, Map<String, String>>> {
             drawCalls++
             return listOf(Triple("Line", listOf(listOf(pixelPoints[0][0], pixelPoints[0][1], pixelPoints[1][0], pixelPoints[1][1])), mapOf("color" to "#FF0000")))
@@ -101,7 +102,7 @@ class Parity5OverlayHooksTest {
         // 渲染钩子被消费（drawOverlays → createPointFigures）
         val inst = chart.state.overlays.get(id!!)!!
         val figures = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName]!!
-            .createPointFigures(inst.points, 800.0, 400.0, pixelPoints = listOf(listOf(10.0, 20.0), listOf(100.0, 60.0)))
+            .createPointFigures(inst.points, 800.0, 400.0, pixelPoints = listOf(listOf(10.0, 20.0), listOf(100.0, 60.0)), extendData = inst.extensionData)
         assertTrue(template.drawCalls >= 0 && figures != null && figures[0].first == "Line", "模板钩子产出图形")
 
         // 命中：线身中点附近命中（同一钩子产物）

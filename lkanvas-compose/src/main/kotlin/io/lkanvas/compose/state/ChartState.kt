@@ -543,11 +543,15 @@ class ChartState(
     }
 
     /** 锚点 → 像素（主 pane）。 */
-    fun overlayPointToPx(p: io.lkanvas.core.overlay.OverlayPoint): androidx.compose.ui.geometry.Offset? {
+    fun overlayPointToPx(p: io.lkanvas.core.overlay.OverlayPoint): androidx.compose.ui.geometry.Offset? =
+        overlayPointToPx(p, "main")
+
+    /** 锚点 → 像素（R09：按实例 pane 的值映射与几何）。 */
+    fun overlayPointToPx(p: io.lkanvas.core.overlay.OverlayPoint, paneId: String): androidx.compose.ui.geometry.Offset? {
         val idx = indexOfTimestampNearest(p.timestamp) ?: return null
         val x = viewport.candleCenterX(idx.toDouble())
-        val y = mainPaneYOf(p.value) ?: return null
-        return androidx.compose.ui.geometry.Offset(x.toFloat(), y.toFloat())
+        val y = paneValueToY(paneId, p.value) ?: return null
+        return androidx.compose.ui.geometry.Offset(x.toFloat(), (y + (paneBounds(paneId)?.first ?: 0f)).toFloat())
     }
 
     /**

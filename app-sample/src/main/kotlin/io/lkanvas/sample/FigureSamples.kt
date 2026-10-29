@@ -32,6 +32,7 @@ object FigureSamples {
             boundingWidth: Double,
             boundingHeight: Double,
             pixelPoints: List<List<Double>>,
+            extendData: Map<String, String>,
         ): List<Triple<String, List<List<Double>>, Map<String, String>>> {
             val a = pixelPoints.getOrNull(0) ?: return emptyList()
             val b = pixelPoints.getOrNull(1) ?: return emptyList()
@@ -54,6 +55,7 @@ object FigureSamples {
             boundingWidth: Double,
             boundingHeight: Double,
             pixelPoints: List<List<Double>>,
+            extendData: Map<String, String>,
         ): List<Triple<String, List<List<Double>>, Map<String, String>>> {
             val a = pixelPoints.getOrNull(0) ?: return emptyList()
             val b = pixelPoints.getOrNull(1) ?: return emptyList()
@@ -82,6 +84,7 @@ object FigureSamples {
             boundingWidth: Double,
             boundingHeight: Double,
             pixelPoints: List<List<Double>>,
+            extendData: Map<String, String>,
         ): List<Triple<String, List<List<Double>>, Map<String, String>>> =
             listOf(
                 Triple(
@@ -102,6 +105,7 @@ object FigureSamples {
             boundingWidth: Double,
             boundingHeight: Double,
             pixelPoints: List<List<Double>>,
+            extendData: Map<String, String>,
         ): List<Triple<String, List<List<Double>>, Map<String, String>>> {
             val a = pixelPoints.getOrNull(0) ?: return emptyList()
             val b = pixelPoints.getOrNull(1) ?: return emptyList()
