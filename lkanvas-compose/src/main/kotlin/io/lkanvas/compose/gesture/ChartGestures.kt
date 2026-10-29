@@ -82,8 +82,9 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         // brush 连续采样位置
         var lastBrushX = 0f
         var lastBrushY = 0f
-        // 分隔条拖动上下文
+        // 分隔条拖动上下文（paneWhich=-1 时 extraPaneId 生效，0.5.x 动态副图）
         var paneWhich = 0
+        var extraPaneId: String? = null
         var paneStartValue = 0f
         var paneStartY = 0f
         var axisStartY = 0f
@@ -131,9 +132,19 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
             // 分隔条与轴区（未命中覆盖物时判定；同一时刻仅一个所有者，A-33）
             if (mode == GMode.IDLE) {
                 val sep = state.paneSeparatorAt(down.position.y, tolerancePx = 14f)
+                // 0.5.x 动态副图分隔（内置分隔优先）
+                val extraSep = if (sep == null) state.extraPaneSeparatorAt(down.position.y, tolerancePx = 14f) else null
                 if (sep != null) {
                     paneWhich = sep
+                    extraPaneId = null
                     paneStartValue = if (sep == 0) state.paneHeightsPx.vol else state.paneHeightsPx.macd
+                    paneStartY = down.position.y
+                    mode = GMode.PANE_ADJUST
+                    state.setGestureOwner(GestureOwner.PANE_ADJUST)
+                } else if (extraSep != null) {
+                    paneWhich = -1
+                    extraPaneId = extraSep
+                    paneStartValue = state.extraPaneLayout.firstOrNull { it.first == extraSep }?.second?.second ?: 0f
                     paneStartY = down.position.y
                     mode = GMode.PANE_ADJUST
                     state.setGestureOwner(GestureOwner.PANE_ADJUST)
@@ -287,7 +298,11 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
 
                         GMode.PANE_ADJUST -> {
                             val c = event.changes.firstOrNull() ?: continue
-                            state.adjustPane(paneWhich, paneStartValue, c.position.y - paneStartY)
+                            if (paneWhich >= 0) {
+                                state.adjustPane(paneWhich, paneStartValue, c.position.y - paneStartY)
+                            } else if (extraPaneId != null) {
+                                state.adjustExtraPane(extraPaneId!!, paneStartValue, c.position.y - paneStartY)
+                            }
                             event.changes.forEach { it.consume() }
                         }
 

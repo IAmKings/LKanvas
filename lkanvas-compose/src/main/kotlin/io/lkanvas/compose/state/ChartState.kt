@@ -789,10 +789,14 @@ class ChartState(
         relayout()
     }
 
+    /** 0.5.x 动态副图：每 pane 高度覆写（拖动分隔条写入；px）。 */
+    private val extraPaneHeightOverride = HashMap<String, Float>()
+
     private fun relayout() {
         // 0.5.x 动态 pane：自定义副图排在内置 VOL/MACD 之后、时间轴之前，
-        // 高度 = 默认副图高（main 相应压缩，保底规则不变）
-        val extraH = extraPanes.value.size * defaultSubPanePx
+        // 高度 = 覆写或默认副图高（main 相应压缩，保底规则不变）
+        var extraH = 0f
+        for (pane in extraPanes.value) extraH += (extraPaneHeightOverride[pane] ?: defaultSubPanePx)
         val usable = (containerHeightPx - timeAxisHeightPx - extraH).coerceAtLeast(minSubPanePx * 2)
         // 主 pane 保底 35% 可用高（A-41：横屏/大字体下关键绘图区不被挤没）
         val mainMin = (usable * 0.35f).coerceAtLeast(minMainPanePx)
@@ -805,7 +809,7 @@ class ChartState(
         var cursor = main + vol + macd
         extraPaneLayout = extraPanes.value.map { pane ->
             val top = cursor + 1f
-            val bottom = top + defaultSubPanePx
+            val bottom = top + (extraPaneHeightOverride[pane] ?: defaultSubPanePx)
             cursor = bottom
             pane to (top to bottom)
         }
@@ -839,6 +843,19 @@ class ChartState(
     fun setSubPaneHeights(vol: Float, macd: Float) {
         volPaneOverride = vol
         macdPaneOverride = macd
+        relayout()
+    }
+
+    /**
+     * 0.5.x 动态副图分隔命中：返回命中下边界分隔线的 paneId（拖动该 pane 高度），
+     * 未命中 null。在 [paneSeparatorAt] 之后调用（内置分隔优先）。
+     */
+    fun extraPaneSeparatorAt(y: Float, tolerancePx: Float): String? =
+        extraPaneLayout.firstOrNull { kotlin.math.abs(y - it.second.second) <= tolerancePx }?.first
+
+    /** 拖动动态副图分隔条：调整 [paneId] 高度（[startValue] 为拖动起始高度，dy 累计）。 */
+    fun adjustExtraPane(paneId: String, startValue: Float, dyTotal: Float) {
+        extraPaneHeightOverride[paneId] = (startValue + dyTotal).coerceAtLeast(minSubPanePx)
         relayout()
     }
 

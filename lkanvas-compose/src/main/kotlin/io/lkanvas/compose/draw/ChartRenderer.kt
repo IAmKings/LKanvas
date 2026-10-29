@@ -104,7 +104,9 @@ object ChartRenderer {
         with(OverlayRenderer) {
             drawOverlays(state, theme, contentRight, mainBottom, text)
         }
-        drawTimeAxis(state, theme, text, 0f, contentRight, macdBottom, panes.timeAxis)
+        // 0.5.x 动态副图：时间轴跟随最后一个自定义 pane 的下缘（否则与其重叠）
+        val timeAxisTop = state.extraPaneLayout.lastOrNull()?.second?.second ?: macdBottom
+        drawTimeAxis(state, theme, text, 0f, contentRight, timeAxisTop, panes.timeAxis)
         if (params.drawLegend) {
             val styles = params.styles
             if (styles != null) {

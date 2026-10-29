@@ -192,6 +192,37 @@ class AxisAndInstanceFieldsTest {
         LKanvasChart.dispose(chart)
     }
 
+    // ---------- 0.5.x 动态副图分隔条 ----------
+
+    @Test
+    fun dynamicSubPane_separatorHitAndDragResize() {
+        val chart = newChart()
+        val st = chart.state
+        // 模拟布局（容器 1200：main+vol+macd+timeAxis + 1 extra）
+        st.onLayout(800f, ChartState.PaneHeights(600f, 200f, 200f, 60f))
+        chart.createIndicator("MA", calcParams = listOf(5.0), paneId = "pane_a")
+        val layout = st.extraPaneLayout.first { it.first == "pane_a" }
+        val defaultH = layout.second.second - layout.second.first
+        // 分隔命中：pane 下边界 y
+        assertEquals("pane_a", st.extraPaneSeparatorAt(layout.second.second, 14f))
+        // 内置分隔优先：主|VOL 分隔处不返回 extra
+        assertEquals(null, st.extraPaneSeparatorAt(st.paneHeightsPx.main, 14f))
+        // 拖动：+80px → 高度增大且 main 压缩
+        val mainBefore = st.paneHeightsPx.main
+        st.adjustExtraPane("pane_a", defaultH, 80f)
+        val after = st.extraPaneLayout.first { it.first == "pane_a" }
+        val newH = after.second.second - after.second.first
+        assertEquals(defaultH + 80f, newH, "拖动后高度")
+        assertEquals(mainBefore - 80f, st.paneHeightsPx.main, "main 相应压缩")
+        // 最小高度钳制
+        st.adjustExtraPane("pane_a", defaultH, -10_000f)
+        assertTrue(
+            st.extraPaneLayout.first { it.first == "pane_a" }.let { it.second.second - it.second.first } >= 40f,
+            "最小副图高钳制",
+        )
+        LKanvasChart.dispose(chart)
+    }
+
     // ---------- isStack 语义（CH-044 收口；上游 Store.addIndicator） ----------
 
     @Test
