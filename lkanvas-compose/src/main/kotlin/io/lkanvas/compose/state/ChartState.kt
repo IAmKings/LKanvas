@@ -381,13 +381,17 @@ class ChartState(
         val meta = extraYAxisMeta[axisId] ?: return mainPaneYOf(value)
         val (vFrom, vTo) = visibleIndexRange() ?: return null
         val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
-        val spec = extraYAxisCustom[axisId]
-            ?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
-            ?: io.lkanvas.core.axis.YAxisSpec.Normal
+        val spec = effectiveExtraAxisSpec(axisId)
         val bottom = paneHeightsPx.main.toDouble()
         val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, value, alo, ahi, 0.0, bottom)
         return if (meta.reverse) bottom - y else y
     }
+
+    /** R06：轴实例生效 spec（custom > 模板 spec > Normal）——绘制与转换共用。 */
+    fun effectiveExtraAxisSpec(axisId: String): io.lkanvas.core.axis.YAxisSpec =
+        extraYAxisCustom[axisId]?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
+            ?: extraYAxisSpec[axisId]
+            ?: io.lkanvas.core.axis.YAxisSpec.Normal
 
     /** 绑定轴 y 像素 → 数值（[axisValueToY] 的逆；convertFromPixel 用）。 */
     fun axisValueAt(axisId: String, y: Float): Double? {
@@ -395,9 +399,7 @@ class ChartState(
         val meta = extraYAxisMeta[axisId] ?: return mainPaneValueAt(y)
         val (vFrom, vTo) = visibleIndexRange() ?: return null
         val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
-        val spec = extraYAxisCustom[axisId]
-            ?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
-            ?: io.lkanvas.core.axis.YAxisSpec.Normal
+        val spec = effectiveExtraAxisSpec(axisId)
         val bottom = paneHeightsPx.main.toDouble()
         val yy = if (meta.reverse) bottom - y else y
         return io.lkanvas.core.axis.YAxisMath.yToValue(spec, yy.toDouble(), alo, ahi, 0.0, bottom)
@@ -780,6 +782,12 @@ class ChartState(
     /** 0.5.x 多轴完整版：自定义变换轴（axisId → CustomYAxis；渲染按 Custom spec 映射）。 */
     var extraYAxisCustom by androidx.compose.runtime.mutableStateOf(emptyMap<String, io.lkanvas.core.axis.CustomYAxis>())
 
+    /** R06：轴实例 spec 表（axisId → 模板构造的 spec；custom 之外的实际投影来源）。 */
+    var extraYAxisSpec by androidx.compose.runtime.mutableStateOf(emptyMap<String, io.lkanvas.core.axis.YAxisSpec>())
+
+    /** R06 余项消费：overrideXAxis(scrollZoomEnabled) 门禁轴区缩放（门面 overrideXAxis 同步）。 */
+    var xAxisScrollZoomEnabled: Boolean = true
+
     /**
      * 自定义轴 [axisId] 的独立值域：绑定该轴的全部指标在可见区 [from,to] 的
      * 值 min/max（NaN 跳过）。无绑定/无有效值返回 null（渲染跳过该轴）。
@@ -1159,6 +1167,9 @@ class ChartState(
 
     /** 轴区拖动缩放（右 gutter 垂直拖动；dy 累计，向下放大间距）。 */
     fun axisZoomBy(dyTotal: Float) {
+        // R06 余项消费：overrideXAxis(scrollZoomEnabled=false) 门禁轴区缩放
+        // （x 轴覆写的其余字段 reverse/gap 等为平台差异登记，structure-map 台账承载）
+        if (!xAxisScrollZoomEnabled) return
         val scale = 1.0 + dyTotal / 200.0
         viewport.zoomBy(scale, viewport.candleCenterX((dataSnapshot.candles.size - 1).coerceAtLeast(0).toDouble()), dataSnapshot.candles.size)
         viewRevision++

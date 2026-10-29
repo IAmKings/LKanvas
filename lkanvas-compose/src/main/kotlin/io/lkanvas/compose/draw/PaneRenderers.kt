@@ -137,7 +137,8 @@ object PaneRenderers {
             val colX = if (inPane) -1f else extraAxisCols.getOrNull(colIdx++) ?: continue
             val (alo, ahi) = state.extraAxisRange(axisId, range.first, range.last) ?: continue
             val reversed = meta.reverse
-            val customSpec = state.extraYAxisCustom[axisId]?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
+            // R06：轴实例生效 spec（custom > 模板 spec > Normal）——与 convert 同源
+            val customSpec = state.effectiveExtraAxisSpec(axisId)
             // Custom 变换轴：值经变换投影到 real 域再线性映射；刻度经 customTicks（A-18 净化内建）
             val rlo: Double
             val rhi: Double

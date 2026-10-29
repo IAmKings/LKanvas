@@ -982,19 +982,25 @@ class LKanvasChart private constructor(
     internal var xAxisState = XAxisOverride()
 
     /** 上游 `createYAxis(yAxis)`：登记轴实例，返回 id（重复 id 幂等返回）。 */
-    /** 0.4.0 多轴渲染：把自定义轴（paneId=main）同步到 ChartState（渲染消费源）。 */
+    /**
+     * R06（复审 2026-10-30）：轴实例表 → ChartState 执行映射的**唯一**同步点。
+     * - 主轴 reverse 仍走 mainAxisReverse（candle 主轴消费）；
+     * - **全部 pane** 的非主轴实例（含动态 pane）同步 reverse/inside/spec/custom，
+     *   绘制（多轴块）与转换（axisValueToY/axisValueAt）共用同一来源；
+     * - 创建额外轴不再改写 mainAxisSpec（额外轴有自己的 spec）。
+     */
     private fun syncExtraAxes() {
-        // SLA-010：主轴覆写进入执行链（reverse → ChartState 统一映射消费）
         yAxes["main"]?.let { state.mainAxisReverse = it.reverse }
-        val mains = yAxes.values.filter { it.id != "main" && it.paneId == "main" }
-        state.extraYAxisMeta = mains.associate {
+        val extras = yAxes.values.filter { it.id != "main" }
+        state.extraYAxisMeta = extras.associate {
             it.id to io.lkanvas.compose.state.ChartState.ExtraAxisMeta(
                 reverse = it.reverse,
                 inside = it.inside,
                 positionLeft = it.position == AxisPosition.LEFT,
             )
         }
-        state.extraYAxisCustom = mains.mapNotNull { a -> a.customAxis?.let { a.id to it } }.toMap()
+        state.extraYAxisCustom = extras.mapNotNull { a -> a.customAxis?.let { a.id to it } }.toMap()
+        state.extraYAxisSpec = extras.mapNotNull { a -> a.templateSpec?.let { a.id to it } }.toMap()
     }
 
     fun createYAxis(yAxis: YAxisOverride): String? {
@@ -1023,10 +1029,7 @@ class LKanvasChart private constructor(
             customAxis = yAxis.customAxis,
             templateSpec = templateSpec,
         )
-        // SLA-010：main pane 的模板轴直接进入主轴规格（logarithm/percentage 等生效）
-        if (paneId == "main" && templateSpec != null && templateSpec != io.lkanvas.core.axis.YAxisSpec.Normal) {
-            state.mainAxisSpec = templateSpec
-        }
+        // R06：额外轴不再改写主轴 spec（其自身 spec 经 syncExtraAxes 进入执行映射）
         syncExtraAxes()
         state.notifyViewportChanged()
         return id
@@ -1079,7 +1082,7 @@ class LKanvasChart private constructor(
         }
     }
 
-    /** 上游 `overrideXAxis(xAxis)`：时间轴覆写登记。 */
+    /** 上游 `overrideXAxis(xAxis)`：覆写登记 + scrollZoomEnabled 消费（R06 余项）。 */
     fun overrideXAxis(xAxis: XAxisOverride) {
         xAxisState = xAxisState.copy(
             name = xAxis.name ?: xAxisState.name,
@@ -1089,6 +1092,7 @@ class LKanvasChart private constructor(
             scrollZoomEnabled = xAxis.scrollZoomEnabled ?: xAxisState.scrollZoomEnabled,
             gap = xAxis.gap ?: xAxisState.gap,
         )
+        xAxisState.scrollZoomEnabled?.let { state.xAxisScrollZoomEnabled = it }
         state.notifyViewportChanged()
     }
 

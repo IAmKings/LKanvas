@@ -399,4 +399,80 @@ class AxisAndInstanceFieldsTest {
         chart.setStyles("unknown-theme")
         assertEquals(io.lkanvas.chart.styles.StylesThemes.light, chart.getStyles())
     }
+
+    // ---------- 0.7.0 R06：轴注册/实例/执行统一 ----------
+
+    @Test
+    fun `公开registerYAxis进入构造表（R06）`() {
+        // 公开注册自定义模板（log spec）→ createYAxis(template=name) 实际使用
+        io.lkanvas.chart.LkanvasRegistry.registerYAxis(object : io.lkanvas.chart.LkanvasRegistry.AxisTemplate {
+            override val name = "audit_log_axis"
+            override fun createSpec(base: Double?) = io.lkanvas.core.axis.YAxisSpec.Logarithm
+        })
+        val chart = LKanvasChart.init()
+        chart.createYAxis(io.lkanvas.chart.YAxisOverride(id = "ax_pub", template = "audit_log_axis"))!!
+        assertTrue(
+            chart.state.extraYAxisSpec["ax_pub"] is io.lkanvas.core.axis.YAxisSpec.Logarithm,
+            "公开注册模板进入执行映射（复审 R06 复现收口）",
+        )
+        assertEquals(
+            io.lkanvas.core.axis.YAxisSpec.Logarithm,
+            chart.state.effectiveExtraAxisSpec("ax_pub"),
+            "转换与绘制同源 spec",
+        )
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `额外log轴不改写主轴spec（R06）`() {
+        val chart = LKanvasChart.init()
+        val before = chart.state.mainAxisSpec
+        chart.createYAxis(io.lkanvas.chart.YAxisOverride(id = "ax_log", paneId = "main", template = "logarithm"))!!
+        assertEquals(before, chart.state.mainAxisSpec, "额外轴不改写 mainAxisSpec（复审 R06 复现收口）")
+        // 额外轴自身按 log 投影
+        assertTrue(chart.state.extraYAxisSpec["ax_log"] is io.lkanvas.core.axis.YAxisSpec.Logarithm)
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `动态pane的reverse轴进入执行映射（R06）`() {
+        val chart = LKanvasChart.init()
+        val rsiPane = "pane_rsi_audit"
+        // 数据先就绪（与 multiAxis 用例同模式：runBlocking reset 后再建指标）
+        kotlinx.coroutines.runBlocking {
+            chart.state.reset(
+                io.lkanvas.core.store.MarketKey("T", "1m"),
+                (1..40L).map { candleOf(it, 100.0 + it + (if (it % 5 == 0L) -15.0 else 0.0)) },
+            )
+        }
+        val id = chart.createIndicator("RSI", paneId = rsiPane)!!
+        org.junit.Assert.assertNotNull(id)
+        val ax = chart.createYAxis(io.lkanvas.chart.YAxisOverride(id = "ax_rsi", paneId = rsiPane, reverse = true))!!
+        // 复审 R06 复现：syncExtraAxes 只同步 paneId=main——动态 pane 轴不进映射
+        assertEquals(true, chart.state.extraYAxisMeta["ax_rsi"]?.reverse, "副 pane 轴进入执行映射")
+        // 绑定实例到轴
+        val boundId = chart.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = rsiPane)).first().id
+        chart.overrideIndicator(io.lkanvas.compose.state.ChartState.IndicatorFilter(id = boundId), yAxisId = ax)
+        // pane 几何（无 Compose 挂载的单元测试环境）
+        chart.state.onLayout(600f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        val y = chart.state.axisValueToY(ax, 50.0)
+        assertNotNull(y, "动态 pane 轴可转换（复审 R06 复现收口）")
+        assertTrue(y != null && y > 0, "动态 pane 轴转换有效")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `overrideXAxis的scrollZoomEnabled门禁轴区缩放（R06余项）`() {
+        val state = ChartState()
+        val chart = LKanvasChart.init(state)
+        chart.overrideXAxis(io.lkanvas.chart.XAxisOverride(scrollZoomEnabled = false))
+        val barBefore = state.viewport.barSpacing
+        state.axisZoomBy(200f)
+        assertEquals(barBefore, state.viewport.barSpacing, "轴区缩放被门禁")
+        chart.overrideXAxis(io.lkanvas.chart.XAxisOverride(scrollZoomEnabled = true))
+        state.axisZoomBy(200f)
+        assertTrue(state.viewport.barSpacing != barBefore, "恢复后可轴区缩放")
+        LKanvasChart.dispose(chart)
+    }
+
 }

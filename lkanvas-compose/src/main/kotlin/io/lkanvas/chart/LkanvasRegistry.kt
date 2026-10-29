@@ -106,8 +106,9 @@ object LkanvasRegistry {
     fun getSupportedStyles(): List<String> = io.lkanvas.chart.styles.StylesThemes.registeredNames()
 
     /**
-     * 上游 `AxisTemplate` 门面建模（registerXAxis/registerYAxis 按 name 登记；
-     * 自定义变换回调走 [io.lkanvas.core.axis.CustomYAxis]）。
+     * 上游 `AxisTemplate` 门面建模（R06，复审 2026-10-30：注册与 createYAxis
+     * 构造**共用 core 一张表**——注册即进入构造查询，公开注册的模板可被
+     * `YAxisOverride(template=name)` 使用）。
      */
     interface AxisTemplate {
         val name: String
@@ -116,22 +117,41 @@ object LkanvasRegistry {
         val position: AxisPosition get() = AxisPosition.RIGHT
         val scrollZoomEnabled: Boolean get() = true
         val gap: AxisGap get() = AxisGap()
+
+        /** 模板构造轴规格（宿主可覆写；默认线性）。 */
+        fun createSpec(base: Double? = null): io.lkanvas.core.axis.YAxisSpec = io.lkanvas.core.axis.YAxisSpec.Normal
     }
 
-    /** 轴模板注册表（x: normal 预注册；y: normal/percentage/logarithm 预注册）。 */
-    val xAxisTemplates = LinkedHashMap<String, AxisTemplate>()
-    val yAxisTemplates = LinkedHashMap<String, AxisTemplate>().apply {
+    /** facade 模板 → core 注册表适配器（spec/reverse/inside 桥接）。 */
+    private fun toCoreTemplate(axis: AxisTemplate): io.lkanvas.core.extension.yaxis.YAxisTemplates.AxisTemplate =
+        object : io.lkanvas.core.extension.yaxis.YAxisTemplates.AxisTemplate {
+            override val name = axis.name
+            override fun createSpec(base: Double?): io.lkanvas.core.axis.YAxisSpec = axis.createSpec(base)
+        }
+
+    /** x 轴模板视图（core 表的门面视图；x 轴当前无构造消费，登记差异）。 */
+    val xAxisTemplates = LinkedHashMap<String, AxisTemplate>().apply {
         put("normal", object : AxisTemplate { override val name = "normal" })
-        put("percentage", object : AxisTemplate { override val name = "percentage" })
-        put("logarithm", object : AxisTemplate { override val name = "logarithm" })
-    }.also { xAxisTemplates.put("normal", object : AxisTemplate { override val name = "normal" }) }
+    }
 
-    /** 上游 `registerXAxis(axis)` / `registerYAxis(axis)`。 */
+    /** 上游 `registerXAxis(axis)`。 */
     fun registerXAxis(axis: AxisTemplate) { xAxisTemplates[axis.name] = axis }
-    fun registerYAxis(axis: AxisTemplate) { yAxisTemplates[axis.name] = axis }
 
-    /** 上游 `getXAxisClass(name)` / `getYAxisClass(name)` 等价：返回模板。 */
+    /** 上游 `registerYAxis(axis)`：写 **core 全局模板表**（与 createYAxis 同源）。 */
+    fun registerYAxis(axis: AxisTemplate) {
+        io.lkanvas.core.extension.yaxis.YAxisTemplates.register(toCoreTemplate(axis))
+    }
+
+    /** 上游 `getXAxisClass(name)` 等价：门面视图。 */
     fun getXAxisTemplate(name: String): AxisTemplate? = xAxisTemplates[name]
-    fun getYAxisTemplate(name: String): AxisTemplate? = yAxisTemplates[name]
+
+    /** 上游 `getYAxisClass(name)` 等价：core 表门面视图（spec 构造保留）。 */
+    fun getYAxisTemplate(name: String): AxisTemplate? {
+        val core = io.lkanvas.core.extension.yaxis.YAxisTemplates.get(name) ?: return null
+        return object : AxisTemplate {
+            override val name = core.name
+            override fun createSpec(base: Double?): io.lkanvas.core.axis.YAxisSpec = core.createSpec(base)
+        }
+    }
 
 }
