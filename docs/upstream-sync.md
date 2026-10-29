@@ -38,3 +38,12 @@
 | 结论 | 上游仍无新源码提交；本轮对齐以 v10.1.0 静态快照为唯一对照完成 |
 | 矩阵同步 | Chart.ts 79 方法/Indicator 23 字段/Overlay 24 字段/Styles 43 接口全部入矩阵并推进（E 156→55） |
 | 后续检查 | 每月 compare；上游发布新版本时优先跑 tools/alignment/check.py + 两个 meta diff 测试 |
+
+## 演练 3（2026-10-29，0.5.0 发版例行 compare）
+
+| 项 | 内容 |
+|---|---|
+| 检查方式 | GitHub compare v10.1.0...main（WebFetch，本地快照为静态非 git） |
+| 结论 | v10.1.0 之后 main 仍仅 1 个提交 e52ec09「[docs: readme]」（2026-10-21，2 files changed）——文档类不适用，不移植，基线不变（与演练 1/2 结论一致） |
+| 版本状态 | 本项目 0.5.0 基于上游 v10.1.0 静态快照完成全部对齐（矩阵 E=0） |
+| 后续检查 | 维持每月 compare；上游发布 v10.2+ 或出现源码提交时：优先跑 tools/alignment/check.py + 两个 meta diff 测试，数据正确性类提交必须复现并优先评估移植 |
