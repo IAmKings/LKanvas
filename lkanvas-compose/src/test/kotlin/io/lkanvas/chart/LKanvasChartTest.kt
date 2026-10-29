@@ -377,14 +377,43 @@ class LKanvasChartTest {
     }
 
     @Test
-    fun `setStylesDeepPartial深合并`() {
+    fun `setStyles全量替换语义`() {
         val chart = newChart()
+        // R04 新契约：setStyles(Styles) = 主题全量替换（非补丁）
         val patch = io.lkanvas.chart.styles.Styles(candle = io.lkanvas.chart.styles.CandleStyle(bar = io.lkanvas.chart.styles.CandleBarColor(upColor = "#FF0000")))
         chart.setStyles(patch)
         val bar = (chart.getStyles().candle.bar as io.lkanvas.chart.styles.CandleBarColor)
-        assertEquals("#FF0000", bar.upColor, "patch 值生效")
-        assertEquals("#F92855", bar.downColor, "未提供字段保留")
-        assertEquals("#EDEDED", chart.getStyles().grid.horizontal.color, "未触及节保留")
+        assertEquals("#FF0000", bar.upColor, "提供值生效")
+        assertEquals("#EDEDED", chart.getStyles().grid.horizontal.color, "未填分支回到默认（全量替换语义）")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `局部StylesPatch不重置其他分支（R04）`() {
+        val chart = newChart()
+        chart.setStyles("dark")
+        assertEquals("#33353D", chart.getStyles().separator.color, "dark separator 基线")
+        // 复审 R04 复现：只隐藏 grid——修复前会重置 separator 为默认浅色
+        chart.setStyles(io.lkanvas.chart.styles.StylesPatch(grid = io.lkanvas.chart.styles.GridStylePatch(show = false)))
+        assertFalse(chart.getStyles().grid.show, "提供的路径生效")
+        assertEquals("#33353D", chart.getStyles().separator.color, "未提供的分支保持 dark（局部补丁不重置）")
+        assertEquals("#24262E", chart.getStyles().candle.tooltip.rect.color, "更深层未提供分支同样保持")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `局部StylesPatch显式恢复默认值生效（R04）`() {
+        val chart = newChart()
+        chart.setStyles(io.lkanvas.chart.styles.StylesPatch(grid = io.lkanvas.chart.styles.GridStylePatch(show = false)))
+        assertFalse(chart.getStyles().grid.show)
+        // 显式设回 true（非默认 false）→ 生效
+        chart.setStyles(io.lkanvas.chart.styles.StylesPatch(grid = io.lkanvas.chart.styles.GridStylePatch(show = true)))
+        assertTrue(chart.getStyles().grid.show, "显式提供（含默认值）照常生效")
+        // 深层：bar 色局部补丁
+        chart.setStyles(io.lkanvas.chart.styles.StylesPatch(candle = io.lkanvas.chart.styles.CandleStylePatch(bar = io.lkanvas.chart.styles.CandleBarColorPatch(upColor = "#FF0000"))))
+        val bar = (chart.getStyles().candle.bar as io.lkanvas.chart.styles.CandleBarColor)
+        assertEquals("#FF0000", bar.upColor, "深层补丁生效")
+        assertEquals("#F92855", bar.downColor, "深层未提供字段保留")
         LKanvasChart.dispose(chart)
     }
 

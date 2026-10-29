@@ -121,20 +121,72 @@ class Parity6AxisConvertTest {
     // ---------- SLA-010：ConvertFilter 与 pane 校验 ----------
 
     @Test
-    fun `convertFromPixel与磁吸分离且absolute按索引解释`() {
+    fun `absolute只控制y参考系且timestamp恒为时间戳（R05）`() {
         val chart = newChartWithLog()
         val candles = chart.getDataList()
-        // absolute=true：timestamp 字段按数据索引解释
-        val pts = chart.convertToPixel(
-            listOf(io.lkanvas.core.overlay.OverlayPoint(timestamp = 40L, value = 100.0)),
+        chart.state.onLayout(600f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        // 相同时间戳：absolute 切换只改 y（±pane top），不改 x（复审 R05 复现收口）
+        val rel = chart.convertToPixel(
+            listOf(io.lkanvas.core.overlay.OverlayPoint(timestamp = candles[40].timestamp, value = 5000.0)),
+            LKanvasChart.ConvertFilter(absolute = false),
+        )[0]
+        val abs = chart.convertToPixel(
+            listOf(io.lkanvas.core.overlay.OverlayPoint(timestamp = candles[40].timestamp, value = 5000.0)),
             LKanvasChart.ConvertFilter(absolute = true),
-        )
-        val x40 = chart.state.viewport.candleCenterX(40.0)
-        assertEquals(x40, pts[0].first, 1e-9, "absolute 按索引取 x")
-        // convertFromPixel 不做磁吸（返回 raw 值——STRONG 模式下 overlay 输入才吸附）
+        )[0]
+        assertEquals(rel.first, abs.first, 1e-9, "absolute 不改变 x（timestamp 恒为时间戳）")
+        val mainTop = chart.state.paneBounds("main")!!.first.toDouble()
+        assertEquals(rel.second + mainTop, abs.second, 1e-9, "absolute = 相对 y + pane top")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `paneId参与转换且不同pane坐标不同（R05）`() {
+        val chart = newChartWithLog()
+        chart.state.onLayout(600f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        // 创建 VOL 实例于 vol pane（有数据映射）
+        chart.createIndicator("VOL", paneId = "vol")
+        drain()
+        val volValue = chart.getDataList().first().volume ?: 100.0
+        val mainPt = chart.convertToPixel(
+            listOf(io.lkanvas.core.overlay.OverlayPoint(timestamp = chart.getDataList()[5].timestamp, value = volValue)),
+            LKanvasChart.ConvertFilter(paneId = "main"),
+        )[0]
+        val volPt = chart.convertToPixel(
+            listOf(io.lkanvas.core.overlay.OverlayPoint(timestamp = chart.getDataList()[5].timestamp, value = volValue)),
+            LKanvasChart.ConvertFilter(paneId = "vol"),
+        )[0]
+        assertTrue(kotlin.math.abs(mainPt.second - volPt.second) > 1.0, "main 与 vol pane 转换不同（复审 R05 复现收口）")
+        assertEquals(mainPt.first, volPt.first, 1e-9, "x 与 pane 无关")
+        // absolute=true 的 vol 坐标 = 相对 + vol pane top
+        val volAbs = chart.convertToPixel(
+            listOf(io.lkanvas.core.overlay.OverlayPoint(timestamp = chart.getDataList()[5].timestamp, value = volValue)),
+            LKanvasChart.ConvertFilter(paneId = "vol", absolute = true),
+        )[0]
+        val volTop = chart.state.paneBounds("vol")!!.first.toDouble()
+        assertEquals(volPt.second + volTop, volAbs.second, 1e-9, "absolute=vol top 偏移")
+        LKanvasChart.dispose(chart)
+    }
+
+    @Test
+    fun `convertFromPixel不做磁吸且支持absolute逆变换`() {
+        val chart = newChartWithLog()
+        chart.state.onLayout(600f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        drain()
+        val candles = chart.getDataList()
+        // convertFromPixel 不做磁吸（STRONG 模式下 overlay 输入才吸附）
         chart.overlayMode = io.lkanvas.chart.OverlayMode.STRONG_MAGNET
         val raw = chart.convertFromPixel(listOf(Pair(chart.state.viewport.candleCenterX(10.0), 200.0)))
         assertTrue(raw[0].timestamp == candles[10].timestamp, "convertFromPixel 锚定索引")
+        // absolute 逆变换：to(+top) 后 from(-top) 往返
+        val pt = chart.convertToPixel(
+            listOf(io.lkanvas.core.overlay.OverlayPoint(timestamp = candles[20].timestamp, value = 100.0)),
+            LKanvasChart.ConvertFilter(absolute = true),
+        )[0]
+        val back = chart.convertFromPixel(listOf(pt), LKanvasChart.ConvertFilter(absolute = true))
+        assertEquals(100.0, back[0].value, 1e-4, "absolute 往返一致（Float 像素精度）")
         LKanvasChart.dispose(chart)
     }
 

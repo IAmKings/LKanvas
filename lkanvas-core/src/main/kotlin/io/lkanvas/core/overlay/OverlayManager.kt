@@ -7,6 +7,8 @@ package io.lkanvas.core.overlay
 data class OverlayPoint(
     val timestamp: Long,
     val value: Double,
+    /** 上游 Point.dataIndex：timestamp 缺省时的数据索引（convert 用；timestamp 优先）。 */
+    val dataIndex: Int? = null,
 ) {
     operator fun plus(delta: OverlayPoint) = OverlayPoint(timestamp + delta.timestamp, value + delta.value)
     operator fun minus(other: OverlayPoint) = OverlayPoint(timestamp - other.timestamp, value - other.value)

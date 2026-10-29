@@ -403,6 +403,111 @@ class ChartState(
         return io.lkanvas.core.axis.YAxisMath.yToValue(spec, yy.toDouble(), alo, ahi, 0.0, bottom)
     }
 
+    /**
+     * pane 纵向几何（R05）：内容坐标下 (top, bottom)。main=0..main、
+     * vol/macd 依 paneHeightsPx、extras 依 extraPaneLayout；未知 pane 返回 null。
+     */
+    fun paneBounds(paneId: String): Pair<Float, Float>? {
+        val h = paneHeightsPx
+        return when (paneId) {
+            "main" -> 0f to h.main
+            "vol" -> h.main to h.main + h.vol
+            "macd" -> h.main + h.vol to h.main + h.vol + h.macd
+            else -> extraPaneLayout.firstOrNull { it.first == paneId }?.second
+        }
+    }
+
+    /**
+     * pane 数值 → pane 相对 y（R05：与各 pane 渲染器同式——vol 0..maxVol、
+     * macd/extra 可见区公共值域）；未知 pane/无数据返回 null。
+     */
+    fun paneValueToY(paneId: String, value: Double): Double? {
+        val (top, bottom) = paneBounds(paneId) ?: return null
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val (vFrom, vTo) = visibleIndexRange() ?: return null
+        val loHi: Pair<Double, Double>? = when (paneId) {
+            "main" -> return mainPaneYOf(value)?.let { it - top }
+            "vol" -> {
+                val result = volumePaneResult()
+                val visible = candles.subList(vFrom, vTo + 1)
+                val maxVol = maxOf(
+                    visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0,
+                    result?.result?.columns
+                        ?.filterKeys { it.startsWith("ma") }
+                        ?.values
+                        ?.flatMap { arr -> arr.slice(vFrom..vTo).filter { it.isFinite() } }
+                        ?.maxOrNull() ?: 0.0,
+                    1e-12,
+                )
+                0.0 to maxVol
+            }
+            else -> {
+                val result = if (paneId == "macd") macdPaneResult()
+                else indicatorInstances.firstOrNull { it.paneId == paneId && it.visible }?.state
+                val cols = result?.result ?: return null
+                var lo = Double.NaN
+                var hi = Double.NaN
+                for ((_, arr) in cols.columns) {
+                    for (i in vFrom..vTo) {
+                        val v = arr[i]
+                        if (v.isNaN()) continue
+                        if (lo.isNaN() || v < lo) lo = v
+                        if (hi.isNaN() || v > hi) hi = v
+                    }
+                }
+                if (lo.isNaN()) return null
+                if (lo == hi) lo - 1.0 to hi + 1.0 else lo to hi
+            }
+        }
+        val (lo, hi) = loHi ?: return null
+        return io.lkanvas.core.axis.LinearYAxis.valueToY(value, lo, hi, top.toDouble(), bottom.toDouble()) - top
+    }
+
+    /** [paneValueToY] 的逆（pane 相对 y → 数值）。 */
+    fun paneValueAt(paneId: String, yRelative: Float): Double? {
+        val (top, bottom) = paneBounds(paneId) ?: return null
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val (vFrom, vTo) = visibleIndexRange() ?: return null
+        val absY = yRelative + top
+        return when (paneId) {
+            "main" -> mainPaneValueAt(yRelative)
+            "vol" -> {
+                val result = volumePaneResult()
+                val visible = candles.subList(vFrom, vTo + 1)
+                val maxVol = maxOf(
+                    visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0,
+                    result?.result?.columns
+                        ?.filterKeys { it.startsWith("ma") }
+                        ?.values
+                        ?.flatMap { arr -> arr.slice(vFrom..vTo).filter { it.isFinite() } }
+                        ?.maxOrNull() ?: 0.0,
+                    1e-12,
+                )
+                io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), 0.0, maxVol, top.toDouble(), bottom.toDouble())
+            }
+            else -> {
+                val result = if (paneId == "macd") macdPaneResult()
+                else indicatorInstances.firstOrNull { it.paneId == paneId && it.visible }?.state
+                val cols = result?.result ?: return null
+                var lo = Double.NaN
+                var hi = Double.NaN
+                for ((_, arr) in cols.columns) {
+                    for (i in vFrom..vTo) {
+                        val v = arr[i]
+                        if (v.isNaN()) continue
+                        if (lo.isNaN() || v < lo) lo = v
+                        if (hi.isNaN() || v > hi) hi = v
+                    }
+                }
+                if (lo.isNaN()) return null
+                val (l, h2) = if (lo == hi) lo - 1.0 to hi + 1.0 else lo to hi
+                io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), l, h2, top.toDouble(), bottom.toDouble())
+            }
+        }
+    }
+
     /** 当前可见数据索引范围（与 mainPaneRange 同源；轴转换取值域用）。 */
     fun visibleIndexRange(): Pair<Int, Int>? {
         val candles = dataSnapshot.candles

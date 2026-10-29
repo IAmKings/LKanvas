@@ -258,54 +258,69 @@ class LKanvasChart private constructor(
 
     // ---------- 坐标转换（convertToPixel/convertFromPixel） ----------
 
-    /** 上游 ConvertFilter（Chart.ts:1201/1232）：pane/yAxis/absolute 过滤。 */
+    /**
+     * 上游 ConvertFilter（Chart.ts:60-64）原义（R05 纠正，复审 2026-10-30）：
+     * - [paneId] 选择目标 pane（默认 candle/main pane），决定该 pane 的坐标
+     *   边界（bounding.top）与值映射；x 轴 pane 不参与；
+     * - [yAxisId] 在 pane 内选择轴（缺省 pane 默认轴；Alpha 仅主 pane 多轴）；
+     * - [absolute] **只控制 y 的参考系**——false（缺省）返回 pane 相对坐标，
+     *   true 返回画布绝对坐标（+pane bounding.top；from 侧相应先减）。
+     *   timestamp 恒为时间戳、dataIndex 恒为索引，与 absolute 无关。
+     */
     data class ConvertFilter(
         val paneId: String? = null,
         val yAxisId: String? = null,
-        /** true=入参按数据索引解释（上游 absolute 语义）。 */
         val absolute: Boolean? = null,
     )
 
-    private fun yOfForFilter(filter: ConvertFilter?): (Double) -> Double? {
-        // SLA-010/012：convert 消费与绘制同一轴映射（绑定轴→axisValueToY；缺省主轴）
-        val axisId = filter?.yAxisId ?: "main"
-        return { value -> state.axisValueToY(axisId, value) ?: state.mainPaneYOf(value) }
-    }
-
-    /** 上游 `convertToPixel`：数据点→画布像素（filter 限 pane/yAxis/absolute）。 */
+    /** 上游 `convertToPixel`（Chart.ts:1201-1230 镜像）。 */
     fun convertToPixel(
         points: List<io.lkanvas.core.overlay.OverlayPoint>,
         filter: ConvertFilter? = null,
     ): List<Pair<Double, Double>> {
-        val vp = state.viewport
-        val yOf = yOfForFilter(filter)
-        val absolute = filter?.absolute == true
+        val paneId = filter?.paneId ?: "main"
+        val candles = state.dataSnapshot.candles
+        val yOf: (Double) -> Double? = when {
+            filter?.yAxisId != null && filter.yAxisId != "main" ->
+                { value -> state.axisValueToY(filter.yAxisId, value) }
+            else -> { value -> state.paneValueToY(paneId, value) }
+        }
+        // absolute=true：y 加 pane bounding.top（Chart.ts:1223）
+        val paneTop = if (filter?.absolute == true) (state.paneBounds(paneId)?.first?.toDouble() ?: 0.0) else 0.0
         return points.map { p ->
-            val idx = if (absolute) {
-                p.timestamp.toInt().coerceIn(0, state.dataSnapshot.candles.size - 1)
-            } else {
-                io.lkanvas.core.viewport.Viewport.indexOfTimestamp(p.timestamp, state.dataSnapshot.candles)
+            // timestamp 恒为时间戳（优先）；仅缺 timestamp 时用 dataIndex（Chart.ts:1216-1220）
+            val idx = when {
+                p.timestamp >= 0 -> io.lkanvas.core.viewport.Viewport.indexOfTimestamp(p.timestamp, candles)
+                p.dataIndex != null -> p.dataIndex!!.coerceIn(0, candles.size - 1)
+                else -> null
             } ?: return@map Pair(Double.NaN, Double.NaN)
-            val x = vp.candleCenterX(idx.toDouble())
-            val y = yOf(p.value) ?: Double.NaN
-            Pair(x, y)
+            val x = state.viewport.candleCenterX(idx.toDouble())
+            val yRel = yOf(p.value) ?: Double.NaN
+            Pair(x, yRel + paneTop)
         }
     }
 
-    /** 上游 `convertFromPixel`：画布像素→数据点（与磁吸输入逻辑分离：不做吸附）。 */
+    /** 上游 `convertFromPixel`（Chart.ts:1232-1262 镜像；absolute 时 y 先减 pane top）。 */
     fun convertFromPixel(
         coordinates: List<Pair<Double, Double>>,
         filter: ConvertFilter? = null,
     ): List<io.lkanvas.core.overlay.OverlayPoint> {
-        val axisId = filter?.yAxisId ?: "main"
+        val paneId = filter?.paneId ?: "main"
         val candles = state.dataSnapshot.candles
-        if (candles.isEmpty()) return coordinates.map { io.lkanvas.core.overlay.OverlayPoint(timestamp = -1L, value = Double.NaN) }
+        if (candles.isEmpty()) {
+            return coordinates.map { io.lkanvas.core.overlay.OverlayPoint(timestamp = -1L, value = Double.NaN) }
+        }
+        val paneTop = if (filter?.absolute == true) (state.paneBounds(paneId)?.first?.toDouble() ?: 0.0) else 0.0
+        val valueAt: (Float) -> Double? = when {
+            filter?.yAxisId != null && filter.yAxisId != "main" ->
+                { y -> state.axisValueAt(filter.yAxisId, y) }
+            else -> { y -> state.paneValueAt(paneId, y) }
+        }
         return coordinates.map { (x, y) ->
             val idx = state.viewport.logicalIndexAt(x).roundToInt().coerceIn(candles.indices)
-            val value = state.axisValueAt(axisId, y.toFloat())
-                ?: state.mainPaneValueAt(y.toFloat())
-                ?: candles[idx].close
-            io.lkanvas.core.overlay.OverlayPoint(candles[idx].timestamp, value)
+            val yRel = (y - paneTop).toFloat()
+            val value = valueAt(yRel) ?: Double.NaN
+            io.lkanvas.core.overlay.OverlayPoint(timestamp = candles[idx].timestamp, value = value, dataIndex = idx)
         }
     }
 
@@ -576,14 +591,29 @@ class LKanvasChart private constructor(
     )
 
 
-    /** 上游 `setStyles(value: string | DeepPartial<Styles>)`。 */
+    /** 上游 `setStyles(value: string)`：按注册主题名整体替换。 */
     fun setStyles(value: String) {
         styles = io.lkanvas.chart.styles.StylesMerge.resolveTheme(value)
         applyStyleConsumers()
     }
 
-    fun setStyles(patch: io.lkanvas.chart.styles.Styles) {
-        styles = io.lkanvas.chart.styles.StylesMerge.merge(styles, patch) as io.lkanvas.chart.styles.Styles
+    /**
+     * 上游 `setStyles(patch: DeepPartial<Styles>)`（R04，复审 2026-10-30）：
+     * [io.lkanvas.chart.styles.StylesPatch] 为全字段可空补丁——null=未提供，
+     * **未提供的分支保持当前值不变**（局部补丁不重置其他配置）；
+     * 非 null=已提供（显式设回默认值照常生效）。
+     */
+    fun setStyles(patch: io.lkanvas.chart.styles.StylesPatch) {
+        styles = patch.applyTo(styles)
+        applyStyleConsumers()
+    }
+
+    /**
+     * 主题全量替换（非补丁）：用 [value] 的全部字段覆盖当前样式。
+     * 局部修改请使用 [setStyles] 的 [io.lkanvas.chart.styles.StylesPatch] 重载。
+     */
+    fun setStyles(value: io.lkanvas.chart.styles.Styles) {
+        styles = value
         applyStyleConsumers()
     }
 
@@ -610,16 +640,6 @@ class LKanvasChart private constructor(
             }
             else -> null
         }
-    }
-
-    /**
-     * 严格合并版 setStyles（0.3.0）：字段值非 null 即覆盖（无 skip-defaults 启发式）。
-     * 用于宿主把字段**切回默认值**的场景（skip-defaults 会把「==默认值」当未提供，
-     * 从 rect 切回 standard、隐藏切回显示会被吞；矩阵差异登记见 StylesMerge 注释）。
-     */
-    fun setStylesStrict(patch: io.lkanvas.chart.styles.Styles) {
-        styles = io.lkanvas.chart.styles.StylesMerge.mergeStrict(styles, patch) as io.lkanvas.chart.styles.Styles
-        applyStyleConsumers()
     }
 
     /** 上游 `getStyles()`。 */

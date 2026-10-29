@@ -19,14 +19,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.lkanvas.chart.LKanvasChart
-import io.lkanvas.chart.styles.CrosshairStyle
-import io.lkanvas.chart.styles.GridStyle
-import io.lkanvas.chart.styles.LineStyle
 import io.lkanvas.chart.styles.Styles
+import io.lkanvas.chart.styles.CrosshairStylePatch
+import io.lkanvas.chart.styles.GridStylePatch
+import io.lkanvas.chart.styles.SeparatorStylePatch
+import io.lkanvas.chart.styles.StylesPatch
 
 /**
  * Styles 设置面板完整版（批次 5 余量样例）：对齐上游 demo 的样式设置交互——
- * 全部经门面 `setStyles(Styles patch)` 深合并，逐项演示关键样式节点。
+ * 局部项经门面 `setStyles(StylesPatch)`（未提供字段保持不变，R04）；
+ * 全量场景经 `setStyles(Styles)` 主题替换。
  * grid 显隐 / tooltip 规则（always→follow_cross→none）/ crosshair 显隐 / overlay 点色。
  */
 @Composable
@@ -58,7 +60,7 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
         // grid 显隐
         SettingRow("网格", if (gridOn) "显示" else "隐藏") {
             gridOn = !gridOn
-            facade.setStylesStrict(Styles(grid = GridStyle(show = gridOn)))
+            facade.setStyles(StylesPatch(grid = GridStylePatch(show = gridOn)))
         }
 
         // tooltip 规则循环（0.3.0：库枚举；always→follow_cross→none，渲染端已消费）
@@ -70,9 +72,7 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
         SettingRow("Tooltip 规则", tooltipRule) {
             tooltipRule = nextRule
             val cur = facade.getStyles()
-            facade.setStylesStrict(
-                cur.copy(candle = cur.candle.copy(tooltip = cur.candle.tooltip.copy(showRule = nextRule))),
-            )
+            facade.setStyles(cur.copy(candle = cur.candle.copy(tooltip = cur.candle.tooltip.copy(showRule = nextRule))))
         }
 
         // tooltip 形态切换（0.3.0：standard 行式 ↔ rect 卡片，渲染端已消费）
@@ -80,9 +80,7 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
             val next = if (tooltipType == "standard") "rect" else "standard"
             tooltipType = next
             val cur = facade.getStyles()
-            facade.setStylesStrict(
-                cur.copy(candle = cur.candle.copy(tooltip = cur.candle.tooltip.copy(showType = next))),
-            )
+            facade.setStyles(cur.copy(candle = cur.candle.copy(tooltip = cur.candle.tooltip.copy(showType = next))))
         }
 
         // 功能图标演示（0.3.0：indicator.tooltip.features；点击图标经门面发三 ActionType）
@@ -96,22 +94,20 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
                     content = listOf(listOf(0.2, 0.8), listOf(0.5, 0.2), listOf(0.8, 0.8)),
                 ),
             ) else emptyList()
-            facade.setStylesStrict(
-                cur.copy(indicator = cur.indicator.copy(tooltip = cur.indicator.tooltip.copy(features = features))),
-            )
+            facade.setStyles(cur.copy(indicator = cur.indicator.copy(tooltip = cur.indicator.tooltip.copy(features = features))))
         }
 
         // crosshair 显隐
         SettingRow("十字线", if (crosshairOn) "显示" else "隐藏") {
             crosshairOn = !crosshairOn
-            facade.setStylesStrict(Styles(crosshair = CrosshairStyle(show = crosshairOn)))
+            facade.setStyles(StylesPatch(crosshair = CrosshairStylePatch(show = crosshairOn)))
         }
 
         // overlay 控制点大小
         SettingRow("画线控制点", if (overlayPointBig) "大" else "小") {
             overlayPointBig = !overlayPointBig
-            facade.setStylesStrict(
-                Styles(
+            facade.setStyles(
+                facade.getStyles().copy(
                     overlay = facade.getStyles().overlay.copy(
                         point = facade.getStyles().overlay.point.copy(
                             radius = if (overlayPointBig) 8.0 else 4.0,
@@ -126,7 +122,7 @@ fun StylesPanel(facade: LKanvasChart, onClose: () -> Unit) {
         SettingRow("分隔线色", "#76808F↔#33353D") {
             val cur = facade.getStyles().separator.color
             val next = if (cur == "#76808F") "#33353D" else "#76808F"
-            facade.setStylesStrict(Styles(separator = io.lkanvas.chart.styles.SeparatorStyle(color = next)))
+            facade.setStyles(StylesPatch(separator = io.lkanvas.chart.styles.SeparatorStylePatch(color = next)))
         }
     }
 }
