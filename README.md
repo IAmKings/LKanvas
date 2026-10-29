@@ -31,7 +31,14 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
   - **注册统一**：指标/覆盖物/轴/图形模板注册与创建/渲染/命中/手势事件共用同一张全局表（宿主注册端到端可用）
   - **严格上游默认**（破坏性变更，见 compatibility.md）：init 不预置指标、createIndicator 缺省新建指标 pane 且 isStack=false、overrideIndicator 全字段、payload 嵌套 data:{prev,current,next}、executeAction 抑制反向广播
   - **契约收口**：视口锚点/右锚滚动模型/独立 maxOffset/小数 rightOffset/to 钳制/动画；log 轴 convert 与绘制同源；ConvertFilter；scroll/zoomEnabled 共用入口；candle.type/逐根配色/格式链消费；覆盖物模板命中与交互创建配置
+  - **对齐矩阵**：check.py v4 四态校验通过（行为通过=18），SLA-001~016 审计项全部「行为通过」；真实源码补丁演练 4（upstream-sync.md）证明补丁可定位有限本地改动- **0.6.0 结构与逻辑对齐完整版**（审计 16 项发现全部收口，验收依据 `docs/alignment/structure-logic-audit-2026-10-28.zh-CN.md` + gap-matrix SLA-001~016）：
+  - **结构镜像**：27 指标 / 16 覆盖物模板拆分为上游同名文件（`extension/indicator|overlay/*.kt` ↔ `src/extension/*/*.ts`），每模板含上游逐行对照的规范 `calc`；全量路径走 calc、Scratch 增量为优化路径，27 模板双路径互验逐位一致（DualPathParityTest）+ oracle 27/27
+  - **数据路径**：`core/store/Store.kt` 镜像上游 Store 数据段——双向分页边界触发、more 同方向更新、resetData 退订→变更→清 loading→init 顺序、请求代次门禁（本地增强：在途切品种旧回调/推送丢弃）
+  - **注册统一**：指标/覆盖物/轴/图形模板注册与创建/渲染/命中/手势事件共用同一张全局表（宿主注册端到端可用）
+  - **严格上游默认**（破坏性变更，见 compatibility.md）：init 不预置指标、createIndicator 缺省新建指标 pane 且 isStack=false、overrideIndicator 全字段、payload 嵌套 data:{prev,current,next}、executeAction 抑制反向广播
+  - **契约收口**：视口锚点/右锚滚动模型/独立 maxOffset/小数 rightOffset/to 钳制/动画；log 轴 convert 与绘制同源；ConvertFilter；scroll/zoomEnabled 共用入口；candle.type/逐根配色/格式链消费；覆盖物模板命中与交互创建配置
   - **对齐矩阵**：check.py v4 四态校验通过（行为通过=18），SLA-001~016 审计项全部「行为通过」；真实源码补丁演练 4（upstream-sync.md）证明补丁可定位有限本地改动
+- **0.7.0 复审收口**（复审 R01-R14 全项，依据 `docs/alignment/structure-logic-audit-2026-10-30.zh-CN.md` + gap-matrix §14）：数据路径组合正确性（分页不再杀实时订阅、检查点 key 绑定防串品种、提交后自动续拉——parity-9 组合差分）；StylesPatch 全可空镜像（局部补丁不重置其他分支）；convert 上游原义（absolute=y 参考系/paneId 选 pane）；轴实例表/pane 集合单一来源；统一 figure 管线（BAR 分发+visible+attrs）与覆盖物统一模板执行（16 模板图形生成迁入、无名称分支、pane 感知）；Crosshair 语义（null 清除/x 推导索引）；动画真过渡与 LayoutOptions 补齐；arc 端点容差采纳（演练 5 before/after）；check.py SLA 行纳入证据检查
 - **Tooltip 渲染完整版（0.3.0）**：showRule/showType/features 全消费（对齐上游 CandleTooltipView），feature 图标命中→三种 ActionType；样式面板全部开关联动
 - **回调消费端（0.3.0）**：覆盖物 onClick/onDoubleClick/onRightClick(长按)/onTouch 系手势分发、performEventPressedMove 委托、indicator draw 钩子（IndicatorDrawContext）、时区接线；setStylesStrict 修复切回默认值边界
 - **多轴渲染 Alpha（0.4.0）**：createYAxis/removeYAxis/overrideYAxis 渲染消费——绑定自定义轴的指标按独立值域绘制并获独立标签列（reverse 即时生效）

@@ -195,6 +195,15 @@ gfxinfo 非压缩等价口径（PRD 7.3「不混算」），R8 压缩口径待�
 执行：`./gradlew :benchmark:connectedBenchmarkAndroidTest`（3 tests，0 failed，1 skipped）；
 B-02 帧统计经 dumpsys gfxinfo 手工按协议复采（20 次滑动 reset 后 571 帧）。
 
+## 4.y 0.7.0 发版回归（2026-10-30，豁免登记）
+
+| 项 | 状态 |
+|---|---|
+| 设备状态 | 冻结设备 23078PND5G 在线但处于**安全锁屏**（wm dismiss-keyguard 无效，无法/不应绕过宿主锁屏）——冷启动 benchmark 无法采集 |
+| 豁免理由 | 按既有口径（MIUI 测量冻结登记）显式豁免本轮 B-01/B-02 实采；0.6.0 基线（B-01 median 412.8ms / B-02 P50 23ms P95 32ms）留档为下轮对照 |
+| 风险评估 | 本轮触碰渲染热路径的改动（R08 figure 管线/R09 覆盖物统一执行）均保留 native drawLines 批量与 FigureRenderer 原语路径；R01-R03 数据路径改动不进帧循环；预期帧耗时无结构性劣化 |
+| 补测条件 | 设备解锁后执行 `./gradlew :benchmark:connectedBenchmarkAndroidTest`，P95 劣化 >10% 则进入 T-34 循环 |
+
 ## 5. 后续动作（T-34 输入）
 
 - B-02 首轮数据 vs 门槛差距分析 → 超标项进入 T-34 优化循环（视口裁剪、覆盖物批量绘制、指标线分帧）
