@@ -288,10 +288,22 @@ class LocalFeed(private val seed: Int = 2026) {
                 initial += candleAt(startTs + i * 60_000L, open, close, rand.nextDouble() * 5000 + 100)
                 p = close
             }
-            state.reset(io.lkanvas.core.store.MarketKey("STRESS", "1m"), initial)
+            // B-03 改进（分批注入，PRD「就绪期间 UI 可响应」）：首批 reset 后指标在
+            // 小数据量上全量（毫秒级），其余经 appendBatch 分批推进（每批间让出一帧，
+            // 指标走 REPLACE_APPEND 增量）——避免单次 3.7s 的主线程全量阻塞
+            val firstBatch = minOf(1_000, count)
+            state.reset(io.lkanvas.core.store.MarketKey("STRESS", "1m"), initial.subList(0, firstBatch))
+            android.util.Log.i("LKanvas", "stress 首批可交互：$firstBatch candle，距注入开始 ${System.currentTimeMillis() - injectStartMs}ms")
             // K 个 MA 实例（参数各不同，随视口增量推进）
             repeat(stress.indicators) { i ->
                 facade?.createIndicator("MA", calcParams = listOf((i + 2).toDouble()))
+            }
+            var appended = firstBatch
+            while (appended < count) {
+                val end = minOf(appended + 2_000, count)
+                state.appendBatch(initial.subList(appended, end))
+                appended = end
+                delay(16) // 让出一帧：就绪期间 UI 可响应
             }
             // M 条 segment（时间均分 + 价格在数据范围内固定模式取点）
             val lo = initial.minOf { it.low }
