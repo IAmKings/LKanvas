@@ -67,7 +67,11 @@ object PaneRenderers {
         val spec = state.effectiveMainAxisSpec()
         val (rf, rt) = YAxisMath.realRange(spec, lo, hi)
         val yReal: (Double) -> Double = { r -> LinearYAxis.valueToY(r, rf, rt, top.toDouble(), bottom.toDouble()) }
-        val y: (Double) -> Double = { v -> yReal(YAxisMath.valueToReal(spec, v)) }
+        // SLA-010：主轴 reverse 与 convert 共用（ChartState.mainAxisReverse，选中不翻转刻度文本）
+        val y: (Double) -> Double = { v ->
+            val r = yReal(YAxisMath.valueToReal(spec, v))
+            if (state.mainAxisReverse) top + bottom - r else r
+        }
 
         // 网格与刻度按轴规格生成（Styles grid.show/横向虚线开关）
         val axisTicks = YAxisMath.ticks(spec, lo, hi, 5)

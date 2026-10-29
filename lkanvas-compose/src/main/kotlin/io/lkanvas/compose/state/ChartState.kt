@@ -332,20 +332,73 @@ class ChartState(
         return io.lkanvas.core.axis.LinearYAxis.rangeOfCandles(candles.subList(from, to + 1))
     }
 
-    /** y 像素 → 主 pane 数值（与绘制同一映射）。 */
+    /**
+     * 主轴 reverse（SLA-010/012 统一消费：overrideYAxis(main) 同步；
+     * 绘制 y 映射、十字线、覆盖物与门面 convert 共用）。
+     */
+    var mainAxisReverse: Boolean = false
+
+    /**
+     * y 像素 → 主 pane 数值（SLA-012 统一轴模型：与绘制同用 YAxisMath +
+     * effectiveMainAxisSpec，log/percentage/custom 一致；reverse 逆映射）。
+     */
     fun mainPaneValueAt(y: Float): Double? {
         val (lo, hi) = mainPaneRange() ?: return null
-        return io.lkanvas.core.axis.LinearYAxis.yToValue(
-            y.toDouble(), lo, hi, 0.0, paneHeightsPx.main.toDouble(),
-        )
+        val spec = effectiveMainAxisSpec()
+        val bottom = paneHeightsPx.main.toDouble()
+        val yy = if (mainAxisReverse) bottom - y else y
+        return io.lkanvas.core.axis.YAxisMath.yToValue(spec, yy.toDouble(), lo, hi, 0.0, bottom)
     }
 
-    /** 数值 → y 像素（主 pane）。 */
+    /** 数值 → y 像素（SLA-012 统一轴模型：与绘制同用 YAxisMath；reverse 翻转）。 */
     fun mainPaneYOf(value: Double): Double? {
         val (lo, hi) = mainPaneRange() ?: return null
-        return io.lkanvas.core.axis.LinearYAxis.valueToY(
-            value, lo, hi, 0.0, paneHeightsPx.main.toDouble(),
-        )
+        val spec = effectiveMainAxisSpec()
+        val bottom = paneHeightsPx.main.toDouble()
+        val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, value, lo, hi, 0.0, bottom)
+        return if (mainAxisReverse) bottom - y else y
+    }
+
+    /**
+     * 绑定轴数值 → 主 pane 内 y 像素（SLA-010 convert 感知：与 PaneRenderers
+     * 轴绑定绘制同式——extraAxisRange 值域 + custom 变换 + reverse 翻转）。
+     * 主轴/未知轴回退 mainPaneYOf；无绑定值域返回 null。
+     */
+    fun axisValueToY(axisId: String, value: Double): Double? {
+        if (axisId == "main") return mainPaneYOf(value)
+        val meta = extraYAxisMeta[axisId] ?: return mainPaneYOf(value)
+        val (vFrom, vTo) = visibleIndexRange() ?: return null
+        val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
+        val spec = extraYAxisCustom[axisId]
+            ?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
+            ?: io.lkanvas.core.axis.YAxisSpec.Normal
+        val bottom = paneHeightsPx.main.toDouble()
+        val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, value, alo, ahi, 0.0, bottom)
+        return if (meta.reverse) bottom - y else y
+    }
+
+    /** 绑定轴 y 像素 → 数值（[axisValueToY] 的逆；convertFromPixel 用）。 */
+    fun axisValueAt(axisId: String, y: Float): Double? {
+        if (axisId == "main") return mainPaneValueAt(y)
+        val meta = extraYAxisMeta[axisId] ?: return mainPaneValueAt(y)
+        val (vFrom, vTo) = visibleIndexRange() ?: return null
+        val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
+        val spec = extraYAxisCustom[axisId]
+            ?.let { io.lkanvas.core.axis.YAxisSpec.Custom(it) }
+            ?: io.lkanvas.core.axis.YAxisSpec.Normal
+        val bottom = paneHeightsPx.main.toDouble()
+        val yy = if (meta.reverse) bottom - y else y
+        return io.lkanvas.core.axis.YAxisMath.yToValue(spec, yy.toDouble(), alo, ahi, 0.0, bottom)
+    }
+
+    /** 当前可见数据索引范围（与 mainPaneRange 同源；轴转换取值域用）。 */
+    fun visibleIndexRange(): Pair<Int, Int>? {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val from = kotlin.math.floor(viewport.scrollIndex).toInt().coerceIn(candles.indices)
+        val to = kotlin.math.ceil(viewport.scrollIndex + viewport.visibleCount).toInt().coerceIn(candles.indices)
+        if (to < from) return null
+        return from to to
     }
 
     /** 时间戳 → 数据索引（不存在取不大于它的最近一根；早于首根取首根）。 */

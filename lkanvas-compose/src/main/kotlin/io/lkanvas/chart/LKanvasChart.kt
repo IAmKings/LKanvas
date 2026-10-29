@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlin.math.roundToInt
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -219,23 +220,54 @@ class LKanvasChart private constructor(
 
     // ---------- 坐标转换（convertToPixel/convertFromPixel） ----------
 
-    /** 上游 `convertToPixel`：数据点→画布像素；filter 限 pane（Alpha 仅主 pane）。 */
-    fun convertToPixel(points: List<io.lkanvas.core.overlay.OverlayPoint>): List<Pair<Double, Double>> {
+    /** 上游 ConvertFilter（Chart.ts:1201/1232）：pane/yAxis/absolute 过滤。 */
+    data class ConvertFilter(
+        val paneId: String? = null,
+        val yAxisId: String? = null,
+        /** true=入参按数据索引解释（上游 absolute 语义）。 */
+        val absolute: Boolean? = null,
+    )
+
+    private fun yOfForFilter(filter: ConvertFilter?): (Double) -> Double? {
+        // SLA-010/012：convert 消费与绘制同一轴映射（绑定轴→axisValueToY；缺省主轴）
+        val axisId = filter?.yAxisId ?: "main"
+        return { value -> state.axisValueToY(axisId, value) ?: state.mainPaneYOf(value) }
+    }
+
+    /** 上游 `convertToPixel`：数据点→画布像素（filter 限 pane/yAxis/absolute）。 */
+    fun convertToPixel(
+        points: List<io.lkanvas.core.overlay.OverlayPoint>,
+        filter: ConvertFilter? = null,
+    ): List<Pair<Double, Double>> {
         val vp = state.viewport
+        val yOf = yOfForFilter(filter)
+        val absolute = filter?.absolute == true
         return points.map { p ->
-            val idx = io.lkanvas.core.viewport.Viewport.indexOfTimestamp(p.timestamp, state.dataSnapshot.candles)
-                ?: return@map Pair(Double.NaN, Double.NaN)
+            val idx = if (absolute) {
+                p.timestamp.toInt().coerceIn(0, state.dataSnapshot.candles.size - 1)
+            } else {
+                io.lkanvas.core.viewport.Viewport.indexOfTimestamp(p.timestamp, state.dataSnapshot.candles)
+            } ?: return@map Pair(Double.NaN, Double.NaN)
             val x = vp.candleCenterX(idx.toDouble())
-            val y = state.mainPaneYOf(p.value) ?: Double.NaN
+            val y = yOf(p.value) ?: Double.NaN
             Pair(x, y)
         }
     }
 
-    /** 上游 `convertFromPixel`：画布像素→数据点。 */
-    fun convertFromPixel(coordinates: List<Pair<Double, Double>>): List<io.lkanvas.core.overlay.OverlayPoint> {
+    /** 上游 `convertFromPixel`：画布像素→数据点（与磁吸输入逻辑分离：不做吸附）。 */
+    fun convertFromPixel(
+        coordinates: List<Pair<Double, Double>>,
+        filter: ConvertFilter? = null,
+    ): List<io.lkanvas.core.overlay.OverlayPoint> {
+        val axisId = filter?.yAxisId ?: "main"
+        val candles = state.dataSnapshot.candles
+        if (candles.isEmpty()) return coordinates.map { io.lkanvas.core.overlay.OverlayPoint(timestamp = -1L, value = Double.NaN) }
         return coordinates.map { (x, y) ->
-            state.overlayPointFromPx(x.toFloat(), y.toFloat())
-                ?: io.lkanvas.core.overlay.OverlayPoint(timestamp = -1L, value = Double.NaN)
+            val idx = state.viewport.logicalIndexAt(x).roundToInt().coerceIn(candles.indices)
+            val value = state.axisValueAt(axisId, y.toFloat())
+                ?: state.mainPaneValueAt(y.toFloat())
+                ?: candles[idx].close
+            io.lkanvas.core.overlay.OverlayPoint(candles[idx].timestamp, value)
         }
     }
 
@@ -790,6 +822,8 @@ class LKanvasChart private constructor(
     /** 上游 `createYAxis(yAxis)`：登记轴实例，返回 id（重复 id 幂等返回）。 */
     /** 0.4.0 多轴渲染：把自定义轴（paneId=main）同步到 ChartState（渲染消费源）。 */
     private fun syncExtraAxes() {
+        // SLA-010：主轴覆写进入执行链（reverse → ChartState 统一映射消费）
+        yAxes["main"]?.let { state.mainAxisReverse = it.reverse }
         val mains = yAxes.values.filter { it.id != "main" && it.paneId == "main" }
         state.extraYAxisMeta = mains.associate {
             it.id to io.lkanvas.compose.state.ChartState.ExtraAxisMeta(
@@ -804,6 +838,9 @@ class LKanvasChart private constructor(
     fun createYAxis(yAxis: YAxisOverride): String? {
         val paneId = yAxis.paneId ?: "main"
         if (paneId == "candle_x") return null // x 轴 pane 不支持 y 轴（上游 PaneIdConstants.X_AXIS）
+        // SLA-010：目标 pane 必须存在（上游 getDrawPaneById !isValid → null）
+        val knownPanes = setOf("main", "vol", "macd") + state.extraPanes.value
+        if (paneId !in knownPanes) return null
         val id = yAxis.id ?: "yAxis_${++yAxisSerial}"
         if (yAxes.containsKey(id)) return id
         yAxes[id] = YAxisInfo(
