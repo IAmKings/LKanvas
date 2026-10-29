@@ -14,7 +14,7 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 | `lkanvas-compose` | Android Compose 库：`KLineChart` 组件（六种主图类型、三 pane、明暗主题）、Canvas 绘制、手势状态机、segment 画线 |
 | `app-sample` | 示例应用：本地确定性行情、实时末根更新、分页、画线、图型/轴切换 |
 
-## 当前进度（0.3.0：Tooltip 完整版 + 回调消费端）
+## 当前进度（0.4.0：多轴渲染 + 性能门槛全绿）
 
 - **27/27 内置指标**：全部与上游 v10.1.0 TS oracle 逐位对照通过（值与 Missing 位置），附手算样例与增量/全量一致性测试
 - **16/16 覆盖物**：共用生命周期状态机，brush 5000 点上限；斐波那契价格空间投影（D-02）
@@ -28,8 +28,10 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 - **对齐矩阵 E=0**（A=15/B=227/C=9/D=6，unknown=0）：门面 API 面/模板注册/Styles 树/多轴/utils 22 项全部落位，check.py 七面校验通过
 - **Tooltip 渲染完整版（0.3.0）**：showRule/showType/features 全消费（对齐上游 CandleTooltipView），feature 图标命中→三种 ActionType；样式面板全部开关联动
 - **回调消费端（0.3.0）**：覆盖物 onClick/onDoubleClick/onRightClick(长按)/onTouch 系手势分发、performEventPressedMove 委托、indicator draw 钩子（IndicatorDrawContext）、时区接线；setStylesStrict 修复切回默认值边界
+- **多轴渲染 Alpha（0.4.0）**：createYAxis/removeYAxis/overrideYAxis 渲染消费——绑定自定义轴的指标按独立值域绘制并获独立标签列（reverse 即时生效）
+- **性能门槛全绿（0.4.0，PRD 7.3）**：B-01 启动 387.6ms（3.9 倍余量）、B-02 扩展负载帧耗时 P50 69→23ms（-67%）、B-03 100k 就绪 1895ms 进入门槛 + 首批可交互 54ms、B-04 突发收敛 158ms（12.7 倍）、B-06 30 分钟热稳定零崩溃零 ANR 内存稳定；过程修复 3 个真缺陷（视口重绘订阅缺失/plotsFor 假列/tooltip 热点）
 - **B-01 初测**：10k candle 三指标末根更新 P95=0.270ms（D1 目标 4ms 的 1/15）
-- 待 0.4.x：多轴渲染消费（YAxisInfo→多轴绘制）、动态 pane 模型/isStack、Macrobenchmark（B-02~B-06）性能线、诊断可视化 UI（见兼容台账）
+- 待 0.5.x：动态 pane 模型/isStack、多轴完整版（轴 widget 宽度自适应/自定义变换回调绘制消费）、R8 压缩口径帧数据（待 MIUI perfetto 兼容）、诊断可视化 UI、fling 曲线（见兼容台账）
 
 ## 从 KLineChart (WebView) 迁移到 LKanvas
 
