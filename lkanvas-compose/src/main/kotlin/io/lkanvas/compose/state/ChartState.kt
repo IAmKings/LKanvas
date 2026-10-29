@@ -861,11 +861,13 @@ class ChartState(
     var indicatorResultsRevision by mutableIntStateOf(0)
         private set
 
-    /** 主 pane 叠加的指标实例结果（MA + 用户 price 系实例）。 */
+    /**
+     * 主 pane 叠加的指标实例结果（SLA-003：paneId=="main" 的**全部**可见实例，
+     * 不再按 series 过滤——上游允许任意指标叠加 candle pane）。
+     */
     fun mainPaneIndicatorResults(): List<IndicatorInstance> =
         indicatorInstances.filter {
-            it.visible && it.paneId == "main" &&
-                it.definition.series == io.lkanvas.core.indicator.IndicatorSeries.PRICE && it.state != null
+            it.visible && it.paneId == "main" && it.state != null
         }
 
     /** VOL pane 实例结果（绑定 vol pane 的 volume 系；回退 VOLUME 模板实例）。 */

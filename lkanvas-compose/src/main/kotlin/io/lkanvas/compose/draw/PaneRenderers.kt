@@ -241,7 +241,8 @@ object PaneRenderers {
         val range = state.viewport.visibleRange(candles.size)
         if (range.count <= 0) return
         val visible = candles.subList(range.first, range.last + 1)
-        val result = state.volResult ?: return
+        // SLA-003：pane 绑定实例优先（任意 VOLUME 系实例可入 vol pane），回退 VOL 模板结果
+        val result = state.volumePaneResult() ?: state.volResult ?: return
 
         val maxVol = maxOf(
             visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0,
@@ -273,12 +274,15 @@ object PaneRenderers {
         val candles = state.dataSnapshot.candles
         val range = state.viewport.visibleRange(candles.size)
         if (range.count <= 0) return
-        val result = state.macdResult ?: return
-
-        val values = sequenceOf("dif", "dea").flatMap { k ->
+        // SLA-003：pane 绑定实例优先（任意实例可入 macd pane），回退 MACD 模板结果
+        val result = state.macdPaneResult() ?: state.macdResult ?: return
+        // 动态线键：BAR 型列（macd 柱）以外的全部列按 palette 画线（上游 IndicatorView 通用口径）
+        val barKeys = if ("macd" in result.result.keys) listOf("macd") else emptyList()
+        val lineKeys = result.result.keys.filter { it !in barKeys }
+        val values = lineKeys.flatMap { k ->
             result.result[k].slice(range.first..range.last).filter { it.isFinite() }
         } + sequenceOf(0.0)
-        val bars = result.result["macd"].slice(range.first..range.last).filter { it.isFinite() }
+        val bars = result.result["macd"]?.slice(range.first..range.last)?.filter { it.isFinite() } ?: emptyList()
         var lo = min(values.minOrNull() ?: 0.0, bars.minOrNull() ?: 0.0)
         var hi = max(values.maxOrNull() ?: 0.0, bars.maxOrNull() ?: 0.0)
         if (lo == hi) { lo -= 1.0; hi += 1.0 }
@@ -286,8 +290,10 @@ object PaneRenderers {
 
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
-            drawMacdBars(state, theme, result, range, y)
-            drawLinePlots(result, state.viewport, range, y, listOf(theme.macdDif, theme.macdDea), keys = listOf("dif", "dea"), lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = false)
+            if ("macd" in result.result.keys) {
+                drawMacdBars(state, theme, result, range, y)
+            }
+            drawLinePlots(result, state.viewport, range, y, theme.linePalette, keys = lineKeys, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = false)
         }
         drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), y, contentRight)
     }
