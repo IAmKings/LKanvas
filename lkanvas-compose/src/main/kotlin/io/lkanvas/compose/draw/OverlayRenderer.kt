@@ -94,7 +94,9 @@ object OverlayRenderer {
             pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble() - paneTop) },
             extendData = inst.extensionData,
         ) ?: return
-        // 产物为 pane 局部坐标：绘制一次性平移到 pane 绝对位置（边界一次转换）
+        // 产物为 pane 局部坐标：绘制一次性平移到 pane 绝对位置 + **pane 裁剪**
+        //（Q04：越界图形不再干扰其他 pane；边界只在明确边界处理）
+        clipRect(left = 0f, top = paneTop, right = contentRight, bottom = paneTop + paneHeight.toFloat()) {
         translate(left = 0f, top = paneTop) {
             for ((figureType, attrs, styles) in figures) {
                 val figColor = parseFigureColor(styles["color"]) ?: color
@@ -139,7 +141,8 @@ object OverlayRenderer {
                 }
             }
         }
-        // 控制点（非连续模板；选中或创建中）
+        }
+        // 控制点（非连续模板；选中或创建中）——pane 内绘制（不裁剪，保持可见性）
         if (template.continuous != true && (selected || creating)) {
             px.forEach { drawControlPoint(it, theme.overlayPoint) }
         }
@@ -265,6 +268,8 @@ object OverlayRenderer {
         val paneHeight = ((paneBoundsPair?.second ?: paneBottom) - paneTop).toDouble()
         // T04：命中与绘制同坐标系——pane 局部 bounds + pixelPoints 减 top + 查询点减 top
         val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneHeight)
+        // Q04：pane 外查询点不参与该实例命中（修复前副图水平线在主图区仍可命中）
+        if (y < paneTop || y > paneTop + paneHeight.toFloat()) return false
         val px = inst.points.mapNotNull { state.overlayPointToPx(it, paneId) }
         if (px.isEmpty()) return false
         val template = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName] ?: return false

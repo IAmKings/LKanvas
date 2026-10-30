@@ -598,9 +598,11 @@ class ChartState(
         if (candles.isEmpty()) return null
         val idx = viewport.logicalIndexAt(x.toDouble()).roundToInt().coerceIn(candles.indices)
         val candle = candles[idx]
-        // T04（第三轮复审 2026-10-30）：值反算按实例所属 pane 的轴/值域
-        // （修复前一律 mainPaneValueAt——副图触点按主轴反算得错误数值）
-        val valueOf: (Float) -> Double? = { yy -> paneValueAt(paneId, yy) }
+        // T04/Q04：手势传入**整图绝对 y**——在输入边界减一次 pane top 再交给
+        // 期望相对 y 的 paneValueAt（修复前直接传入，paneValueAt 内部再加 top，
+        // 双计导致副图反算值错误）
+        val paneTopForInput = paneBounds(paneId)?.first ?: 0f
+        val valueOf: (Float) -> Double? = { yy -> paneValueAt(paneId, yy - paneTopForInput) }
         val value = when (overlays.magnetMode) {
             io.lkanvas.core.overlay.MagnetMode.NORMAL ->
                 valueOf(y) ?: candle.close

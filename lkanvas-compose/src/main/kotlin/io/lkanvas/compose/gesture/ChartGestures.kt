@@ -101,6 +101,11 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         if (state.overlays.creatingId != null) {
             mode = GMode.CREATE
             state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
+            // Q04：创建上下文按 creating 实例的 pane 初始化（修复前 dragPaneId
+            // 从默认 main 开始，副图创建的 brush 采样/加点用错 pane）
+            state.overlays.creatingId?.let { cid ->
+                state.overlays.get(cid)?.effectivePaneId?.let { dragPaneId = it }
+            }
             // brush：按下即采首点，随后 Move 连续采样
             if (state.currentTool == "brush") {
                 lastBrushX = down.position.x
