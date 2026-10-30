@@ -18,17 +18,16 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** 数据变更请求（经引擎串行队列提交到 [ChartDataStore]）。 */
 /**
- * 数据变更请求（T01，第三轮复审 2026-10-30）：
- * [expectedSessionId] = 发起时引擎 store 的会话快照——[applyToStore] 在**唯一
- * 串行写入入口**执行前复核，非 Reset 且不匹配即丢弃（旧回调数据不得写入
- * 新会话；[Reset] 不携带，是唯一允许开新会话的操作）。
+ * 数据变更请求。会话归属门禁在门面 dataEpoch（Q01，第四轮复审 2026-10-30）：
+ * 接受时点身份捕获/复核，不再经由引擎字段（旧机制读协程运行时状态，ABA 与
+ * 首推场景均不成立）。
  */
 sealed interface ChangeRequest {
     data class Reset(val key: MarketKey?, val candles: List<Candle>) : ChangeRequest
-    data class ReplaceLatest(val candle: Candle, val expectedSessionId: Long? = null) : ChangeRequest
-    data class UpsertLatest(val candle: Candle, val expectedSessionId: Long? = null) : ChangeRequest
-    data class AppendBatch(val candles: List<Candle>, val expectedSessionId: Long? = null) : ChangeRequest
-    data class PrependHistory(val candles: List<Candle>, val expectedSessionId: Long? = null) : ChangeRequest
+    data class ReplaceLatest(val candle: Candle) : ChangeRequest
+    data class UpsertLatest(val candle: Candle) : ChangeRequest
+    data class AppendBatch(val candles: List<Candle>) : ChangeRequest
+    data class PrependHistory(val candles: List<Candle>) : ChangeRequest
 
     /** 显式纠正已存在历史值（R-02 PatchHistory）。 */
     data class PatchHistory(val patches: List<Candle>) : ChangeRequest
@@ -90,9 +89,6 @@ class ChartEngine(
 ) {
 
     private val events = Channel<EngineEvent>(queueCapacity)
-
-    /** 当前会话 id 快照（T01：Host 发起动作时捕获，经 ChangeRequest 透传到写入门禁）。 */
-    val currentSessionId: Long get() = store.sessionId
 
     /** 实例配置版本（参数/样式定义变化时 bump）。只在串行上下文读写。 */
     private val configVersions = HashMap<String, Long>()
@@ -236,20 +232,7 @@ class ChartEngine(
         configVersion = configVersions[instanceId] ?: 0L,
     )
 
-    private fun applyToStore(request: ChangeRequest): ChangeResult {
-        // T01（第三轮复审 2026-10-30）：写入前会话复核——发起时快照 ≠ 当前会话
-        // 即丢弃（唯一串行写入入口的门禁；Reset 不携带、允许开新会话）
-        val expected = when (request) {
-            is ChangeRequest.ReplaceLatest -> request.expectedSessionId
-            is ChangeRequest.UpsertLatest -> request.expectedSessionId
-            is ChangeRequest.AppendBatch -> request.expectedSessionId
-            is ChangeRequest.PrependHistory -> request.expectedSessionId
-            else -> null
-        }
-        if (expected != null && expected != store.sessionId) {
-            return ChangeResult.Rejected(applyToStoreOp(request), RejectReason.SESSION_MISMATCH)
-        }
-        return when (request) {
+    private fun applyToStore(request: ChangeRequest): ChangeResult = when (request) {
             is ChangeRequest.Reset -> {
                 val r = store.reset(request.key, request.candles)
                 if (r is ChangeResult.Accepted) {
@@ -263,14 +246,5 @@ class ChartEngine(
             is ChangeRequest.AppendBatch -> store.appendBatch(request.candles)
             is ChangeRequest.PrependHistory -> store.prependHistory(request.candles)
             is ChangeRequest.PatchHistory -> store.patchHistory(request.patches)
-        }
-    }
-
-    private fun applyToStoreOp(request: ChangeRequest): io.lkanvas.core.store.DataOp = when (request) {
-        is ChangeRequest.ReplaceLatest -> io.lkanvas.core.store.DataOp.REPLACE_LATEST
-        is ChangeRequest.UpsertLatest -> io.lkanvas.core.store.DataOp.UPSERT_LATEST
-        is ChangeRequest.AppendBatch -> io.lkanvas.core.store.DataOp.APPEND_BATCH
-        is ChangeRequest.PrependHistory -> io.lkanvas.core.store.DataOp.PREPEND_HISTORY
-        else -> io.lkanvas.core.store.DataOp.RESET
     }
 }

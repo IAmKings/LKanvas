@@ -456,8 +456,18 @@ class LKanvasChart private constructor(
      * 边界续拉由 [ChartState] 的 onSnapshot 统一驱动（R03，镜像上游
      * _addData → _adjustVisibleRange 提交后链）。
      */
+    /**
+     * Q01（第四轮复审 2026-10-30）：**接受时点会话身份**——dataEpoch 在
+     * applyInit 被 Store 锁内调用的瞬间递增（新会话建立点），其余动作在
+     * 接受时捕获该值、在协程执行前复核。与读协程运行时引擎状态不同，
+     * 这是发起请求时的不可变身份：ABA 旧动作（旧 epoch）被拒；INIT 后的
+     * 合法首推（新 epoch，即使 Reset 协程尚未执行）被接纳。
+     */
+    private val dataEpoch = java.util.concurrent.atomic.AtomicLong(0)
+
     private fun storeHost() = object : Store.Host {
         override fun applyInit(key: MarketKey, data: List<Candle>): Boolean {
+            dataEpoch.incrementAndGet() // 接受时点（Store 锁内）：新会话建立
             scope.launch {
                 state.reset(key, data)
                 // init 重载后按上游 _addData init 分支重放右侧留白（应用完成后）
@@ -467,23 +477,31 @@ class LKanvasChart private constructor(
         }
 
         override fun applyBackward(key: MarketKey, data: List<Candle>): Boolean {
-            // T01：发起时会话快照随动作携带（引擎写入入口复核；A→B→A 旧动作失效）
-            scope.launch { state.appendBatch(data, engineSessionId()) }
+            val epoch = dataEpoch.get() // 接受时点捕获
+            scope.launch {
+                if (epoch != dataEpoch.get()) return@launch // 旧会话动作丢弃
+                state.appendBatch(data)
+            }
             return true
         }
 
         override fun applyForward(key: MarketKey, data: List<Candle>): Boolean {
-            scope.launch { state.prependHistory(data, engineSessionId()) }
+            val epoch = dataEpoch.get()
+            scope.launch {
+                if (epoch != dataEpoch.get()) return@launch
+                state.prependHistory(data)
+            }
             return true
         }
 
         override fun applyUpdate(key: MarketKey, candle: Candle): Boolean {
-            scope.launch { state.upsertLatest(candle, engineSessionId()) }
+            val epoch = dataEpoch.get()
+            scope.launch {
+                if (epoch != dataEpoch.get()) return@launch
+                state.upsertLatest(candle)
+            }
             return true
         }
-
-        /** 引擎当前会话 id 快照（接受时点捕获，经状态透传到写入门禁）。 */
-        private fun engineSessionId(): Long = state.engineSessionId()
 
         override fun candleCount(): Int = state.dataSnapshot.candles.size
 

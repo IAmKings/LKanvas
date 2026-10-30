@@ -170,14 +170,17 @@ class Store(private val host: Host) {
                     if (gen != generation) return@GetBarsParams // 旧代次回调丢弃
                     loading = false
                     // T01：携带请求代次——addData 锁内复核（检查与写入原子）
-                    addData(data, type, more, requestKey, gen, subGen)
-                    if (type == DataLoader.DataLoadType.INIT) {
+                    val accepted = addData(data, type, more, requestKey, gen, subGen)
+                    // Q01（第四轮复审 2026-10-30）：INIT 被锁内拒绝时**不再订阅**——
+                    // 拒绝数据不应保留过期生命周期副作用（旧实现无条件 subscribeBar，
+                    // 拒绝后的订阅记录把旧上下文带回新会话）
+                    if (type == DataLoader.DataLoadType.INIT && accepted) {
                         l.subscribeBar(
                             DataLoader.SubscribeBarParams(s, p) { candle ->
                                 // R01：校验**订阅会话**代次——分页请求的
                                 // generation 递增不影响同品种实时订阅
                                 if (subGen != subscriptionGeneration) return@SubscribeBarParams
-                                addUpdate(candle, requestKey)
+                                addUpdate(candle, requestKey, subGen)
                             },
                         )
                     }
@@ -195,13 +198,13 @@ class Store(private val host: Host) {
         requestKey: MarketKey? = null,
         requestGen: Long = generation,
         requestSubGen: Long = subscriptionGeneration,
-    ) = synchronized(lock) {
+    ): Boolean = synchronized(lock) {
         // T01（第三轮复审 2026-10-30）：**锁内复核**——回调入口的代次检查与
         // 真正写入之间隔锁等待/切换（TOCTOU）；请求捕获的代次在临界区内与
-        // 当前代次比对，过期即整体丢弃（INIT/实时更新一视同仁）
-        if (requestGen != generation) return@synchronized
+        // 当前代次比对，过期即整体丢弃（INIT/实时更新一视一律）
+        if (requestGen != generation) return@synchronized false
         if (type == DataLoader.DataLoadType.UPDATE && requestSubGen != subscriptionGeneration) {
-            return@synchronized
+            return@synchronized false
         }
         // R02：key 在接受检查的同一锁临界区内确定——排队中的切换在本块
         // 之后才能改 symbol，应用动作使用检查点绑定的会话 key
@@ -244,27 +247,22 @@ class Store(private val host: Host) {
         // R03：上游 _addData 尾部 adjustFlag → _adjustVisibleRange 的范围调整
         // 与边界续拉，由宿主在数据**实际提交完成**后统一执行（onSnapshot 驱动），
         // 此处不再回调 onDataAdjusted（提交前时机不可靠）
+        return success
     }
 
     /** 上游 `_addData` 单根分支：大于末根 push（末根右侧留白随动）、等于替换、小于忽略。 */
-    fun addUpdate(candle: Candle, requestKey: MarketKey? = null): Boolean = synchronized(lock) {
-        // T01：锁内复核订阅会话代次（入口检查与写入之间的切换在临界区内失效）
-        if (subscriptionGeneration != currentSubscriptionGenFor(requestKey)) return@synchronized false
+    fun addUpdate(
+        candle: Candle,
+        requestKey: MarketKey? = null,
+        requestSubGen: Long = subscriptionGeneration,
+    ): Boolean = synchronized(lock) {
+        // Q01（第四轮复审 2026-10-30）：锁内比对**捕获的订阅会话代次**——
+        // A→B→A 两次 A 的 key 相同但代次不同，旧实现以 key 相等代替代次相等
+        // （currentSubscriptionGenFor hack），ABA 旧推送仍落库
+        if (requestSubGen != subscriptionGeneration) return@synchronized false
         val key = requestKey ?: MarketKey(symbol?.ticker ?: "UNKNOWN", period?.toString() ?: "UNKNOWN")
         host.applyUpdate(key, candle)
     }
-
-    /**
-     * T01 辅助：实时推送归属校验——推送属于当前订阅会话当且仅当其
-     * (symbol, period) 与当前上下文一致（订阅回调已按 subscriptionGeneration
-     * 首检，此处锁内二次校验会话上下文未被切换）。
-     */
-    private fun currentSubscriptionGenFor(requestKey: MarketKey?): Long =
-        if (requestKey != null && requestKey != MarketKey(symbol?.ticker ?: "", period?.toString() ?: "")) {
-            subscriptionGeneration + 1 // key 已切换：强制不匹配
-        } else {
-            subscriptionGeneration
-        }
 
     // ---------- 边界触发（上游 _adjustVisibleRange 末尾） ----------
 
