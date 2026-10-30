@@ -1007,8 +1007,10 @@ class LKanvasChart private constructor(
             drag["vol"]?.let { state.volDragEnabled = it }
             drag["macd"]?.let { state.macdDragEnabled = it }
             for ((pane, enabled) in drag) {
+                // Q07：单一状态（ChartState.disabledExtraDrags）——setter/getter/手势共用
                 if (pane in state.extraPanes.value) {
-                    if (enabled) disabledExtraDrags.remove(pane) else if (!disabledExtraDrags.contains(pane)) disabledExtraDrags.add(pane)
+                    if (enabled) state.disabledExtraDrags.remove(pane)
+                    else if (pane !in state.disabledExtraDrags) state.disabledExtraDrags.add(pane)
                 }
             }
         }
@@ -1016,9 +1018,11 @@ class LKanvasChart private constructor(
         val cur = state.paneHeightsPx
         val usable = cur.main + cur.vol + cur.macd
         if (usable <= 0f) return
-        heights["main"]?.let { setPaneOptions(PaneOptions("main", it)) }
-        heights["vol"]?.let { setPaneOptions(PaneOptions("vol", it)) }
-        heights["macd"]?.let { setPaneOptions(PaneOptions("macd", it)) }
+        // Q07：遍历实际 pane 集合（动态 pane 高度经 setPaneOptions 统一路由，
+        // 修复前 {paneId:123} 被忽略）
+        for ((paneId, height) in heights) {
+            setPaneOptions(PaneOptions(paneId, height))
+        }
     }
 
     /** 上游 `getLayoutOptions()`（T10：存取同源——返回全部已配置状态）。 */
@@ -1030,7 +1034,7 @@ class LKanvasChart private constructor(
             if (!state.volDragEnabled) put("vol", false)
             if (!state.macdDragEnabled) put("macd", false)
             for (pane in state.extraPanes.value) {
-                if (pane in disabledExtraDrags) put(pane, false)
+                if (pane in state.disabledExtraDrags) put(pane, false)
             }
         }
         val heights = buildMap {
@@ -1049,7 +1053,6 @@ class LKanvasChart private constructor(
         )
     }
 
-    /** T10：动态 pane 拖动禁用集（setLayoutOptions 写入；getter 回读）。 */
     private val disabledExtraDrags = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     /**
