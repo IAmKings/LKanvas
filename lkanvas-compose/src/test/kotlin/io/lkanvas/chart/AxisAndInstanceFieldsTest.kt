@@ -591,10 +591,10 @@ class AxisAndInstanceFieldsTest {
         // attrs 消费：几何数值（drawBarPlots 的 top/bottom 覆盖来源）
         val attrsFn = io.lkanvas.compose.draw.PaneRenderers.attrsOverrideFor(inst)
         kotlin.test.assertNotNull(attrsFn, "attrs 几何有消费者（Q05：drawBarPlots 消费）")
-        val geo0 = attrsFn!!("k", 0)
+        val geo0 = attrsFn!!("k", 0, Double.NaN, candles)
         assertEquals(0.0, geo0["top"]!!, "attrs 几何 top（row=0）")
         assertEquals(5.0, geo0["bottom"]!!, "attrs 几何 bottom（row=0）")
-        val geo3 = attrsFn("k", 3)
+        val geo3 = attrsFn("k", 3, Double.NaN, candles)
         assertEquals(30.0, geo3["top"]!!, "attrs 逐行求值（row=3 top=30）")
     }
 

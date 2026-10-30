@@ -117,7 +117,7 @@ object PaneRenderers {
                 } else {
                     // T06（第三轮复审 2026-10-30）：主图叠加走统一 figure 管线
                     //（BAR 分发——main 上创建 MACD 柱列不再画折线）
-                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow)
+                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow, candles = candles, paneTop = top)
                 }
                 paletteIdx += res.result.keys.size
             }
@@ -179,7 +179,7 @@ object PaneRenderers {
                         )
                     } else {
                         // T06：主图额外轴入口同管线
-                        drawInstanceFigures(inst, res, state.viewport, range, ay, theme, axPalette, lastValueMark = theme.lastValueMarkShow)
+                        drawInstanceFigures(inst, res, state.viewport, range, ay, theme, axPalette, lastValueMark = theme.lastValueMarkShow, candles = candles)
                     }
                     axPalette += res.result.keys.size
                 }
@@ -301,7 +301,7 @@ object PaneRenderers {
                         ),
                     )
                 } else {
-                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = false, candles = candles)
+                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = false, candles = candles, paneTop = top)
                 }
                 paletteIdx += res.result.keys.size
             }
@@ -369,7 +369,7 @@ object PaneRenderers {
                 } else {
                     // R08：统一 figure 管线——按 PlotDef.type 分发 line/bar（含 baseValue），
                     // attrs/styles 逐行求值；27 显示模板不再依赖专用 renderer
-                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow)
+                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow, candles = candles, paneTop = top)
                 }
                 paletteIdx += res.result.keys.size
             }
@@ -657,6 +657,7 @@ object PaneRenderers {
         paletteOffset: Int,
         lastValueMark: Boolean,
         candles: List<Candle> = emptyList(),
+        paneTop: Float = 0f,
     ) {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
         val override = styleOverrideFor(inst)
@@ -675,7 +676,7 @@ object PaneRenderers {
             drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = override?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } })
         }
         if (barEntries.isNotEmpty()) {
-            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, override, attrsGeo, candles)
+            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, override, attrsGeo, candles, paneTop)
         }
     }
 
@@ -692,8 +693,9 @@ object PaneRenderers {
         palette: List<Color>,
         paletteOffset: Int,
         override: ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)?,
-        attrsGeo: ((String, Int) -> Map<String, Double>)?,
+        attrsGeo: ((String, Int, Double, List<Candle>) -> Map<String, Double>)?,
         candles: List<Candle> = emptyList(),
+        paneTop: Float = 0f,
     ) {
         val gap = (vp.barSpacing * 0.25).coerceAtMost(vp.barSpacing - 1.0).coerceAtLeast(0.0).toFloat()
         val bodyWidth = (vp.barSpacing - gap).coerceAtLeast(1.0).toFloat()
@@ -707,25 +709,31 @@ object PaneRenderers {
                 if (v.isNaN()) continue
                 val x = vp.candleCenterX(i.toDouble()).toFloat()
                 val vy = y(v).toFloat()
-                // Q05：attrs 几何优先（上游 figure.attrs 协议——top/bottom 像素
-                // 覆盖自算；修复前 attrs 仅测试调用、管线零消费）
-                val geo = attrsGeo?.invoke(key, i)
+                // N04（第五轮复审 2026-10-31）：attrs 几何=**pane 相对坐标**——
+                // 绘制时加 paneTop 平移到绝对位置（修复前被当绝对坐标，副图
+                // attrs 图形落在裁剪区外）；支持 x/width 覆盖（上游 bar 矩形
+                // x/y/width/height 四键；修复前只消费 top/bottom）
+                val geo = attrsGeo?.invoke(key, i, v, candles)
+                val ax = geo?.get("x")?.toFloat() ?: vp.candleCenterX(i.toDouble()).toFloat()
+                val aw = geo?.get("width")?.toFloat() ?: bodyWidth
                 val top: Float
                 val hgt: Float
                 if (geo != null && geo.containsKey("top") && geo.containsKey("bottom")) {
-                    top = minOf(geo.getValue("top").toFloat(), geo.getValue("bottom").toFloat())
-                    hgt = kotlin.math.abs(geo.getValue("bottom") - geo.getValue("top")).toFloat().coerceAtLeast(0.5f)
+                    val geoTop = geo.getValue("top").toFloat() + paneTop
+                    val geoBottom = geo.getValue("bottom").toFloat() + paneTop
+                    top = minOf(geoTop, geoBottom)
+                    hgt = kotlin.math.abs(geoBottom - geoTop).coerceAtLeast(0.5f)
                 } else {
                     top = minOf(vy, baseY)
                     hgt = kotlin.math.abs(vy - baseY).coerceAtLeast(0.5f)
                 }
                 val (c0, w0) = override?.invoke(key, i, v, candles) ?: (null to null)
                 val color = c0 ?: palette[(bi + paletteOffset) % palette.size]
-                val w = (w0 ?: 1f) * bodyWidth
+                val w = (w0 ?: 1f) * aw / bodyWidth
                 drawRect(
                     color,
-                    topLeft = Offset(x - w / 2f, top),
-                    size = androidx.compose.ui.geometry.Size(w, hgt),
+                    topLeft = Offset(ax - aw / 2f, top),
+                    size = androidx.compose.ui.geometry.Size(aw, hgt),
                 )
             }
         }
@@ -776,12 +784,13 @@ object PaneRenderers {
      * BAR 消费键：top/bottom（pane 相对 y）——缺省由管线按值/基线自算。
      */
     /** Q05：attrs 几何求值（含 value+candles 上下文；数值 map）。 */
-    fun attrsOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int) -> Map<String, Double>)? {
+    fun attrsOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Map<String, Double>)? {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
         if (plots.values.all { it.attrs == null }) return null
-        return { key, row ->
-            val colValue: Double = Double.NaN
-            val map: Map<*, *> = evaluateStyles(plots[key]?.attrs, row, inst.params, colValue, emptyList()) ?: emptyMap<Any?, Any>()
+        return { key, row, colValue, candles ->
+            // N04（第五轮复审 2026-10-31）：attrs 求值传入**真实** value+candles
+            //（修复前 NaN/空列表——上游 figure.attrs 的 data 上下文语义）
+            val map: Map<*, *> = evaluateStyles(plots[key]?.attrs, row, inst.params, colValue, candles) ?: emptyMap<Any?, Any>()
             buildMap {
                 for ((k, v) in map) {
                     (v as? Number)?.let { put(k.toString(), it.toDouble()) }
