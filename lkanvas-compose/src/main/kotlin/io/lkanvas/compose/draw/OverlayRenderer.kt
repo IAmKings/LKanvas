@@ -139,9 +139,10 @@ object OverlayRenderer {
             }
         }
         }
-        // 控制点（非连续模板；选中或创建中）——pane 内绘制（不裁剪，保持可见性）
+        // N06（第五轮复审 2026-10-31）：控制点绘制移入 pane 裁剪块内
+        //（pane 局部坐标；修复前在 clipRect 外用绝对坐标，越界控制点画进其他 pane）
         if (template.continuous != true && (selected || creating)) {
-            px.forEach { drawControlPoint(it, theme.overlayPoint) }
+            px.forEach { drawControlPoint(Offset(it.x, it.y - paneTop), theme.overlayPoint) }
         }
     }
 
@@ -153,8 +154,9 @@ object OverlayRenderer {
      */
     private fun formatPriceText(state: ChartState, paneId: String, raw: Double): String {
         val precision = if (paneId != "main") {
+            // N05（第五轮复审 2026-10-31）：实例 precisionOverride 优先于模板 precision
             state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
-                .maxOfOrNull { it.definition.precision } ?: state.pricePrecision
+                .maxOfOrNull { it.precisionOverride ?: it.definition.precision } ?: state.pricePrecision
         } else {
             state.pricePrecision
         }
@@ -162,6 +164,11 @@ object OverlayRenderer {
         var text = io.lkanvas.core.common.utils.Format.formatPrecision(raw, precision)
         cfg.thousandsSign?.takeIf { it.isNotEmpty() }?.let { sign ->
             text = io.lkanvas.core.common.utils.Format.formatThousands(text, sign)
+        }
+        // N05：小数折叠消费（上游 priceLine.ts:33 decimalFold 格式链最后一步；
+        // Format.kt:62 formatFoldDecimal 现成函数——修复前直接 return 跳过）
+        cfg.decimalFoldThreshold?.let { threshold ->
+            text = io.lkanvas.core.common.utils.Format.formatFoldDecimal(text, threshold)
         }
         return text
     }
@@ -240,9 +247,15 @@ object OverlayRenderer {
         val ordered = all.sortedWith(compareByDescending { it.zIndex })
         // 1) 控制点（仅选中实例；连续模板无控制点编辑；fixedZLevel 不随选中浮起）
         for (inst in ordered) {
-            if (inst.id != selectedId || inst.locked || inst.fixedZLevel) continue
+            // N07（第五轮复审 2026-10-31）：fixedZLevel 不再排除控制点候选
+            //（上游 Overlay.ts:153 该字段只约束层级浮起，不禁用控制点编辑；
+            // 修复前选中 fixedZLevel 对象后端点点击变整体拖动）
+            if (inst.id != selectedId || inst.locked) continue
             if (io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName]?.continuous == true) continue
             val paneId = inst.effectivePaneId
+            // N06：pane 边界预检（触点不在实例所属 pane 内则跳过控制点）
+            val pb = state.paneBounds(paneId)
+            if (pb != null && (y < pb.first || y > pb.second)) continue
             inst.points.forEachIndexed { i, p ->
                 val px = state.overlayPointToPx(p, paneId) ?: return@forEachIndexed
                 if (hypot(px.x - x, px.y - y) <= POINT_HIT_RADIUS) return OverlayHit(inst.id, i, false)

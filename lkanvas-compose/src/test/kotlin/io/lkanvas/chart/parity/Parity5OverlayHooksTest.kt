@@ -173,10 +173,10 @@ class Parity5OverlayHooksTest {
         // 未固定层级：选中实例享受优先命中
         val hitSelected = io.lkanvas.compose.draw.OverlayRenderer.hitTest(chart.state, px0.x, px0.y, 800f, 400f)
         assertEquals(lowId, hitSelected?.instanceId, "选中实例优先命中")
-        // fixedZLevel=true：层级固定，高 z 实例胜出（审计发现 13 收口）
+        // N07（第五轮复审）：fixedZLevel 不禁控制点编辑——选中实例的控制点仍可命中
         chart.overrideOverlay(lowId, io.lkanvas.chart.OverlayOverride(fixedZLevel = true))
         val hitFixed = io.lkanvas.compose.draw.OverlayRenderer.hitTest(chart.state, px0.x, px0.y, 800f, 400f)
-        assertEquals(highId, hitFixed?.instanceId, "fixedZLevel 取消选中越级")
+        assertEquals(lowId, hitFixed?.instanceId, "fixedZLevel 选中实例控制点仍可编辑（上游 Overlay.ts:153 只约束浮起）")
         LKanvasChart.dispose(chart)
     }
 }
