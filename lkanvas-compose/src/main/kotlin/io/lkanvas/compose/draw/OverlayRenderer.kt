@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.clipRect
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
@@ -74,8 +75,12 @@ object OverlayRenderer {
     ) {
         val paneId = inst.effectivePaneId
         val paneBoundsPair = state.paneBounds(paneId)
-        val paneBottomByPane = paneBoundsPair?.second ?: paneBottom
-        val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneBottomByPane.toDouble())
+        val paneTop = paneBoundsPair?.first ?: 0f
+        val paneHeight = ((paneBoundsPair?.second ?: paneBottom) - paneTop).toDouble()
+        // T04（第三轮复审 2026-10-30）：模板统一 **pane 局部坐标**——bounds =
+        // (0,0,width,paneHeight)、pixelPoints y 减 pane top（修复前 bounds 底是
+        // 绝对坐标、verticalStraightLine 从整图顶画穿主图）
+        val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneHeight)
         val px = inst.points.mapNotNull { state.overlayPointToPx(it, paneId) }
         val dash = if (creating) floatArrayOf(8f, 6f) else null
         val lineWidth = stylesLineWidth(inst) ?: 2f
@@ -83,34 +88,38 @@ object OverlayRenderer {
         val template = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName] ?: return
         val figures = template.createPointFigures(
             inst.points, bounds.width, bounds.height,
-            pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble()) },
+            pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble() - paneTop) },
             extendData = inst.extensionData,
         ) ?: return
-        for ((figureType, attrs, styles) in figures) {
-            val figColor = parseFigureColor(styles["color"]) ?: color
-            val strokeWidth = styles["lineWidth"]?.toFloatOrNull() ?: lineWidth
-            when (figureType) {
-                "FibLevel" -> {
-                    val value = attrs.getOrNull(0)?.getOrNull(1) ?: continue
-                    val y = state.paneValueToY(paneId, value) ?: continue
-                    if (y < bounds.top || y > bounds.bottom) continue
-                    val seg = OverlayGeometry.horizontalLine(y, bounds).toOffset()
-                    drawLine(
-                        figColor, seg.first, seg.second,
-                        strokeWidth = if (creating) 1.5f else strokeWidth,
-                        pathEffect = dash?.let { PathEffect.dashPathEffect(it) },
-                    )
-                    val label = styles["label"] ?: ""
-                    drawText(
-                        text, label,
-                        Offset(seg.first.x + 4f, y.toFloat() - text.textHeight),
-                        theme.overlayText,
-                    )
-                }
-                else -> {
-                    val fig = figureFromDescription(figureType, attrs, styles) ?: continue
-                    with(io.lkanvas.compose.draw.FigureRenderer) {
-                        drawFigure(fig, figColor, strokeWidth = strokeWidth)
+        // 产物为 pane 局部坐标：绘制一次性平移到 pane 绝对位置（边界一次转换）
+        translate(left = 0f, top = paneTop) {
+            for ((figureType, attrs, styles) in figures) {
+                val figColor = parseFigureColor(styles["color"]) ?: color
+                val strokeWidth = styles["lineWidth"]?.toFloatOrNull() ?: lineWidth
+                when (figureType) {
+                    "FibLevel" -> {
+                        val value = attrs.getOrNull(0)?.getOrNull(1) ?: continue
+                        // pane 局部 y（paneValueToY 即相对值）
+                        val y = state.paneValueToY(paneId, value) ?: continue
+                        if (y < bounds.top || y > bounds.bottom) continue
+                        val seg = OverlayGeometry.horizontalLine(y, bounds).toOffset()
+                        drawLine(
+                            figColor, seg.first, seg.second,
+                            strokeWidth = if (creating) 1.5f else strokeWidth,
+                            pathEffect = dash?.let { PathEffect.dashPathEffect(it) },
+                        )
+                        val label = styles["label"] ?: ""
+                        drawText(
+                            text, label,
+                            Offset(seg.first.x + 4f, y.toFloat() - text.textHeight),
+                            theme.overlayText,
+                        )
+                    }
+                    else -> {
+                        val fig = figureFromDescription(figureType, attrs, styles) ?: continue
+                        with(io.lkanvas.compose.draw.FigureRenderer) {
+                            drawFigure(fig, figColor, strokeWidth = strokeWidth)
+                        }
                     }
                 }
             }
@@ -227,18 +236,22 @@ object OverlayRenderer {
     ): Boolean {
         val paneId = inst.effectivePaneId
         val paneBoundsPair = state.paneBounds(paneId)
-        val paneBottomByPane = paneBoundsPair?.second ?: paneBottom
-        val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneBottomByPane.toDouble())
+        val paneTop = paneBoundsPair?.first ?: 0f
+        val paneHeight = ((paneBoundsPair?.second ?: paneBottom) - paneTop).toDouble()
+        // T04：命中与绘制同坐标系——pane 局部 bounds + pixelPoints 减 top + 查询点减 top
+        val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneHeight)
         val px = inst.points.mapNotNull { state.overlayPointToPx(it, paneId) }
         if (px.isEmpty()) return false
         val template = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName] ?: return false
         if (!template.checkEventOn) return false
         val figures = template.createPointFigures(
             inst.points, bounds.width, bounds.height,
-            pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble()) },
+            pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble() - paneTop) },
             extendData = inst.extensionData,
         ) ?: return false
-        // R09：命中 = 模板产物的图形距离判定（与绘制同一钩子产物）
+        val xLocal = x
+        val yLocal = y - paneTop
+        // R09：命中 = 模板产物的图形距离判定（与绘制同一钩子产物，pane 局部）
         for ((type, attrs, styles) in figures) {
             when (type) {
                 "FibLevel" -> {
@@ -246,15 +259,15 @@ object OverlayRenderer {
                     val fy = state.paneValueToY(paneId, value) ?: continue
                     if (fy < bounds.top || fy > bounds.bottom) continue
                     val seg = OverlayGeometry.horizontalLine(fy, bounds).toOffset()
-                    if (distanceToSegment(x, y, seg.first, seg.second) <= HIT_RADIUS) return true
+                    if (distanceToSegment(xLocal, yLocal, seg.first, seg.second) <= HIT_RADIUS) return true
                 }
                 "Text" -> {
                     val d0 = attrs.getOrNull(0)
                     val tx = d0?.getOrNull(0)?.toFloat() ?: continue
                     val ty = d0.getOrNull(1)?.toFloat() ?: continue
-                    if (hypot(x - tx, y - ty) <= HIT_RADIUS) return true
+                    if (hypot(xLocal - tx, yLocal - ty) <= HIT_RADIUS) return true
                 }
-                else -> if (hitFigureShape(type, attrs, x, y)) return true
+                else -> if (hitFigureShape(type, attrs, xLocal, yLocal)) return true
             }
         }
         return false

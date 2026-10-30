@@ -424,6 +424,7 @@ class LKanvasChart private constructor(
                 crosshair?.x ?: Double.NaN,
                 crosshair?.y ?: Double.NaN,
                 crosshair?.dataIndex ?: -1,
+                crosshair?.paneId,
             )
             return
         }

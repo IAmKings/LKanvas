@@ -587,22 +587,26 @@ class ChartState(
         x: Float,
         y: Float,
         sensitivityPx: Double = 8.0,
+        paneId: String = "main",
     ): io.lkanvas.core.overlay.OverlayPoint? {
         val candles = dataSnapshot.candles
         if (candles.isEmpty()) return null
         val idx = viewport.logicalIndexAt(x.toDouble()).roundToInt().coerceIn(candles.indices)
         val candle = candles[idx]
+        // T04（第三轮复审 2026-10-30）：值反算按实例所属 pane 的轴/值域
+        // （修复前一律 mainPaneValueAt——副图触点按主轴反算得错误数值）
+        val valueOf: (Float) -> Double? = { yy -> paneValueAt(paneId, yy) }
         val value = when (overlays.magnetMode) {
             io.lkanvas.core.overlay.MagnetMode.NORMAL ->
-                mainPaneValueAt(y) ?: candle.close
+                valueOf(y) ?: candle.close
             io.lkanvas.core.overlay.MagnetMode.WEAK -> {
-                val raw = mainPaneValueAt(y) ?: candle.close
-                // 弱磁吸：与最近 OHLC 的像素距离在灵敏度内才吸附
+                val raw = valueOf(y) ?: candle.close
+                // 弱磁吸：与最近 OHLC 的像素距离在灵敏度内才吸附（pane 感知映射）
                 val nearest = listOf(candle.open, candle.high, candle.low, candle.close).minByOrNull {
                     kotlin.math.abs(it - raw)
                 } ?: raw
-                val nearestPx = mainPaneYOf(nearest)
-                val rawPx = mainPaneYOf(raw)
+                val nearestPx = paneValueToY(paneId, nearest)
+                val rawPx = paneValueToY(paneId, raw)
                 if (nearestPx != null && rawPx != null &&
                     kotlin.math.abs(nearestPx - rawPx) <= sensitivityPx
                 ) {
@@ -612,7 +616,7 @@ class ChartState(
                 }
             }
             io.lkanvas.core.overlay.MagnetMode.STRONG -> {
-                val raw = mainPaneValueAt(y) ?: candle.close
+                val raw = valueOf(y) ?: candle.close
                 // 吸附到最近 OHLC
                 listOf(candle.open, candle.high, candle.low, candle.close).minByOrNull {
                     kotlin.math.abs(it - raw)
@@ -634,20 +638,29 @@ class ChartState(
             y <= h.main + h.vol && "vol" in paneList() -> "vol"
             y <= h.main + h.vol + h.macd && "macd" in paneList() -> "macd"
             else -> extraPaneLayout.lastOrNull { y >= it.second.first && y <= it.second.second }?.first
+                ?: extraPaneLayout.lastOrNull()?.first
                 ?: "macd"
         }
     }
+
+    /** T05：内容区纵向底界——实际 pane 集合的最后 bottom（含动态 pane extras）。 */
+    fun contentBottom(): Float =
+        maxOf(
+            paneHeightsPx.main + paneHeightsPx.vol + paneHeightsPx.macd,
+            extraPaneLayout.lastOrNull()?.second?.second ?: 0f,
+        )
 
     /**
      * R10（复审 2026-10-30）：executeAction 十字线写入——上游顺序
      * （Store.ts:1285-1310）：x 为数字时**按 x 推导数据索引**（coordinateToDataIndex），
      * x 缺省回退**最后一根**（非 0）； dataIndex 显式提供时仅在 x 缺省下使用。
      */
-    fun applyCrosshairAction(x: Double, y: Double, dataIndex: Int) {
+    fun applyCrosshairAction(x: Double, y: Double, dataIndex: Int, paneId: String? = null) {
         val candles = dataSnapshot.candles
         if (candles.isEmpty()) return
         if (x.isNaN() || y.isNaN()) {
             crosshairPosition = null
+            crosshairPaneId = null
             viewRevision++
             return
         }
@@ -657,12 +670,20 @@ class ChartState(
             dataIndex.coerceIn(candles.indices)
         }
         val px = viewport.candleCenterX(idx.toDouble()).toFloat()
+        // T05：y 钳制到实际 pane 集合（含动态 pane extras，不截回主图）；pane 归属保留
+        val bounds = paneBounds(paneId ?: paneIdAt(y.toFloat()))
+        val upper = bounds?.second ?: contentBottom()
         crosshairPosition = androidx.compose.ui.geometry.Offset(
             px,
-            y.toFloat().coerceIn(0f, paneHeightsPx.main + paneHeightsPx.vol + paneHeightsPx.macd),
+            y.toFloat().coerceIn(0f, upper),
         )
+        crosshairPaneId = paneId ?: paneIdAt(y.toFloat())
         viewRevision++
     }
+
+    /** T05：当前十字线所在 pane（null=未显示）。 */
+    var crosshairPaneId: String? = null
+        private set
 
     /** candle 点击事件（PRD R-10）。 */
     var onCandleClick: ((io.lkanvas.core.data.Candle) -> Unit)? = null
@@ -922,9 +943,11 @@ class ChartState(
         if (candles.isEmpty()) return
         val vp = viewport
         val idx = vp.logicalIndexAt(x.toDouble()).toInt().coerceIn(candles.indices)
+        // T05：y 钳制到实际 pane 集合（含 extras，不截回主图）；pane 归属保留
+        crosshairPaneId = paneIdAt(y)
         crosshairPosition = androidx.compose.ui.geometry.Offset(
             vp.candleCenterX(idx.toDouble()).toFloat(),
-            y.coerceIn(0f, paneHeightsPx.main + paneHeightsPx.vol + paneHeightsPx.macd),
+            y.coerceIn(0f, contentBottom()),
         )
         onCrosshairChanged?.invoke(
             vp.candleCenterX(idx.toDouble()),

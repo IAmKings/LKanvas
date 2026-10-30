@@ -77,6 +77,8 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
         val velocity = VelocityTracker()
         // 覆盖物拖动上下文
         var dragInstanceId: String? = null
+        // T04：被拖实例所属 pane（编辑输入反算用）
+        var dragPaneId: String = "main"
         var dragPointIndex: Int? = null
         var lastAnchor: io.lkanvas.core.overlay.OverlayPoint? = null
         // brush 连续采样位置
@@ -103,7 +105,8 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
             if (state.currentTool == "brush") {
                 lastBrushX = down.position.x
                 lastBrushY = down.position.y
-                val anchor = state.overlayPointFromPx(down.position.x, down.position.y)
+                // T04：创建/采样按触点所在 pane 反算
+                val anchor = state.overlayPointFromPx(down.position.x, down.position.y, paneId = state.paneIdAt(down.position.y))
                 val id = state.overlays.creatingId
                 if (anchor != null && id != null) {
                     state.overlays.addCreatePoint(id, anchor)
@@ -121,11 +124,15 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                     mode = GMode.POINT_DRAG
                     dragInstanceId = hit.instanceId
                     dragPointIndex = hit.pointIndex
+                    // T04：编辑输入按被拖实例所属 pane 反算
+                    dragPaneId = state.overlays.get(hit.instanceId)?.effectivePaneId ?: "main"
                     state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
                 } else if (hit.wholeDrag && state.overlays.beginDrag(hit.instanceId, null)) {
                     mode = GMode.WHOLE_DRAG
                     dragInstanceId = hit.instanceId
-                    lastAnchor = state.overlayPointFromPx(down.position.x, down.position.y)
+                    dragPaneId = state.overlays.get(hit.instanceId)?.effectivePaneId ?: "main"
+                    // T04：编辑输入按被拖实例所属 pane 反算
+                    lastAnchor = state.overlayPointFromPx(down.position.x, down.position.y, paneId = dragPaneId)
                     state.setGestureOwner(GestureOwner.OVERLAY_EDIT)
                 }
             }
@@ -240,7 +247,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
 
                         GMode.POINT_DRAG -> {
                             val c = event.changes.firstOrNull() ?: continue
-                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y, paneId = dragPaneId)
                             if (anchor != null) {
                                 // 批次 8b：模板提供 performEventPressedMove 时委托（自定义拖动定位）
                                 val hook = OverlayEventDispatch.templateOf(state, dragInstanceId)?.performEventPressedMove
@@ -258,7 +265,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
 
                         GMode.WHOLE_DRAG -> {
                             val c = event.changes.firstOrNull() ?: continue
-                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                            val anchor = state.overlayPointFromPx(c.position.x, c.position.y, paneId = dragPaneId)
                             val last = lastAnchor
                             if (anchor != null && last != null) {
                                 state.overlays.drag(
@@ -284,7 +291,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                     if (hypot(dx, dy) >= 4f) {
                                         lastBrushX = c.position.x
                                         lastBrushY = c.position.y
-                                        val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                                        val anchor = state.overlayPointFromPx(c.position.x, c.position.y, paneId = dragPaneId)
                                         val id = state.overlays.creatingId
                                         if (anchor != null && id != null) {
                                             state.overlays.addCreatePoint(id, anchor)
@@ -360,7 +367,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                             // brush 已在按下/移动中采样，抬起只结束本次手势（宿主按完成/取消收尾）
                             if (state.currentTool != "brush") {
                                 val c = event.changes.firstOrNull() ?: break
-                                val anchor = state.overlayPointFromPx(c.position.x, c.position.y)
+                                val anchor = state.overlayPointFromPx(c.position.x, c.position.y, paneId = dragPaneId)
                                 if (anchor != null) {
                                     val id = state.overlays.creatingId
                                     if (id != null) {

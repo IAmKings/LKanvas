@@ -327,8 +327,14 @@ object ChartRenderer {
         contentRight: Float,
         legendHeight: Float,
     ) {
-        // R10：标签值经主 pane 统一映射（reverse 翻转 + 与绘制同源值域）
-        val value = state.mainPaneValueAt(crosshair.y) ?: return
+        // T05（第三轮复审 2026-10-30）：标签按十字线所在 pane 的轴反算
+        // （修复前恒 mainPaneValueAt——副 pane 十字线显示主图价格）
+        val paneId = state.crosshairPaneId ?: state.paneIdAt(crosshair.y)
+        val value = if (paneId == "main") {
+            state.mainPaneValueAt(crosshair.y)
+        } else {
+            state.paneValueAt(paneId, crosshair.y - (state.paneBounds(paneId)?.first ?: 0f))
+        } ?: return
         val clampedY = crosshair.y.coerceIn(legendHeight + text.tagHeight / 2f, Float.MAX_VALUE)
         drawTag(text, value, clampedY, contentRight, theme.crosshairLine)
     }
