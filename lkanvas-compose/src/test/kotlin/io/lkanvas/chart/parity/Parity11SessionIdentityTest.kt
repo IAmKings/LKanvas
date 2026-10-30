@@ -146,6 +146,7 @@ class Parity11SessionIdentityTest {
         // ScriptedLoader.subscribeBar 立即记录回调，可立即推送）
         loader.subscribes.last().callback(candle(6_000L, 201.0))
         drain()
+        println("DEBUG-Q01b marketKey=${chart.state.dataSnapshot.marketKey} size=${chart.getDataList().size} candles=${chart.getDataList().map { it.close }}")
         // 修复前：epoch 读协程执行时引擎状态（Reset 未执行 → 旧 session）→ 首推被拒
         assertEquals(2, chart.getDataList().size, "新会话首推被接纳（Q01-b 收口）")
         assertEquals(201.0, chart.getDataList().last().close)

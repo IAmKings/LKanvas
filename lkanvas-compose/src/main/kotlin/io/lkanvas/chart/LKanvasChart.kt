@@ -476,7 +476,18 @@ class LKanvasChart private constructor(
         override fun applyInit(key: MarketKey, data: List<Candle>): Boolean {
             dataEpoch.incrementAndGet() // 接受时点（Store 锁内）：新会话建立
             scope.launch {
-                state.reset(key, data)
+                val result = state.reset(key, data)
+                // N01（第五轮复审 2026-10-31）：真实提交结果反馈到订阅与会话身份——
+                // Rejected（如 OHLC 校验失败）时：①退订（递增 subscriptionGeneration，
+                // 受理时建立的订阅推送被代次门禁丢弃）；②**回滚 dataEpoch**——
+                // 排队中携带本世代 epoch 的推送在执行前失效（修复前 Reset 被拒后
+                // 旧内核接纳新会话推送）。Reset 成功时 epoch 保持，INIT 后合法首推
+                // 正常接纳（Q01-b 语义不回退）
+                if (result is io.lkanvas.core.store.ChangeResult.Rejected) {
+                    dataEpoch.decrementAndGet()
+                    store.unsubscribeData()
+                    return@launch
+                }
                 // init 重载后按上游 _addData init 分支重放右侧留白（应用完成后）
                 offsetRightDistanceInternal?.let { d -> setOffsetRightDistance(d) }
             }
