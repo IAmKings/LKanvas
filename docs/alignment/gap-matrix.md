@@ -417,17 +417,17 @@
 
 | ID | 复审发现 | 批次 | 实现证据 | 状态 |
 |---|---|---|---|---|
-| R01 | 分页使实时订阅失效 | 07 | lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt subscriptionGeneration（仅退订/重置递增） | 行为通过 |
-| R02 | 旧回调数据写入新品种 | 07 | Store.kt 检查点 key 绑定（Host.apply* 带 MarketKey）+ Parity9DataPipelineTest | 行为通过 |
-| R03 | 数据提交后无范围调整链 | 07 | ChartState onSnapshot 尾部 emitRangeChange → adjustVisibleRangeBoundary 自动续拉 + viewport.onReset 修复 | 行为通过 |
-| R04 | 局部 Styles patch 重置其他分支 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesPatch.kt（全可空镜像树 + applyTo） | 行为通过 |
-| R05 | absolute 语义错误/paneId 不参与 | 07 | LKanvasChart convert 镜像 Chart.ts:1201-1262 + ChartState paneBounds/paneValueToY/paneValueAt | 行为通过 |
-| R06 | 轴注册两套表/额外轴改主轴 | 07 | ChartState extraYAxisSpec + effectiveExtraAxisSpec + syncExtraAxes 全 pane + LkanvasRegistry 委托 core 表 | 行为通过 |
-| R07 | pane 查询/覆写三 pane 模型 | 07 | ChartState.paneList() 单一来源 + getPaneOptions/setPaneOptions 遍历 + mainPaneOverride | 行为通过 |
-| R08 | 柱图画折线/visible 未过滤 | 07 | PaneRenderers.drawInstanceFigures + drawBarPlots（PlotType 分发）+ attrs 消费 | 行为通过 |
-| R09 | 覆盖物名称分支/pane 未进绘制 | 07 | 16 模板 createPointFigures 迁入 + OverlayRenderer 统一执行（无名称分支）+ effectivePaneId 上下文 | 行为通过 |
-| R10 | Crosshair null/可选字段语义 | 07 | executeAction null 清除 + x 推导索引 + paneIdAt 实际布局 + mainPaneValueAt 同源标签 | 行为通过 |
-| R11 | 动画空实现/布局缩减 | 07 | scrollToDataIndex 距离动画 + zoomAtCoordinate 逐帧增量 + LayoutOptions barSpaceLimit/paneDragEnabled + backgroundColor | 行为通过 |
-| R12 | check.py SLA 豁免/台账坏引用 | 07 | tools/alignment/check.py SLA 行纳入证据检查 + structure-map 校验 + 台账修正（Parity4 类名/22 模板占位/循环引用） | 行为通过 |
-| R13 | 演练缺 before/after 证据 | 07 | 演练 5（upstream-sync.md）：临时分支 before 2 失败 → 最小 diff → after 转绿 | 行为通过 |
-| R14 | arc 端点容差缺失 | 07 | lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt FigureHit Arc 分支端点距离容差（采纳 e829f30e） | 行为通过 |
+| R01 | 分页使实时订阅失效 | 07 | lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt subscriptionGeneration（仅退订/重置递增）+ Parity9DataPipelineTest | 行为通过 |
+| R02 | 旧回调数据写入新品种 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt storeHost 检查点 key 绑定 + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity9DataPipelineTest.kt | 行为通过 |
+| R03 | 数据提交后无范围调整链 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt onSnapshot emitRangeChange + viewport.onReset；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity9DataPipelineTest.kt | 行为通过 |
+| R04 | 局部 Styles patch 重置其他分支 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesPatch.kt（全可空镜像树 + applyTo）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/LKanvasChartTest.kt 局部/恢复用例 | 行为通过 |
+| R05 | absolute 语义错误/paneId 不参与 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt convert + lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt paneBounds/paneValueToY/paneValueAt；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity6AxisConvertTest.kt | 行为通过 |
+| R06 | 轴注册两套表/额外轴改主轴 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt extraYAxisSpec/effectiveExtraAxisSpec + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| R07 | pane 查询/覆写三 pane 模型 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt paneList() + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| R08 | 柱图画折线/visible 未过滤 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawInstanceFigures/drawBarPlots；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| R09 | 覆盖物名称分支/pane 未进绘制 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 统一模板执行；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity5OverlayHooksTest.kt | 行为通过 |
+| R10 | Crosshair null/可选字段语义 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt applyCrosshairAction/paneIdAt + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity8ViewportEventsTest.kt | 行为通过 |
+| R11 | 动画空实现/布局缩减 | 07 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt animate/LayoutOptions + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity8ViewportEventsTest.kt | 行为通过 |
+| R12 | check.py SLA 豁免/台账坏引用 | 07 | tools/alignment/check.py SLA/R 行纳入证据检查 + structure-map 校验接入 main + structure-map.md 台账修正；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt（check.py 引用校验守护样本） | 行为通过 |
+| R13 | 演练缺 before/after 证据 | 07 | docs/upstream-sync.md 演练 5；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt | 行为通过 |
+| R14 | arc 端点容差缺失 | 07 | lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt FigureHit Arc 端点容差；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt | 行为通过 |

@@ -55,7 +55,9 @@
 | `simpleMovingAverage.ts` | `extension/indicator/SimpleMovingAverage.kt` | 已声明 |
 | `movingAverageConvergenceDivergence.ts` | `extension/indicator/MovingAverageConvergenceDivergence.kt` | 已声明 |
 | `volume.ts` | `extension/indicator/Volume.kt` | 已声明 |
+| `averagePrice.ts` | `extension/indicator/AveragePrice.kt` | 已声明 |
 | `awesomeOscillator.ts` | `extension/indicator/AwesomeOscillator.kt` | 已声明 |
+| `bollingerBands.ts` | `extension/indicator/BollingerBands.kt` | 已声明 |
 | `bias.ts` | `extension/indicator/Bias.kt` | 已声明 |
 | `brar.ts` | `extension/indicator/Brar.kt` | 已声明 |
 | `bullAndBearIndex.ts` | `extension/indicator/BullAndBearIndex.kt` | 已声明 |

@@ -33,7 +33,7 @@ UP = ROOT / 'third_party/klinechart-v10.1.0/src'
 MATRIX = ROOT / 'docs/alignment/gap-matrix.md'
 TSINV = ROOT / 'docs/alignment/ts-inventory.md'
 
-PREFIXES = ('CH', 'IDX', 'EVT', 'TYP', 'IND', 'OVL', 'STY', 'NUM', 'SLA')
+PREFIXES = ('CH', 'IDX', 'EVT', 'TYP', 'IND', 'OVL', 'STY', 'NUM', 'SLA', 'R')
 CLASSES = set('ABCDE')
 VERIFS = {'test', 'diff', 'compile', 'parity', 'manual', 'existing', '—'}
 WORKLOADS = {'S', 'M', 'L', '—'}
@@ -104,10 +104,11 @@ def extract_iface_fields(path, iface):
 def parse_matrix():
     rows = []
     for i, line in enumerate(MATRIX.read_text().split('\n'), 1):
-        if not re.match(r'^\| [A-Z]{2,3}-\d{3}', line):
+        is_r_row = bool(re.match(r'^\| R\d{2} ', line))
+        if not is_r_row and not re.match(r'^\| [A-Z]{2,3}-\d{3}', line):
             continue
         cells = [c.strip() for c in line.split('|')]
-        if cells[1].startswith('SLA-'):
+        if cells[1].startswith('SLA-') or re.fullmatch(r'R\d{2}', cells[1]):
             # SLA 行（§14 审计追踪表）为 5 列：ID | 发现 | 批次 | 备注 | 状态
             if len(cells) < 6:
                 err(f'矩阵:{i} SLA 行列数不足: {line[:60]}')
@@ -127,7 +128,8 @@ def parse_matrix():
 
 
 def validate_structure_map():
-    """R12：structure-map.md 引用的测试类/文件必须真实存在。"""
+    """T11（第三轮复审 2026-10-30）：structure-map.md 引用校验——区分计划路径
+    缩略（含 `...`，警告不计错）与完整具体路径（不存在即错）。"""
     smap = ROOT / 'docs/alignment/structure-map.md'
     if not smap.exists():
         return
@@ -140,8 +142,12 @@ def validate_structure_map():
     for m in re.finditer(r'Parity\d+\w*Test', text):
         if m.group(0) not in test_files:
             err(f"structure-map: 引用的测试类不存在: {m.group(0)}")
+    plan_paths = 0
     for m in re.finditer(r'lkanvas-[\w-]+/[\w/.-]+\.kt', text):
         tok = m.group(0)
+        if '...' in tok:
+            plan_paths += 1  # 缩略/计划路径：非实现证据，不计缺失
+            continue
         if '/' in tok and not (ROOT / tok).exists():
             err(f"structure-map: 引用文件不存在: {tok}")
     if '待登记' in text or '待回填' in text:
@@ -215,11 +221,11 @@ def main():
         if v > 1:
             err(f'ID 重复: {k}')
     for r in matrix:
-        if not re.fullmatch(r'[A-Z]{2,3}-\d{3}(~\d{3})?', r['id']):
+        if not (re.fullmatch(r'[A-Z]{2,3}-\d{3}(~\d{3})?', r['id']) or re.fullmatch(r'R\d{2}', r['id'])):
             err(f"矩阵:{r['line']} ID 非法: {r['id']}")
-        if r['id'].split('-')[0] not in PREFIXES:
+        if '-' in r['id'] and r['id'].split('-')[0] not in PREFIXES:
             err(f"矩阵:{r['line']} ID 前缀非法: {r['id']}")
-        if r['id'].startswith('SLA-'):
+        if r['id'].startswith('SLA-') or re.fullmatch(r'R\d{2}', r['id']):
             continue
         if r['cls'] not in CLASSES:
             err(f"矩阵:{r['line']} 分类列非法（须单字母）: {r['cls']!r}")
@@ -311,6 +317,7 @@ def main():
     # ---- 状态体系（v4） ----
     kt_files = collect_kt_files()
     by_state = validate_states(matrix, kt_files)
+    validate_structure_map()
 
     # ---- 方法名纠错护栏 ----
     for name in ('convertToPictureUrl',):

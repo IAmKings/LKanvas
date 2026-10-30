@@ -1256,9 +1256,13 @@ class ChartState(
 
     /** 拖动动态副图分隔条：调整 [paneId] 高度（[startValue] 为拖动起始高度，dy 累计）。 */
     fun adjustExtraPane(paneId: String, startValue: Float, dyTotal: Float) {
+        if (paneId in disabledExtraDrags) return // T10：LayoutOptions.paneDragEnabled=false
         extraPaneHeightOverride[paneId] = (startValue + dyTotal).coerceAtLeast(minSubPanePx)
         relayout()
     }
+
+    /** T10：动态 pane 拖动禁用集（门面 LayoutOptions 写入）。 */
+    val disabledExtraDrags = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     /** R07：setPaneOptions 路由——直接设置动态 pane 高度。 */
     fun setExtraPaneHeight(paneId: String, heightPx: Float) {
@@ -1272,6 +1276,12 @@ class ChartState(
     /** R11：LayoutOptions.paneDragEnabled 消费——分隔条拖动开关（按 paneId）。 */
     var volDragEnabled: Boolean = true
     var macdDragEnabled: Boolean = true
+
+    /** T10（第三轮复审 2026-10-30）：动态 pane 高度覆写快照（LayoutOptions 回读）。 */
+    fun extraPaneHeights(): Map<String, Double> =
+        extraPaneLayout.associate { (pane, bounds) ->
+            pane to (bounds.second - bounds.first).toDouble()
+        }
 
     /** 拖动分隔条：[which]=0 调整 VOL pane 高度，1 调整 MACD pane 高度（dy 累计）。 */
     fun adjustPane(which: Int, startValue: Float, dyTotal: Float) {

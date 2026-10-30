@@ -981,6 +981,11 @@ class LKanvasChart private constructor(
         options.paneDragEnabled?.let { drag ->
             drag["vol"]?.let { state.volDragEnabled = it }
             drag["macd"]?.let { state.macdDragEnabled = it }
+            for ((pane, enabled) in drag) {
+                if (pane in state.extraPanes.value) {
+                    if (enabled) disabledExtraDrags.remove(pane) else if (!disabledExtraDrags.contains(pane)) disabledExtraDrags.add(pane)
+                }
+            }
         }
         val heights = options.paneHeights ?: return
         val cur = state.paneHeightsPx
@@ -991,22 +996,36 @@ class LKanvasChart private constructor(
         heights["macd"]?.let { setPaneOptions(PaneOptions("macd", it)) }
     }
 
-    /** 上游 `getLayoutOptions()`。 */
+    /** 上游 `getLayoutOptions()`（T10：存取同源——返回全部已配置状态）。 */
     fun getLayoutOptions(): LayoutOptions {
         val p = state.paneHeightsPx
         val limit = state.viewport.minBarSpacing to state.viewport.maxBarSpacing
-        if (p.main <= 0f) {
-            return LayoutOptions(barSpaceLimit = limit)
+        // paneDragEnabled 回读（未显式配置过=缺省 true，不进 map——与 set 对称）
+        val drag = buildMap {
+            if (!state.volDragEnabled) put("vol", false)
+            if (!state.macdDragEnabled) put("macd", false)
+            for (pane in state.extraPanes.value) {
+                if (pane in disabledExtraDrags) put(pane, false)
+            }
+        }
+        val heights = buildMap {
+            if (p.main > 0f) {
+                put("main", p.main.toDouble())
+                if (state.hasBuiltinPane("vol")) put("vol", p.vol.toDouble())
+                if (state.hasBuiltinPane("macd")) put("macd", p.macd.toDouble())
+                // T10：动态 pane 高度也在回读 map 中
+                putAll(state.extraPaneHeights())
+            }
         }
         return LayoutOptions(
-            paneHeights = mapOf(
-                "main" to p.main.toDouble(),
-                "vol" to p.vol.toDouble(),
-                "macd" to p.macd.toDouble(),
-            ),
+            paneHeights = heights.ifEmpty { null },
             barSpaceLimit = limit,
+            paneDragEnabled = drag.ifEmpty { null },
         )
     }
+
+    /** T10：动态 pane 拖动禁用集（setLayoutOptions 写入；getter 回读）。 */
+    private val disabledExtraDrags = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     /**
      * 上游 `getConvertPictureUrl` 等价入口：经 [io.lkanvas.compose.export.ChartSnapshotExporter]
@@ -1017,17 +1036,20 @@ class LKanvasChart private constructor(
         format: String = "png",
         backgroundColor: Int = android.graphics.Color.WHITE,
     ): String? {
+        // T10（第三轮复审 2026-10-30）：bmp 平台不支持——显式返回 null 并以
+        // 日志登记（上游 'png'|'jpeg'|'bmp'；平台差异登记 gap-matrix/compatibility）
+        if (format.equals("bmp", ignoreCase = true)) {
+            android.util.Log.w("LKanvasChart", "getConvertPictureUrl: bmp not supported on this platform, returning null")
+            return null
+        }
         val type = if (format.equals("jpeg", ignoreCase = true) || format.equals("jpg", ignoreCase = true)) "jpeg" else "png"
         val source = bitmapProvider() ?: return null
-        // R11：backgroundColor 消费——背景填充后再压缩（上游 getConvertPictureUrl 语义）
-        val bitmap = if (backgroundColor != android.graphics.Color.WHITE) {
-            android.graphics.Bitmap.createBitmap(source.width, source.height, android.graphics.Bitmap.Config.ARGB_8888).also { out ->
-                out.eraseColor(backgroundColor)
-                val canvas = android.graphics.Canvas(out)
-                canvas.drawBitmap(source, 0f, 0f, null)
-            }
-        } else {
-            source
+        // T10：backgroundColor **无条件合成**（上游 Chart.ts:1299-1300 fillRect
+        // 语义——默认值不等同"未提供"；修复前 WHITE 跳过合成、透明区保留）
+        val bitmap = android.graphics.Bitmap.createBitmap(source.width, source.height, android.graphics.Bitmap.Config.ARGB_8888).also { out ->
+            out.eraseColor(backgroundColor)
+            val canvas = android.graphics.Canvas(out)
+            canvas.drawBitmap(source, 0f, 0f, null)
         }
         val bytes = java.io.ByteArrayOutputStream().use { out ->
             bitmap.compress(if (type == "jpeg") android.graphics.Bitmap.CompressFormat.JPEG else android.graphics.Bitmap.CompressFormat.PNG, 100, out)
