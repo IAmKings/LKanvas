@@ -460,15 +460,26 @@ class ChartState(
                 }
             }
         }
+        // N03（第五轮复审 2026-10-31）：vol/macd 分支与 else 同口径——聚合该 pane
+        // **全部可见实例**（修复前只取 volumePaneResult/macdPaneResult 的首实例，
+        // 叠加实例被绘制但落在首实例值域之外被裁剪掉）
         when (paneId) {
             "vol" -> {
-                scan(volumePaneResult()?.result, null)
+                for (inst in indicatorInstances) {
+                    if (!inst.visible || inst.paneId != "vol") continue
+                    scan(inst.state?.result, null)
+                }
                 val visible = candles.subList(vFrom, vTo + 1)
                 val volMax = visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0
                 if (lo.isNaN()) lo = 0.0
                 if (hi.isNaN() || volMax > hi) hi = maxOf(hi, volMax)
             }
-            "macd" -> scan(macdPaneResult()?.result, 0.0)
+            "macd" -> {
+                for (inst in indicatorInstances) {
+                    if (!inst.visible || inst.paneId != "macd") continue
+                    scan(inst.state?.result, 0.0)
+                }
+            }
             else -> {
                 for (inst in indicatorInstances) {
                     if (!inst.visible || inst.paneId != paneId) continue
@@ -489,20 +500,9 @@ class ChartState(
         val (vFrom, vTo) = visibleIndexRange() ?: return null
         val loHi: Pair<Double, Double>? = when (paneId) {
             "main" -> return mainPaneYOf(value)?.let { it - top }
-            "vol" -> {
-                val result = volumePaneResult()
-                val visible = candles.subList(vFrom, vTo + 1)
-                val maxVol = maxOf(
-                    visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0,
-                    result?.result?.columns
-                        ?.filterKeys { it.startsWith("ma") }
-                        ?.values
-                        ?.flatMap { arr -> arr.slice(vFrom..vTo).filter { it.isFinite() } }
-                        ?.maxOrNull() ?: 0.0,
-                    1e-12,
-                )
-                0.0 to maxVol
-            }
+            // N03（第五轮复审 2026-10-31）：vol 分支统一走 paneVisibleRange
+            //（删除独立 0..maxVol 公式；修复前转换/渲染两套值域差 40px）
+            "vol" -> paneVisibleRange(paneId) ?: return null
             else -> {
                 // T03：与渲染同源（全部可见实例全列聚合 + 基线规则）
                 paneVisibleRange(paneId) ?: return null
@@ -522,18 +522,8 @@ class ChartState(
         return when (paneId) {
             "main" -> mainPaneValueAt(yRelative)
             "vol" -> {
-                val result = volumePaneResult()
-                val visible = candles.subList(vFrom, vTo + 1)
-                val maxVol = maxOf(
-                    visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0,
-                    result?.result?.columns
-                        ?.filterKeys { it.startsWith("ma") }
-                        ?.values
-                        ?.flatMap { arr -> arr.slice(vFrom..vTo).filter { it.isFinite() } }
-                        ?.maxOrNull() ?: 0.0,
-                    1e-12,
-                )
-                io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), 0.0, maxVol, top.toDouble(), bottom.toDouble())
+                val (l, h2) = paneVisibleRange(paneId) ?: return null
+                io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), l, h2, top.toDouble(), bottom.toDouble())
             }
             else -> {
                 val (l, h2) = paneVisibleRange(paneId) ?: return null
