@@ -554,8 +554,8 @@ class AxisAndInstanceFieldsTest {
     // ---------- 0.7.0 R08：统一 figure 管线（attrs/styles 逐行求值） ----------
 
     @Test
-    fun `figure管线attrs与styles逐行求值（R08）`() {
-        // 自定义模板：PlotDef.attrs 供色、styles 覆盖线宽（styles 优先）
+    fun `figure管线attrs几何与styles样式分离（T06）`() {
+        // T06 新契约：attrs=几何（数值 map 供管线消费）、styles=样式（color/lineWidth）
         val def = object : io.lkanvas.core.indicator.IndicatorDefinition {
             override val name = "audit_fig"
             override val shortName = "AF"
@@ -565,9 +565,11 @@ class AxisAndInstanceFieldsTest {
                 io.lkanvas.core.indicator.PlotDef(
                     key = "k",
                     title = "K: ",
-                    type = io.lkanvas.core.indicator.PlotType.LINE,
-                    attrs = { row: Int -> mapOf("color" to if (row % 2 == 0) "#111111" else "#222222") },
-                    styles = { row: Int -> mapOf("lineWidth" to "${row + 1}") },
+                    type = io.lkanvas.core.indicator.PlotType.BAR,
+                    // 几何：BAR 的 pane 相对 y 上下界（供管线覆盖自算）
+                    attrs = { row: Int -> mapOf("top" to row * 10.0, "bottom" to row * 10.0 + 5.0) },
+                    // 样式：色/线宽
+                    styles = { row: Int -> mapOf("color" to if (row % 2 == 0) "#111111" else "#222222", "lineWidth" to "${row + 1}") },
                 ),
             )
             override fun initScratch(params: List<Double>): Any? = null
@@ -576,15 +578,22 @@ class AxisAndInstanceFieldsTest {
             override fun calc(candles: List<io.lkanvas.core.data.Candle>, params: List<Double>): List<Map<String, Double>> = candles.map { emptyMap() }
         }
         val inst = io.lkanvas.core.indicator.IndicatorInstance("audit_fig_inst", def)
-        val override = io.lkanvas.compose.draw.PaneRenderers.styleOverrideFor(inst)
-        val overrideFn = override
-        kotlin.test.assertNotNull(overrideFn, "attrs/styles 有消费者（R08）")
-        val (c0, w0) = overrideFn!!("k", 0)
-        kotlin.test.assertNotNull(c0, "attrs 供色")
+        // styles 消费：色与线宽
+        val styleFn = io.lkanvas.compose.draw.PaneRenderers.styleOverrideFor(inst)
+        kotlin.test.assertNotNull(styleFn, "styles 有消费者")
+        val (c0, w0) = styleFn!!("k", 0)
+        kotlin.test.assertNotNull(c0, "styles 供色")
         assertEquals(1f, w0!!, "styles 供线宽（row=0 → 1）")
-        val (c1, w1) = overrideFn("k", 3)
-        kotlin.test.assertNotNull(c1, "逐行 attrs 求值（row=3 色≠row=0）")
-        assertTrue(c0 != c1, "逐行求值（row=3 色 ≠ row=0）")
-        assertEquals(4f, w1!!, "逐行求值（row=3 → 4）")
+        val (c1, w1) = styleFn("k", 3)
+        assertTrue(c0 != c1, "styles 逐行求值（row=3 色 ≠ row=0）")
+        assertEquals(4f, w1!!, "styles 逐行求值（row=3 → 4）")
+        // attrs 消费：几何数值
+        val attrsFn = io.lkanvas.compose.draw.PaneRenderers.attrsOverrideFor(inst)
+        kotlin.test.assertNotNull(attrsFn, "attrs 几何有消费者（T06）")
+        val geo0 = attrsFn!!("k", 0)
+        assertEquals(0.0, geo0["top"]!!, "attrs 几何 top（row=0）")
+        assertEquals(5.0, geo0["bottom"]!!, "attrs 几何 bottom（row=0）")
+        val geo3 = attrsFn("k", 3)
+        assertEquals(30.0, geo3["top"]!!, "attrs 逐行求值（row=3 top=30）")
     }
 }

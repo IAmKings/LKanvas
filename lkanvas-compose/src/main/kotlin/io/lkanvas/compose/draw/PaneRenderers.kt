@@ -115,7 +115,9 @@ object PaneRenderers {
                         ),
                     )
                 } else {
-                    drawLinePlots(res, state.viewport, range, y, theme.linePalette, paletteOffset = paletteIdx, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow, styleOverrideOf = styleOverrideFor(inst))
+                    // T06（第三轮复审 2026-10-30）：主图叠加走统一 figure 管线
+                    //（BAR 分发——main 上创建 MACD 柱列不再画折线）
+                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow)
                 }
                 paletteIdx += res.result.keys.size
             }
@@ -176,7 +178,8 @@ object PaneRenderers {
                             ),
                         )
                     } else {
-                        drawLinePlots(res, state.viewport, range, ay, theme.linePalette, paletteOffset = axPalette, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = theme.lastValueMarkShow, styleOverrideOf = styleOverrideFor(inst))
+                        // T06：主图额外轴入口同管线
+                        drawInstanceFigures(inst, res, state.viewport, range, ay, theme, axPalette, lastValueMark = theme.lastValueMarkShow)
                     }
                     axPalette += res.result.keys.size
                 }
@@ -257,6 +260,9 @@ object PaneRenderers {
 
         drawGrid(theme, text, 0.0, maxVol, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
+            // T06：VOL pane 的 ma 线列走统一管线（LINE 批量）；volume 柱保留
+            // 涨跌色专用绘制（VOL 柱体着色= candle 涨跌语义，属平台级视觉规则，
+            // gap-matrix 登记平台差异——上游也是 CandleBarView 专用实现）
             drawVolumeBars(state, theme, result, range, y)
             drawLinePlots(result, state.viewport, range, y, theme.linePalette, skipKeys = listOf("volume"), lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = false)
         }
@@ -767,8 +773,9 @@ object PaneRenderers {
      */
     fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int) -> Pair<Color?, Float?>)? {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
-        if (plots.values.all { it.styles == null && it.attrs == null }) return null
-        // R08：attrs 与 styles 同协议逐行求值（styles 优先，attrs 兜底）
+        if (plots.values.all { it.styles == null }) return null
+        // T06（第三轮复审 2026-10-30）：styles=样式（color/lineWidth）；
+        // attrs=几何（由 attrsOverrideFor 单独消费）——不再混入样式 map
         fun evaluate(value: Any?, row: Int): Map<*, *>? = when (value) {
             null -> null
             is Function2<*, *, *> ->
@@ -781,10 +788,39 @@ object PaneRenderers {
             else -> null
         }
         return { key, row ->
-            val map = (evaluate(plots[key]?.attrs, row) ?: emptyMap<Any?, Any>()) + (evaluate(plots[key]?.styles, row) ?: emptyMap<Any?, Any>())
+            val map: Map<*, *> = evaluate(plots[key]?.styles, row) ?: emptyMap<Any?, Any>()
             val color = map["color"]?.toString()?.let { io.lkanvas.compose.theme.StylesThemeBridge.parse(it) }
             val width = map["lineWidth"]?.let { (it as? Number)?.toFloat() ?: it.toString().toFloatOrNull() }
             color to width
+        }
+    }
+
+    /**
+     * T06：PlotDef.attrs → **几何**逐行求值（上游 IndicatorView eachFigures 的
+     * figure.attrs 协议：坐标/尺寸等；样式走 [styleOverrideFor]）。
+     * BAR 消费键：top/bottom（pane 相对 y）——缺省由管线按值/基线自算。
+     */
+    fun attrsOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int) -> Map<String, Double>)? {
+        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+        if (plots.values.all { it.attrs == null }) return null
+        fun evaluate(value: Any?, row: Int): Map<*, *>? = when (value) {
+            null -> null
+            is Function2<*, *, *> ->
+                @Suppress("UNCHECKED_CAST")
+                (value as (Int, List<Double>) -> Any?)(row, inst.params) as? Map<*, *>
+            is Function1<*, *> ->
+                @Suppress("UNCHECKED_CAST")
+                (value as (Int) -> Any?)(row) as? Map<*, *>
+            is Map<*, *> -> value
+            else -> null
+        }
+        return { key, row ->
+            val map: Map<*, *> = evaluate(plots[key]?.attrs, row) ?: emptyMap<Any?, Any>()
+            buildMap {
+                for ((k, v) in map) {
+                    (v as? Number)?.let { put(k.toString(), it.toDouble()) }
+                }
+            }
         }
     }
 
