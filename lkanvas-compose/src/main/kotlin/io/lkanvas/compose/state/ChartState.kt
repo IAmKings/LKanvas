@@ -385,11 +385,13 @@ class ChartState(
         val (vFrom, vTo) = visibleIndexRange() ?: return null
         val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
         val spec = effectiveExtraAxisSpec(axisId)
-        // T02：投影几何 = 轴所属 pane 的 bounds（修复前一律用主 pane 高度，
-        // 副 pane 轴的转换与绘制错位 ~pane 高度差）
+        // Q02（第四轮复审 2026-10-30）：投影几何 = 轴所属 pane 的 bounds，但返回
+        // **pane 相对 y**（与 paneValueToY 同约定；修复前返回绝对 y，门面又当
+        // 相对坐标使用/absolute 再加 top——双计 pane top）
         val (aTop, aBottom) = paneBounds(meta.paneId) ?: (0f to paneHeightsPx.main)
         val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, value, alo, ahi, aTop.toDouble(), aBottom.toDouble())
-        return if (meta.reverse) (aTop + aBottom).toDouble() - y else y
+        val rel = if (meta.reverse) (aBottom - aTop).toDouble() - (y - aTop) else y - aTop
+        return rel
     }
 
     /** R06：轴实例生效 spec（custom > 模板 spec > Normal）——绘制与转换共用。 */
@@ -405,9 +407,12 @@ class ChartState(
         val (vFrom, vTo) = visibleIndexRange() ?: return null
         val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
         val spec = effectiveExtraAxisSpec(axisId)
+        // Q02：输入为 pane 相对 y（与 axisValueToY 输出互逆）
         val (aTop, aBottom) = paneBounds(meta.paneId) ?: (0f to paneHeightsPx.main)
-        val yy = if (meta.reverse) (aTop + aBottom).toFloat() - y else y
-        return io.lkanvas.core.axis.YAxisMath.yToValue(spec, yy.toDouble(), alo, ahi, aTop.toDouble(), aBottom.toDouble())
+        val h = (aBottom - aTop).toDouble()
+        val yD = y.toDouble()
+        val rel = if (meta.reverse) h - yD else yD
+        return io.lkanvas.core.axis.YAxisMath.yToValue(spec, rel + aTop, alo, ahi, aTop.toDouble(), aBottom.toDouble())
     }
 
     /**

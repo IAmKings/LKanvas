@@ -292,13 +292,17 @@ class LKanvasChart private constructor(
     ): List<Pair<Double, Double>> {
         val paneId = filter?.paneId ?: "main"
         val candles = state.dataSnapshot.candles
+        // Q02：yAxisId 分支的偏移用**轴所属 pane**（axisValueToY 返回该 pane 的
+        // 相对 y；修复前把绝对当相对、absolute 再加一次 top）
+        val axisPaneId = filter?.yAxisId?.takeIf { it != "main" }
+            ?.let { state.extraYAxisMeta[it]?.paneId } ?: paneId
         val yOf: (Double) -> Double? = when {
             filter?.yAxisId != null && filter.yAxisId != "main" ->
                 { value -> state.axisValueToY(filter.yAxisId, value) }
             else -> { value -> state.paneValueToY(paneId, value) }
         }
-        // absolute=true：y 加 pane bounding.top（Chart.ts:1223）
-        val paneTop = if (filter?.absolute == true) (state.paneBounds(paneId)?.first?.toDouble() ?: 0.0) else 0.0
+        // absolute=true：y 加 pane bounding.top（Chart.ts:1223）——仅此一次
+        val paneTop = if (filter?.absolute == true) (state.paneBounds(axisPaneId)?.first?.toDouble() ?: 0.0) else 0.0
         return points.map { p ->
             // timestamp 恒为时间戳（优先）；仅缺 timestamp 时用 dataIndex（Chart.ts:1216-1220）
             val idx = when {
@@ -322,7 +326,9 @@ class LKanvasChart private constructor(
         if (candles.isEmpty()) {
             return coordinates.map { io.lkanvas.core.overlay.OverlayPoint(timestamp = -1L, value = Double.NaN) }
         }
-        val paneTop = if (filter?.absolute == true) (state.paneBounds(paneId)?.first?.toDouble() ?: 0.0) else 0.0
+        val axisPaneId2 = filter?.yAxisId?.takeIf { it != "main" }
+            ?.let { state.extraYAxisMeta[it]?.paneId } ?: paneId
+        val paneTop = if (filter?.absolute == true) (state.paneBounds(axisPaneId2)?.first?.toDouble() ?: 0.0) else 0.0
         val valueAt: (Float) -> Double? = when {
             filter?.yAxisId != null && filter.yAxisId != "main" ->
                 { y -> state.axisValueAt(filter.yAxisId, y) }

@@ -150,11 +150,19 @@ object LkanvasRegistry {
     /** 上游 `getXAxisClass(name)` 等价：门面视图。 */
     fun getXAxisTemplate(name: String): AxisTemplate? = xAxisTemplates[name]
 
-    /** 上游 `getYAxisClass(name)` 等价：core 表门面视图（spec 构造保留）。 */
+    /** 上游 `getYAxisClass(name)` 等价：core 表门面视图（Q02：全字段回读）。 */
     fun getYAxisTemplate(name: String): AxisTemplate? {
         val core = io.lkanvas.core.extension.yaxis.YAxisTemplates.get(name) ?: return null
         return object : AxisTemplate {
             override val name = core.name
+            override val reverse = core.reverse
+            override val inside = core.inside
+            override val positionLeft = core.positionLeft
+            override val scrollZoomEnabled = core.scrollZoomEnabled
+            override val gap = AxisGap(
+                top = core.gapValues.getOrNull(0) ?: AxisGap().top,
+                bottom = core.gapValues.getOrNull(1) ?: AxisGap().bottom,
+            )
             override fun createSpec(base: Double?): io.lkanvas.core.axis.YAxisSpec = core.createSpec(base)
         }
     }

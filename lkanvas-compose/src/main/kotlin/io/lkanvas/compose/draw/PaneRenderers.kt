@@ -329,23 +329,22 @@ object PaneRenderers {
         val range = state.viewport.visibleRange(candles.size)
         if (range.count <= 0) return
 
-        // 全 pane 值域：全部实例全部列在可见区的 min/max
-        var lo = Double.NaN
-        var hi = Double.NaN
-        for (res in valid) {
-            for (key in res.result.keys) {
-                val col = res.result[key] ?: continue
-                for (i in range.first..range.last) {
-                    val v = col[i]
-                    if (v.isNaN()) continue
-                    if (lo.isNaN() || v < lo) lo = v
-                    if (hi.isNaN() || v > hi) hi = v
-                }
-            }
+        // Q03（第四轮复审 2026-10-30）：值域**单一来源** = ChartState.paneVisibleRange
+        // （全可见实例聚合 + BAR 0 基线；与 paneValueToY/paneValueAt 同一份——
+        // 修复前本函数自扫全列且无基线规则，BAR pane 转换/渲染两套范围差 40px）
+        val (lo, hi) = state.paneVisibleRange(paneId) ?: return
+        // Q02：pane 内绑定轴消费其 spec/reverse（与 axisValueToY 同式；
+        // 修复前全 pane 共用普通线性 y，log/reverse 绑定轴被忽略）
+        val boundAxis = state.extraYAxisMeta.entries.firstOrNull { it.value.paneId == paneId }
+        val y: (Double) -> Double = if (boundAxis != null) {
+            val (aId, meta) = boundAxis
+            val spec = state.effectiveExtraAxisSpec(aId)
+            val (rf, rt) = YAxisMath.realRange(spec, lo, hi)
+            val (ylo, yhi) = if (meta.reverse) rt to rf else rf to rt
+            { v -> LinearYAxis.valueToY(YAxisMath.valueToReal(spec, v), ylo, yhi, top.toDouble(), bottom.toDouble()) }
+        } else {
+            { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
         }
-        if (lo.isNaN()) return
-        if (lo == hi) { lo -= 1.0; hi += 1.0 }
-        val y: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
 
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
