@@ -114,7 +114,7 @@ object LkanvasRegistry {
         val name: String
         val reverse: Boolean get() = false
         val inside: Boolean get() = false
-        val position: AxisPosition get() = AxisPosition.RIGHT
+        val positionLeft: Boolean get() = false
         val scrollZoomEnabled: Boolean get() = true
         val gap: AxisGap get() = AxisGap()
 
@@ -122,10 +122,15 @@ object LkanvasRegistry {
         fun createSpec(base: Double? = null): io.lkanvas.core.axis.YAxisSpec = io.lkanvas.core.axis.YAxisSpec.Normal
     }
 
-    /** facade 模板 → core 注册表适配器（spec/reverse/inside 桥接）。 */
+    /** facade 模板 → core 注册表适配器（T02：全字段桥接，默认值不再丢失）。 */
     private fun toCoreTemplate(axis: AxisTemplate): io.lkanvas.core.extension.yaxis.YAxisTemplates.AxisTemplate =
         object : io.lkanvas.core.extension.yaxis.YAxisTemplates.AxisTemplate {
             override val name = axis.name
+            override val reverse = axis.reverse
+            override val inside = axis.inside
+            override val positionLeft = axis.positionLeft
+            override val scrollZoomEnabled = axis.scrollZoomEnabled
+            override val gapValues = listOf(axis.gap.top, axis.gap.bottom)
             override fun createSpec(base: Double?): io.lkanvas.core.axis.YAxisSpec = axis.createSpec(base)
         }
 

@@ -1078,6 +1078,7 @@ class LKanvasChart private constructor(
                 reverse = it.reverse,
                 inside = it.inside,
                 positionLeft = it.position == AxisPosition.LEFT,
+                paneId = it.paneId,
             )
         }
         state.extraYAxisCustom = extras.mapNotNull { a -> a.customAxis?.let { a.id to it } }.toMap()
@@ -1093,18 +1094,23 @@ class LKanvasChart private constructor(
         val id = yAxis.id ?: "yAxis_${++yAxisSerial}"
         if (yAxes.containsKey(id)) return id
         // SLA-010：注册轴模板用于构造轴（extension/yaxis 注册表；customAxis 优先）
-        val templateSpec = yAxis.template
+        val template = yAxis.template
             ?.let { io.lkanvas.core.extension.yaxis.YAxisTemplates.get(it) }
-            ?.createSpec()
+        val templateSpec = template?.createSpec()
+        // T02：模板默认字段作缺省、override 参数覆盖（修复前 reverse/inside 等
+        // 模板默认被丢弃，全部落 false/RIGHT）
         yAxes[id] = YAxisInfo(
             id = id,
             name = yAxis.name,
             paneId = paneId,
-            reverse = yAxis.reverse ?: false,
-            inside = yAxis.inside ?: false,
-            position = yAxis.position ?: AxisPosition.RIGHT,
-            scrollZoomEnabled = true,
-            gap = yAxis.gap ?: AxisGap(),
+            reverse = yAxis.reverse ?: template?.reverse ?: false,
+            inside = yAxis.inside ?: template?.inside ?: false,
+            position = yAxis.position ?: if (template?.positionLeft == true) AxisPosition.LEFT else AxisPosition.RIGHT,
+            scrollZoomEnabled = yAxis.scrollZoomEnabled ?: template?.scrollZoomEnabled ?: true,
+            gap = yAxis.gap ?: AxisGap(
+                top = template?.gapValues?.getOrNull(0) ?: AxisGap().top,
+                bottom = template?.gapValues?.getOrNull(1) ?: AxisGap().bottom,
+            ),
             needWidget = yAxis.needWidget ?: true,
             isDefault = false,
             customAxis = yAxis.customAxis,

@@ -385,9 +385,11 @@ class ChartState(
         val (vFrom, vTo) = visibleIndexRange() ?: return null
         val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
         val spec = effectiveExtraAxisSpec(axisId)
-        val bottom = paneHeightsPx.main.toDouble()
-        val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, value, alo, ahi, 0.0, bottom)
-        return if (meta.reverse) bottom - y else y
+        // T02：投影几何 = 轴所属 pane 的 bounds（修复前一律用主 pane 高度，
+        // 副 pane 轴的转换与绘制错位 ~pane 高度差）
+        val (aTop, aBottom) = paneBounds(meta.paneId) ?: (0f to paneHeightsPx.main)
+        val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, value, alo, ahi, aTop.toDouble(), aBottom.toDouble())
+        return if (meta.reverse) (aTop + aBottom).toDouble() - y else y
     }
 
     /** R06：轴实例生效 spec（custom > 模板 spec > Normal）——绘制与转换共用。 */
@@ -403,9 +405,9 @@ class ChartState(
         val (vFrom, vTo) = visibleIndexRange() ?: return null
         val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
         val spec = effectiveExtraAxisSpec(axisId)
-        val bottom = paneHeightsPx.main.toDouble()
-        val yy = if (meta.reverse) bottom - y else y
-        return io.lkanvas.core.axis.YAxisMath.yToValue(spec, yy.toDouble(), alo, ahi, 0.0, bottom)
+        val (aTop, aBottom) = paneBounds(meta.paneId) ?: (0f to paneHeightsPx.main)
+        val yy = if (meta.reverse) (aTop + aBottom).toFloat() - y else y
+        return io.lkanvas.core.axis.YAxisMath.yToValue(spec, yy.toDouble(), alo, ahi, aTop.toDouble(), aBottom.toDouble())
     }
 
     /**
@@ -426,6 +428,55 @@ class ChartState(
      * pane 数值 → pane 相对 y（R05：与各 pane 渲染器同式——vol 0..maxVol、
      * macd/extra 可见区公共值域）；未知 pane/无数据返回 null。
      */
+    /**
+     * T03（第三轮复审 2026-10-30）：pane 可见区公共值域**单一来源**——聚合该
+     * pane 全部可见实例的全部列（索引区间与渲染同源）+ BAR 列 0 基线。
+     * [paneValueToY]/[paneValueAt]/drawExtraPane 三处共用（修复前转换只取
+     * 第一个实例、与渲染聚合值域错位）。
+     */
+    fun paneVisibleRange(paneId: String): Pair<Double, Double>? {
+        val candles = dataSnapshot.candles
+        if (candles.isEmpty()) return null
+        val (vFrom, vTo) = visibleIndexRange() ?: return null
+        var lo = Double.NaN
+        var hi = Double.NaN
+        fun scan(result: io.lkanvas.core.indicator.IndicatorResult?, baseline: Double?) {
+            val cols = result ?: return
+            for ((_, arr) in cols.columns) {
+                for (i in vFrom..vTo) {
+                    val v = arr[i]
+                    if (v.isNaN()) continue
+                    if (lo.isNaN() || v < lo) lo = v
+                    if (hi.isNaN() || v > hi) hi = v
+                    if (baseline != null) {
+                        if (lo.isNaN() || baseline < lo) lo = baseline
+                        if (hi.isNaN() || baseline > hi) hi = baseline
+                    }
+                }
+            }
+        }
+        when (paneId) {
+            "vol" -> {
+                scan(volumePaneResult()?.result, null)
+                val visible = candles.subList(vFrom, vTo + 1)
+                val volMax = visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0
+                if (lo.isNaN()) lo = 0.0
+                if (hi.isNaN() || volMax > hi) hi = maxOf(hi, volMax)
+            }
+            "macd" -> scan(macdPaneResult()?.result, 0.0)
+            else -> {
+                for (inst in indicatorInstances) {
+                    if (!inst.visible || inst.paneId != paneId) continue
+                    val hasBar = inst.definition.plotsFor(inst.params)
+                        .any { it.type == io.lkanvas.core.indicator.PlotType.BAR }
+                    scan(inst.state?.result, if (hasBar) 0.0 else null)
+                }
+            }
+        }
+        if (lo.isNaN()) return null
+        return if (lo == hi) lo - 1.0 to hi + 1.0 else lo to hi
+    }
+
     fun paneValueToY(paneId: String, value: Double): Double? {
         val (top, bottom) = paneBounds(paneId) ?: return null
         val candles = dataSnapshot.candles
@@ -448,21 +499,8 @@ class ChartState(
                 0.0 to maxVol
             }
             else -> {
-                val result = if (paneId == "macd") macdPaneResult()
-                else indicatorInstances.firstOrNull { it.paneId == paneId && it.visible }?.state
-                val cols = result?.result ?: return null
-                var lo = Double.NaN
-                var hi = Double.NaN
-                for ((_, arr) in cols.columns) {
-                    for (i in vFrom..vTo) {
-                        val v = arr[i]
-                        if (v.isNaN()) continue
-                        if (lo.isNaN() || v < lo) lo = v
-                        if (hi.isNaN() || v > hi) hi = v
-                    }
-                }
-                if (lo.isNaN()) return null
-                if (lo == hi) lo - 1.0 to hi + 1.0 else lo to hi
+                // T03：与渲染同源（全部可见实例全列聚合 + 基线规则）
+                paneVisibleRange(paneId) ?: return null
             }
         }
         val (lo, hi) = loHi ?: return null
@@ -493,21 +531,7 @@ class ChartState(
                 io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), 0.0, maxVol, top.toDouble(), bottom.toDouble())
             }
             else -> {
-                val result = if (paneId == "macd") macdPaneResult()
-                else indicatorInstances.firstOrNull { it.paneId == paneId && it.visible }?.state
-                val cols = result?.result ?: return null
-                var lo = Double.NaN
-                var hi = Double.NaN
-                for ((_, arr) in cols.columns) {
-                    for (i in vFrom..vTo) {
-                        val v = arr[i]
-                        if (v.isNaN()) continue
-                        if (lo.isNaN() || v < lo) lo = v
-                        if (hi.isNaN() || v > hi) hi = v
-                    }
-                }
-                if (lo.isNaN()) return null
-                val (l, h2) = if (lo == hi) lo - 1.0 to hi + 1.0 else lo to hi
+                val (l, h2) = paneVisibleRange(paneId) ?: return null
                 io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), l, h2, top.toDouble(), bottom.toDouble())
             }
         }
@@ -806,6 +830,8 @@ class ChartState(
         val inside: Boolean = false,
         /** 上游 position LEFT：标签画 pane 内左缘（right 轴位置与独立列等价，登记）。 */
         val positionLeft: Boolean = false,
+        /** T02（第三轮复审 2026-10-30）：轴所属 pane——转换/绘制按其 bounds 投影。 */
+        val paneId: String = "main",
     )
 
     /** 0.5.x 多轴完整版：自定义变换轴（axisId → CustomYAxis；渲染按 Custom spec 映射）。 */

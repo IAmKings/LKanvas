@@ -8,9 +8,18 @@ import io.lkanvas.core.axis.YAxisSpec
  */
 object YAxisTemplates {
 
-    /** 轴模板：按名构造规格（百分比轴可带基准）。 */
+    /**
+     * 轴模板（T02，第三轮复审 2026-10-30）：携带完整默认配置——
+     * reverse/inside/positionLeft/scrollZoomEnabled/gap 与 spec 一并进构造
+     * （createYAxis 以模板字段为缺省，override 参数覆盖）。
+     */
     interface AxisTemplate {
         val name: String
+        val reverse: Boolean get() = false
+        val inside: Boolean get() = false
+        val positionLeft: Boolean get() = false
+        val scrollZoomEnabled: Boolean get() = true
+        val gapValues: List<Double> get() = emptyList()
         fun createSpec(base: Double? = null): YAxisSpec
     }
 

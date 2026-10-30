@@ -131,7 +131,8 @@ object PaneRenderers {
         // 独立值域映射，轴标签画在各自 gutter 列（reverse 翻转值域方向）
         val extraAxes = state.extraYAxisMeta
         var colIdx = 0
-        for ((ai, axisId) in extraAxes.keys.withIndex()) {
+        // T02：仅主 pane 的额外轴参与主图标签/gutter（副 pane 轴由 drawExtraPane 消费）
+        for ((ai, axisId) in extraAxes.entries.filter { it.value.paneId == "main" }.map { it.key }.withIndex()) {
             val meta = extraAxes[axisId] ?: continue
             val inPane = meta.inside || meta.positionLeft
             val colX = if (inPane) -1f else extraAxisCols.getOrNull(colIdx++) ?: continue
