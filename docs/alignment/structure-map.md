@@ -27,6 +27,7 @@
 | `extension/indicator/*.ts`（27） | `lkanvas-core/.../extension/indicator/` 上游同名 27 文件 + `Index.kt`（0.6.0 已落地） | 4 个合并文件已删除 | calc 逐行对照；oracle 27/27 + DualPathParityTest 双路径 | 行为通过 |
 | `extension/overlay/*.ts`（16） | `lkanvas-core/.../extension/overlay/` 上游同名 16 文件 + `Index.kt`（0.6.0 已落地） | `OverlayTemplates.kt` 已删除（契约移 OverlayDefinition.kt） | 渲染/命中/手势共表（Parity5）；`OverlayGeometry.kt` 保留为共享几何助手 | 行为通过 |
 | `extension/figure/index.ts`（注册表） | `lkanvas-core/.../extension/figure/Index.kt`（0.6.0：类型+命中开关注册表） | 原语在 `core/figure/Figures.kt`、绘制在平台层 `FigureRenderer.kt`（单一 when，稳定） | 图形绘制为平台关注点，注册/命中经共表；逐文件拆分不带来补丁映射收益（登记决策） | 已接线 |
+| `view/IndicatorView.ts:142` figure.attrs 几何协议 | 本地 `PlotDef.attrs` 消费于 `PaneRenderers.kt drawBarPlots`（BAR top/bottom/x/width，pane 相对坐标 + paneTop 平移）；**LINE 型 attrs 几何消费为平台差异**——本地 LINE 由列+视口生成（drawLinePlots native drawLines 批量），非上游 coordinates 点列，attrs 几何不适用 | `FigureRenderer.kt` / `drawLinePlots` | 上游 attrs 为每行几何覆盖（坐标/尺寸）；本地 LINE 走数据驱动批量路径。差异登记 gap-matrix §16 N04 | 已接线 |
 | `extension/y-axis/{normal,logarithm,percentage}.ts` | `lkanvas-core/.../extension/yaxis/` 3 模板 + `Index.kt`（0.6.0 已落地，createYAxis 消费 template） | `YAxisSpec.kt` 保留为规格/数学 | 模板按名构造轴实例并进主轴规格（Parity6） | 行为通过 |
 | `extension/x-axis/normal.ts` | `lkanvas-core/.../extension/xaxis/Normal.kt` + `Index.kt` | `ChartState.xAxisState` | — | 已声明 |
 | `extension/i18n/{en-US,zh-CN}.ts` | `lkanvas-core/.../extension/i18n/` 同名 + `Index.kt` | `ChartLocale.kt` | registerLocale 消费（SLA-004） | 已声明 |
