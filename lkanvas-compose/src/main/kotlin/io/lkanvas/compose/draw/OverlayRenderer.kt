@@ -19,7 +19,7 @@ import kotlin.math.hypot
 /**
  * 覆盖物渲染与命中（R09，复审 2026-10-30：**统一模板执行**——16 内置模板的
  * createPointFigures 为图形生成唯一来源，renderer/命中消费同一产物，不再有
- * 按名称分支；pane 上下文按实例 effectivePaneId；命中序与绘制序共用 zIndex 排序）。
+ * 按名称分支；pane 上下文按实例 effectivePaneId；绘制升序/命中降序——同一层级顺序的两个方向）。
  */
 object OverlayRenderer {
 
@@ -47,9 +47,12 @@ object OverlayRenderer {
         text: ChartText,
     ) {
         val creatingId = state.overlays.creatingId
+        // T09（第三轮复审 2026-10-30）：绘制**升序**（低 z 先画、高 z 最后画在
+        // 顶层——上游 Store.ts:1570 升序排序 + OverlayView 顺序绘制；
+        // 修复前降序使高 z 被低 z 覆盖）
         val ordered = state.overlays.all()
             .filter { it.visible && it.points.isNotEmpty() }
-            .sortedWith(compareByDescending { it.zIndex })
+            .sortedWith(compareBy { it.zIndex })
         for (inst in ordered) {
             val selected = inst.id == state.overlays.selectedId
             val color = if (selected) theme.overlayPoint else (stylesColor(inst) ?: theme.overlayLine)
@@ -116,7 +119,19 @@ object OverlayRenderer {
                         )
                     }
                     else -> {
-                        val fig = figureFromDescription(figureType, attrs, styles) ?: continue
+                        // T07：rawValue 标记 → 渲染层按状态上下文格式化
+                        // （蜡烛 pane=品种精度；指标 pane=pane 内指标精度最大值——
+                        // 上游 priceLine.ts:25-33；修复前固定 2 位无分隔/折叠）
+                        val textStyles = if (styles.containsKey("rawValue")) {
+                            val raw = styles["rawValue"]?.toDoubleOrNull() ?: 0.0
+                            val formatted = io.lkanvas.core.common.utils.Format.formatPrecision(
+                                raw, resolvePricePrecision(state, paneId),
+                            )
+                            styles + mapOf("text" to formatted)
+                        } else {
+                            styles
+                        }
+                        val fig = figureFromDescription(figureType, attrs, textStyles) ?: continue
                         with(io.lkanvas.compose.draw.FigureRenderer) {
                             drawFigure(fig, figColor, strokeWidth = strokeWidth)
                         }
@@ -128,6 +143,15 @@ object OverlayRenderer {
         if (template.continuous != true && (selected || creating)) {
             px.forEach { drawControlPoint(it, theme.overlayPoint) }
         }
+    }
+
+    /** T07：价格文本精度——蜡烛 pane=品种精度；指标 pane=pane 内指标精度最大值。 */
+    private fun resolvePricePrecision(state: ChartState, paneId: String): Int {
+        if (paneId != "main") {
+            val inPane = state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
+            return inPane.maxOfOrNull { it.definition.precision } ?: 0
+        }
+        return 2 // 品种默认精度（SymbolDefaultPrecisionConstants.PRICE）
     }
 
     /** styles["color"]（'#RRGGBB'）→ Compose Color；非法返回 null（回退主题色）。 */
@@ -194,12 +218,13 @@ object OverlayRenderer {
         Offset(first.x.toFloat(), first.y.toFloat()) to Offset(second.x.toFloat(), second.y.toFloat())
 
     /**
-     * 命中测试（R09：命中序与绘制序共用 zIndex 排序；模板产物消费）。
+     * 命中测试（R09/T09：绘制升序、命中降序（绘制的逆序）；模板产物消费）。
      * 优先级：控制点 > 选中对象 > 其他对象（PRD R-09）。
      */
     fun hitTest(state: ChartState, x: Float, y: Float, contentRight: Float, paneBottom: Float): OverlayHit? {
         val all = state.overlays.all().filter { it.visible && it.phase != OverlayPhase.CREATING }
         val selectedId = state.overlays.selectedId
+        // T09：命中**降序**（高 z 优先选中——绘制的逆序；上游 hover 置顶语义）
         val ordered = all.sortedWith(compareByDescending { it.zIndex })
         // 1) 控制点（仅选中实例；连续模板无控制点编辑；fixedZLevel 不随选中浮起）
         for (inst in ordered) {
@@ -267,66 +292,18 @@ object OverlayRenderer {
                     val ty = d0.getOrNull(1)?.toFloat() ?: continue
                     if (hypot(xLocal - tx, yLocal - ty) <= HIT_RADIUS) return true
                 }
-                else -> if (hitFigureShape(type, attrs, xLocal, yLocal)) return true
+                else -> {
+                    // T08（第三轮复审 2026-10-30）：命中统一走 core FigureHit
+                    //（角度/半径带/端点容差一套实现；修复前 Arc 只判圆盘、
+                    // Circle 圆盘膨胀——第二套简化算法绕过已修补丁）
+                    val fig = figureFromDescription(type, attrs)
+                    if (fig != null && io.lkanvas.core.figure.FigureHit.hit(fig, xLocal.toDouble(), yLocal.toDouble(), tolerance = HIT_RADIUS.toDouble())) return true
+                }
             }
         }
         return false
     }
 
-    /** 图形形状距离判定（Line/Rect/Polygon/Circle/Arc/Path）。 */
-    private fun hitFigureShape(type: String, attrs: List<List<Double>>, x: Float, y: Float): Boolean {
-        fun d(i: Int): Float? =
-            (attrs.getOrNull(i)?.getOrNull(0) ?: attrs.getOrNull(0)?.getOrNull(i))?.toFloat()
-        when (type) {
-            "Line" -> {
-                val a = d(0) ?: return false
-                val b = d(1) ?: return false
-                val c = d(2) ?: return false
-                val e = d(3) ?: return false
-                return distanceToSegment(x, y, Offset(a, b), Offset(c, e)) <= HIT_RADIUS
-            }
-            "Circle" -> {
-                val cx = d(0) ?: return false
-                val cy = d(1) ?: return false
-                val r = d(2) ?: return false
-                return hypot(x - cx, y - cy) <= r + HIT_RADIUS
-            }
-            "Rect" -> {
-                val l = d(0) ?: return false
-                val t = d(1) ?: return false
-                val r = d(2) ?: return false
-                val b = d(3) ?: return false
-                val inX = x >= minOf(l, r) - HIT_RADIUS && x <= maxOf(l, r) + HIT_RADIUS
-                val inY = y >= minOf(t, b) - HIT_RADIUS && y <= maxOf(t, b) + HIT_RADIUS
-                return inX && inY
-            }
-            "Polygon" -> {
-                val edges = ArrayList<Pair<Offset, Offset>>(attrs.size)
-                for (k in attrs.indices) {
-                    val p0 = attrs[k]
-                    val p1 = attrs[(k + 1) % attrs.size]
-                    if (p0.size >= 2 && p1.size >= 2) {
-                        edges.add(Offset(p0[0].toFloat(), p0[1].toFloat()) to Offset(p1[0].toFloat(), p1[1].toFloat()))
-                    }
-                }
-                return edges.any { (a, b) -> distanceToSegment(x, y, a, b) <= HIT_RADIUS }
-            }
-            "Arc" -> {
-                val cx = d(0) ?: return false
-                val cy = d(1) ?: return false
-                val r = d(2) ?: return false
-                return hypot(x - cx, y - cy) <= r + HIT_RADIUS
-            }
-            "Path" -> {
-                val pts = attrs.mapNotNull { p -> if (p.size >= 2) Offset(p[0].toFloat(), p[1].toFloat()) else null }
-                for (k in 0 until pts.size - 1) {
-                    if (distanceToSegment(x, y, pts[k], pts[k + 1]) <= HIT_RADIUS) return true
-                }
-                return false
-            }
-            else -> return false
-        }
-    }
 
     /** 点到线段距离。 */
     fun distanceToSegment(px: Float, py: Float, a: Offset, b: Offset): Float {

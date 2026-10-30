@@ -18,13 +18,18 @@ object PriceLineDefinition : OverlayDefinition {
         extendData: Map<String, String>,
     ): List<Triple<String, List<List<Double>>, Map<String, String>>>? {
         if (pixelPoints.isEmpty()) return emptyList()
-        val bounds = io.lkanvas.core.overlay.OverlayGeometry.Bounds(0.0, 0.0, boundingWidth, boundingHeight)
-        val seg = io.lkanvas.core.overlay.OverlayGeometry.horizontalLine(pixelPoints[0][1], bounds)
+        // T07（第三轮复审 2026-10-30）：镜像上游 priceLine.ts:38——线段从
+        // **锚点**到右边界（修复前全宽 0→width）；价格文本带 rawValue 标记，
+        // 由渲染层按品种/指标精度 + thousandsSeparator/decimalFold 格式化
+        val (ax, ay) = pixelPoints[0]
         val value = points.firstOrNull()?.value ?: 0.0
-        val text = io.lkanvas.core.common.utils.Format.formatPrecision(value, 2)
         return listOf(
-            Triple("Line", listOf(listOf(seg.first.x, seg.first.y, seg.second.x, seg.second.y)), emptyMap()),
-            Triple("Text", listOf(listOf(pixelPoints[0][0], pixelPoints[0][1])), mapOf("text" to text, "baseline" to "bottom")),
+            Triple("Line", listOf(listOf(ax, ay, boundingWidth, ay)), emptyMap()),
+            Triple(
+                "Text",
+                listOf(listOf(ax, ay)),
+                mapOf("rawValue" to value.toString(), "baseline" to "bottom"),
+            ),
         )
     }
 }
