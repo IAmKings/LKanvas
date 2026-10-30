@@ -29,7 +29,21 @@ class VolumeIndicator : IndicatorDefinition {
 
     override fun plotsFor(params: List<Double>): List<PlotDef> =
         params.mapIndexed { i, p -> PlotDef("ma${i + 1}", "MA${p.toInt()}: ", PlotType.LINE) } +
-            PlotDef("volume", "VOLUME: ", PlotType.BAR, baseValue = 0.0)
+            PlotDef(
+                "volume", "VOLUME: ", PlotType.BAR, baseValue = 0.0,
+                // Q05（第四轮复审 2026-10-30）：上游 volume.ts getVolumeFigure styles
+                // 镜像——按 compareRule 涨跌着色（函数约定 (row, params, value, candles)）
+                styles = { row: Int, _: List<Double>, _: Double, candles: List<io.lkanvas.core.data.Candle> ->
+                    val c = candles.getOrNull(row)
+                    val color = when {
+                        c == null -> "#76808F"
+                        c.close > c.open -> "#2DC08E"
+                        c.close < c.open -> "#F92855"
+                        else -> "#76808F"
+                    }
+                    mapOf("color" to color)
+                },
+            )
 
     /** 上游 calc 镜像 + D-03 掩码：窗口内含缺失 volume → 均线缺键（Missing）。 */
     override fun calc(candles: List<Candle>, params: List<Double>): List<Map<String, Double>> {

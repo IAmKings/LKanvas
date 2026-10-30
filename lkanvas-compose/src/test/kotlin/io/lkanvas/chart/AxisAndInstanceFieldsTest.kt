@@ -578,22 +578,41 @@ class AxisAndInstanceFieldsTest {
             override fun calc(candles: List<io.lkanvas.core.data.Candle>, params: List<Double>): List<Map<String, Double>> = candles.map { emptyMap() }
         }
         val inst = io.lkanvas.core.indicator.IndicatorInstance("audit_fig_inst", def)
-        // styles 消费：色与线宽
+        val candles = (0 until 4).map { candleOf(it.toLong(), 100.0 + it) }
+        // styles 消费（Q05 签名含 value/candles 上下文）
         val styleFn = io.lkanvas.compose.draw.PaneRenderers.styleOverrideFor(inst)
         kotlin.test.assertNotNull(styleFn, "styles 有消费者")
-        val (c0, w0) = styleFn!!("k", 0)
+        val (c0, w0) = styleFn!!("k", 0, Double.NaN, candles)
         kotlin.test.assertNotNull(c0, "styles 供色")
         assertEquals(1f, w0!!, "styles 供线宽（row=0 → 1）")
-        val (c1, w1) = styleFn("k", 3)
+        val (c1, w1) = styleFn("k", 3, Double.NaN, candles)
         assertTrue(c0 != c1, "styles 逐行求值（row=3 色 ≠ row=0）")
         assertEquals(4f, w1!!, "styles 逐行求值（row=3 → 4）")
-        // attrs 消费：几何数值
+        // attrs 消费：几何数值（drawBarPlots 的 top/bottom 覆盖来源）
         val attrsFn = io.lkanvas.compose.draw.PaneRenderers.attrsOverrideFor(inst)
-        kotlin.test.assertNotNull(attrsFn, "attrs 几何有消费者（T06）")
+        kotlin.test.assertNotNull(attrsFn, "attrs 几何有消费者（Q05：drawBarPlots 消费）")
         val geo0 = attrsFn!!("k", 0)
         assertEquals(0.0, geo0["top"]!!, "attrs 几何 top（row=0）")
         assertEquals(5.0, geo0["bottom"]!!, "attrs 几何 bottom（row=0）")
         val geo3 = attrsFn("k", 3)
         assertEquals(30.0, geo3["top"]!!, "attrs 逐行求值（row=3 top=30）")
+    }
+
+    @Test
+    fun `VOL与MACD模板styles回调存在且按数据着色（Q05）`() {
+        val vol = io.lkanvas.core.extension.indicator.IndicatorTemplates.get("VOL")!!
+        val volPlot = vol.plotsFor(vol.calcParams).first { it.key == "volume" }
+        kotlin.test.assertNotNull(volPlot.styles, "VOL volume figure 有 styles 回调（上游 volume.ts:33 镜像）")
+        @Suppress("UNCHECKED_CAST")
+        val upFn = volPlot.styles as (Int, List<Double>, Double, List<io.lkanvas.core.data.Candle>) -> Map<String, String>
+        val candles = listOf(
+            io.lkanvas.core.data.Candle(0L, 100.0, 110.0, 90.0, 105.0, 10.0),
+            io.lkanvas.core.data.Candle(60_000L, 105.0, 115.0, 95.0, 101.0, 10.0),
+        )
+        assertEquals("#2DC08E", upFn(0, vol.calcParams, 10.0, candles)["color"], "阳线绿色")
+        assertEquals("#F92855", upFn(1, vol.calcParams, 10.0, candles)["color"], "阴线红色")
+        val macd = io.lkanvas.core.extension.indicator.IndicatorTemplates.get("MACD")!!
+        val macdPlot = macd.plots.first { it.key == "macd" }
+        kotlin.test.assertNotNull(macdPlot.styles, "MACD macd figure 有 styles 回调")
     }
 }

@@ -28,7 +28,19 @@ class MacdIndicator : IndicatorDefinition {
     override val plots = listOf(
         PlotDef("dif", "DIF: ", PlotType.LINE),
         PlotDef("dea", "DEA: ", PlotType.LINE),
-        PlotDef("macd", "MACD: ", PlotType.BAR, baseValue = 0.0),
+        PlotDef(
+            "macd", "MACD: ", PlotType.BAR, baseValue = 0.0,
+            // Q05：上游 MACD bar styles 镜像——值正负着色（stroke/fill 增强为 Compose
+            // 描边语义延后；色值同 defaultStyles bars[0]）
+            styles = { _: Int, _: List<Double>, value: Double, _: List<io.lkanvas.core.data.Candle> ->
+                val color = when {
+                    value > 0 -> "#2DC08E"
+                    value < 0 -> "#F92855"
+                    else -> "#76808F"
+                }
+                mapOf("color" to color)
+            },
+        ),
     )
 
     /** 上游 calc 镜像：循环外 EMA/DIF/DEA 递推变量，种子与预热条件照抄。 */

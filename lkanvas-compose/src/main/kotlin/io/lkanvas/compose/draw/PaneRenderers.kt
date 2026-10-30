@@ -242,31 +242,10 @@ object PaneRenderers {
         bottom: Float,
         text: ChartText,
     ) {
-        val candles = state.dataSnapshot.candles
-        val range = state.viewport.visibleRange(candles.size)
-        if (range.count <= 0) return
-        val visible = candles.subList(range.first, range.last + 1)
-        // SLA-003：pane 绑定实例优先（任意 VOLUME 系实例可入 vol pane），回退 VOL 模板结果
-        val result = state.volumePaneResult() ?: state.volResult ?: return
-
-        val maxVol = maxOf(
-            visible.maxOf { it.volume ?: Double.NaN }.takeIf { it.isFinite() } ?: 0.0,
-            result.result.columns.filterKeys { it.startsWith("ma") }.values
-                .flatMap { arr -> arr.slice(range.first..range.last).filter { it.isFinite() } }
-                .maxOrNull() ?: 0.0,
-            1e-12,
-        )
-        val y: (Double) -> Double = { v -> LinearYAxis.valueToY(v, 0.0, maxVol, top.toDouble(), bottom.toDouble()) }
-
-        drawGrid(theme, text, 0.0, maxVol, contentLeft, contentRight, top, bottom, tickCount = 3)
-        clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
-            // T06：VOL pane 的 ma 线列走统一管线（LINE 批量）；volume 柱保留
-            // 涨跌色专用绘制（VOL 柱体着色= candle 涨跌语义，属平台级视觉规则，
-            // gap-matrix 登记平台差异——上游也是 CandleBarView 专用实现）
-            drawVolumeBars(state, theme, result, range, y)
-            drawLinePlots(result, state.viewport, range, y, theme.linePalette, skipKeys = listOf("volume"), lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = false)
-        }
-        drawYAxisLabels(text, theme, LinearYAxis.ticks(0.0, maxVol, 3), y, contentRight)
+        // Q05（第四轮复审 2026-10-30）：VOL pane 全实例走统一 figure 管线
+        //（涨跌色经模板 styles 回调——上游 volume.ts:33 同模型；删除
+        // drawVolumeBars 专用旁路与"平台特例"登记）
+        drawIndicatorPaneInstances("vol", state, theme, contentLeft, contentRight, top, bottom, text)
     }
 
     /** MACD pane：DIF/DEA 线 + 柱。 */
@@ -279,29 +258,53 @@ object PaneRenderers {
         bottom: Float,
         text: ChartText,
     ) {
+        // Q05：MACD pane 全实例走统一 figure 管线（柱色经模板 styles 回调；
+        // 删除 drawMacdBars 专用旁路；值域经 paneVisibleRange 与转换同源）
+        drawIndicatorPaneInstances("macd", state, theme, contentLeft, contentRight, top, bottom, text)
+    }
+
+    /**
+     * Q05：内置副 pane（vol/macd）通用入口——遍历该 pane **全部可见实例**经
+     * drawInstanceFigures（与 main/额外轴/动态 pane 同一 figure 契约）；
+     * 值域 = paneVisibleRange（BAR 基线入域；vol 量纲含 candle volume）。
+     */
+    private fun DrawScope.drawIndicatorPaneInstances(
+        paneId: String,
+        state: ChartState,
+        theme: ChartTheme,
+        contentLeft: Float,
+        contentRight: Float,
+        top: Float,
+        bottom: Float,
+        text: ChartText,
+    ) {
         val candles = state.dataSnapshot.candles
         val range = state.viewport.visibleRange(candles.size)
         if (range.count <= 0) return
-        // SLA-003：pane 绑定实例优先（任意实例可入 macd pane），回退 MACD 模板结果
-        val result = state.macdPaneResult() ?: state.macdResult ?: return
-        // 动态线键：BAR 型列（macd 柱）以外的全部列按 palette 画线（上游 IndicatorView 通用口径）
-        val barKeys = if ("macd" in result.result.keys) listOf("macd") else emptyList()
-        val lineKeys = result.result.keys.filter { it !in barKeys }
-        val values = lineKeys.flatMap { k ->
-            result.result[k].slice(range.first..range.last).filter { it.isFinite() }
-        } + sequenceOf(0.0)
-        val bars = result.result["macd"]?.slice(range.first..range.last)?.filter { it.isFinite() } ?: emptyList()
-        var lo = min(values.minOrNull() ?: 0.0, bars.minOrNull() ?: 0.0)
-        var hi = max(values.maxOrNull() ?: 0.0, bars.maxOrNull() ?: 0.0)
-        if (lo == hi) { lo -= 1.0; hi += 1.0 }
+        val insts = state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
+            .filter { it.visible && it.state != null }
+        if (insts.isEmpty()) return
+        val (lo, hi) = state.paneVisibleRange(paneId) ?: return
         val y: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
-
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
-            if ("macd" in result.result.keys) {
-                drawMacdBars(state, theme, result, range, y)
+            var paletteIdx = 0
+            for (inst in insts) {
+                val res = inst.state ?: continue
+                val customDraw = inst.definition.draw
+                if (customDraw != null) {
+                    customDraw(
+                        io.lkanvas.core.indicator.IndicatorDrawContext(
+                            result = res.result, rangeFirst = range.first, rangeLast = range.last,
+                            yOf = y, xOf = { i -> state.viewport.candleCenterX(i.toDouble()) },
+                            palette = theme.linePalette, scope = this,
+                        ),
+                    )
+                } else {
+                    drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = false, candles = candles)
+                }
+                paletteIdx += res.result.keys.size
             }
-            drawLinePlots(result, state.viewport, range, y, theme.linePalette, keys = lineKeys, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = false)
         }
         drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), y, contentRight)
     }
@@ -546,61 +549,7 @@ object PaneRenderers {
         drawText(text, "${text.price(visible[lowIdx].low)} ", Offset((lx - 6f - text.tagWidth).coerceAtLeast(0f), ly + 2f), theme.lowMarkerColor)
     }
 
-    private fun DrawScope.drawVolumeBars(
-        state: ChartState,
-        theme: ChartTheme,
-        result: IndicatorResultState,
-        range: VisibleRange,
-        y: (Double) -> Double,
-    ) {
-        val vp = state.viewport
-        val vols = result.result["volume"]
-        val candles = state.dataSnapshot.candles
-        val bodyWidth = (vp.barSpacing * (1.0 - state.gapRatio)).coerceAtLeast(1.0)
-        for (i in range.first..range.last) {
-            val v = vols[i]
-            if (v.isNaN()) continue
-            val c = candles[i]
-            val color = when {
-                c.close > c.open -> theme.upColor
-                c.close < c.open -> theme.downColor
-                else -> theme.noChangeColor
-            }
-            val x = vp.candleCenterX(i.toDouble())
-            val topY = y(v)
-            val bottomY = y(0.0)
-            drawRect(
-                color,
-                topLeft = Offset((x - bodyWidth / 2).toFloat(), topY.toFloat()),
-                size = Size(bodyWidth.toFloat(), max(bottomY.toFloat() - topY.toFloat(), 1f)),
-            )
-        }
-    }
 
-    private fun DrawScope.drawMacdBars(
-        state: ChartState,
-        theme: ChartTheme,
-        result: IndicatorResultState,
-        range: VisibleRange,
-        y: (Double) -> Double,
-    ) {
-        val vp = state.viewport
-        val bars = result.result["macd"]
-        val bodyWidth = (vp.barSpacing * (1.0 - state.gapRatio)).coerceAtLeast(1.0)
-        val zero = y(0.0).toFloat()
-        for (i in range.first..range.last) {
-            val v = bars[i]
-            if (v.isNaN()) continue
-            val color = if (v >= 0) theme.macdBarUp else theme.macdBarDown
-            val x = vp.candleCenterX(i.toDouble())
-            val vy = y(v).toFloat()
-            drawRect(
-                color,
-                topLeft = Offset((x - bodyWidth / 2).toFloat(), min(vy, zero)),
-                size = Size(bodyWidth.toFloat(), max(kotlin.math.abs(vy - zero), 1f)),
-            )
-        }
-    }
 
     /** 指标线绘制（跳过 NaN；palette 按 key 序取色）。 */
     private fun DrawScope.drawLinePlots(
@@ -704,9 +653,11 @@ object PaneRenderers {
         theme: ChartTheme,
         paletteOffset: Int,
         lastValueMark: Boolean,
+        candles: List<Candle> = emptyList(),
     ) {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
         val override = styleOverrideFor(inst)
+        val attrsGeo = attrsOverrideFor(inst)
         val lineKeys = ArrayList<String>()
         val barEntries = ArrayList<Pair<String, Double?>>() // key → baseValue
         for ((key, plot) in plots) {
@@ -718,10 +669,10 @@ object PaneRenderers {
         }
         // 顺序：先线后柱（与内置 MACD DIF/DEA→柱 口径一致）
         if (lineKeys.isNotEmpty()) {
-            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = override)
+            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = override?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } })
         }
         if (barEntries.isNotEmpty()) {
-            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, override)
+            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, override, attrsGeo, candles)
         }
     }
 
@@ -737,7 +688,9 @@ object PaneRenderers {
         barEntries: List<Pair<String, Double?>>,
         palette: List<Color>,
         paletteOffset: Int,
-        override: ((String, Int) -> Pair<Color?, Float?>)?,
+        override: ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)?,
+        attrsGeo: ((String, Int) -> Map<String, Double>)?,
+        candles: List<Candle> = emptyList(),
     ) {
         val gap = (vp.barSpacing * 0.25).coerceAtMost(vp.barSpacing - 1.0).coerceAtLeast(0.0).toFloat()
         val bodyWidth = (vp.barSpacing - gap).coerceAtLeast(1.0).toFloat()
@@ -751,9 +704,19 @@ object PaneRenderers {
                 if (v.isNaN()) continue
                 val x = vp.candleCenterX(i.toDouble()).toFloat()
                 val vy = y(v).toFloat()
-                val top = minOf(vy, baseY)
-                val hgt = kotlin.math.abs(vy - baseY).coerceAtLeast(0.5f)
-                val (c0, w0) = override?.invoke(key, i) ?: (null to null)
+                // Q05：attrs 几何优先（上游 figure.attrs 协议——top/bottom 像素
+                // 覆盖自算；修复前 attrs 仅测试调用、管线零消费）
+                val geo = attrsGeo?.invoke(key, i)
+                val top: Float
+                val hgt: Float
+                if (geo != null && geo.containsKey("top") && geo.containsKey("bottom")) {
+                    top = minOf(geo.getValue("top").toFloat(), geo.getValue("bottom").toFloat())
+                    hgt = kotlin.math.abs(geo.getValue("bottom") - geo.getValue("top")).toFloat().coerceAtLeast(0.5f)
+                } else {
+                    top = minOf(vy, baseY)
+                    hgt = kotlin.math.abs(vy - baseY).coerceAtLeast(0.5f)
+                }
+                val (c0, w0) = override?.invoke(key, i, v, candles) ?: (null to null)
                 val color = c0 ?: palette[(bi + paletteOffset) % palette.size]
                 val w = (w0 ?: 1f) * bodyWidth
                 drawRect(
@@ -770,24 +733,34 @@ object PaneRenderers {
      * PlotDef.styles 协议：`(row: Int, params: List<Double>) -> Map<String,String>`
      * 或 `(row: Int) -> Map<String,String>`；null=无覆盖。
      */
-    fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int) -> Pair<Color?, Float?>)? {
+    /** styles 求值：支持 (row)/(row,params)/(row,params,value,candles) 函数与 Map。 */
+    private fun evaluateStyles(
+        value: Any?,
+        row: Int,
+        params: List<Double>,
+        colValue: Double,
+        candles: List<Candle>,
+    ): Map<*, *>? = when (value) {
+        null -> null
+        is Function4<*, *, *, *, *> ->
+            @Suppress("UNCHECKED_CAST")
+            (value as (Int, List<Double>, Double, List<Candle>) -> Any?)(row, params, colValue, candles) as? Map<*, *>
+        is Function2<*, *, *> ->
+            @Suppress("UNCHECKED_CAST")
+            (value as (Int, List<Double>) -> Any?)(row, params) as? Map<*, *>
+        is Function1<*, *> ->
+            @Suppress("UNCHECKED_CAST")
+            (value as (Int) -> Any?)(row) as? Map<*, *>
+        is Map<*, *> -> value
+        else -> null
+    }
+
+    /** Q05：styles 上下文含 value+candles（上游 figure.styles data 语义）。 */
+    fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)? {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
         if (plots.values.all { it.styles == null }) return null
-        // T06（第三轮复审 2026-10-30）：styles=样式（color/lineWidth）；
-        // attrs=几何（由 attrsOverrideFor 单独消费）——不再混入样式 map
-        fun evaluate(value: Any?, row: Int): Map<*, *>? = when (value) {
-            null -> null
-            is Function2<*, *, *> ->
-                @Suppress("UNCHECKED_CAST")
-                (value as (Int, List<Double>) -> Any?)(row, inst.params) as? Map<*, *>
-            is Function1<*, *> ->
-                @Suppress("UNCHECKED_CAST")
-                (value as (Int) -> Any?)(row) as? Map<*, *>
-            is Map<*, *> -> value
-            else -> null
-        }
-        return { key, row ->
-            val map: Map<*, *> = evaluate(plots[key]?.styles, row) ?: emptyMap<Any?, Any>()
+        return { key, row, colValue, candles ->
+            val map: Map<*, *> = evaluateStyles(plots[key]?.styles, row, inst.params, colValue, candles) ?: emptyMap<Any?, Any>()
             val color = map["color"]?.toString()?.let { io.lkanvas.compose.theme.StylesThemeBridge.parse(it) }
             val width = map["lineWidth"]?.let { (it as? Number)?.toFloat() ?: it.toString().toFloatOrNull() }
             color to width
@@ -799,22 +772,13 @@ object PaneRenderers {
      * figure.attrs 协议：坐标/尺寸等；样式走 [styleOverrideFor]）。
      * BAR 消费键：top/bottom（pane 相对 y）——缺省由管线按值/基线自算。
      */
+    /** Q05：attrs 几何求值（含 value+candles 上下文；数值 map）。 */
     fun attrsOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int) -> Map<String, Double>)? {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
         if (plots.values.all { it.attrs == null }) return null
-        fun evaluate(value: Any?, row: Int): Map<*, *>? = when (value) {
-            null -> null
-            is Function2<*, *, *> ->
-                @Suppress("UNCHECKED_CAST")
-                (value as (Int, List<Double>) -> Any?)(row, inst.params) as? Map<*, *>
-            is Function1<*, *> ->
-                @Suppress("UNCHECKED_CAST")
-                (value as (Int) -> Any?)(row) as? Map<*, *>
-            is Map<*, *> -> value
-            else -> null
-        }
         return { key, row ->
-            val map: Map<*, *> = evaluate(plots[key]?.attrs, row) ?: emptyMap<Any?, Any>()
+            val colValue: Double = Double.NaN
+            val map: Map<*, *> = evaluateStyles(plots[key]?.attrs, row, inst.params, colValue, emptyList()) ?: emptyMap<Any?, Any>()
             buildMap {
                 for ((k, v) in map) {
                     (v as? Number)?.let { put(k.toString(), it.toDouble()) }
