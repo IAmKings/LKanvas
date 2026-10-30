@@ -35,7 +35,7 @@ class LKanvasChart private constructor(
 ) {
 
     companion object {
-        const val VERSION = "0.9.0"
+        const val VERSION = "0.10.0"
 
         /** 上游 `init(ds, options?)`：Android 无 DOM，直接构造（同一 state 重复 init 返回既有实例）。 */
         private val liveCharts = java.util.concurrent.ConcurrentHashMap<ChartState, LKanvasChart>()

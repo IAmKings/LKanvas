@@ -446,3 +446,15 @@
 | Q07 | 动态 pane Layout 两份禁用状态/高度忽略 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt disabledExtraDrags 单一状态 + lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt setLayoutOptions 全 pane 路由；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity8ViewportEventsTest.kt | 行为通过 |
 | Q08 | arc 绘制与命中跨度不一致 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/FigureRenderer.kt sweep 顺时针归一；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt 基线保持 | 行为通过 |
 | Q09 | fixedZLevel 选中后不可命中 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 命中第三段保留 fixedZLevel 候选；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity5OverlayHooksTest.kt | 行为通过 |
+
+## 16. 第五轮复审追踪（structure-logic-audit-round5-2026-10-31.zh-CN.md N01-N07；0.10.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| N01 | INIT 被拒后新订阅推送写旧会话 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt applyInit Rejected 反馈（unsubscribeData）+ applyUpdate/Backward/Forward key 门禁；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity12CommitResultTest.kt | 行为通过 |
+
+| N02 | 副图按 pane 选第一条轴 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawExtraPane 绑定轴条件加 inst.yAxisId 匹配；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| N03 | 内置 pane 值域漏叠加实例 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt paneVisibleRange 全实例聚合；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| N04 | attrs 上下文/几何不完整 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt attrs pane 相对坐标+真实上下文；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| N05 | 小数折叠/实例精度未消费 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt formatPriceText；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/LKanvasChartTest.kt | 行为通过 |
+| N07 | fixedZLevel 禁控制点编辑 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 命中第一段删 fixedZLevel 排除；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity5OverlayHooksTest.kt | 行为通过 |
