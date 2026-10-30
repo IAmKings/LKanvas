@@ -63,6 +63,7 @@ class LKanvasChart private constructor(
 
     /** 上游 `setSymbol`：切品种（退订旧上下文 → 变更 → 清 loading → init 重载）。 */
     fun setSymbol(symbol: SymbolInfo) {
+        state.pricePrecision = symbol.pricePrecision // Q06：格式链消费源
         scope.launch { store.setSymbol(symbol) }
     }
 

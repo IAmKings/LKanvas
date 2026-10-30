@@ -1271,6 +1271,9 @@ class ChartState(
     /** T10：动态 pane 拖动禁用集（门面 LayoutOptions 写入）。 */
     val disabledExtraDrags = java.util.concurrent.CopyOnWriteArrayList<String>()
 
+    /** Q06（第四轮复审 2026-10-30）：品种价格精度（门面 setSymbol 同步；缺省 2）。 */
+    var pricePrecision: Int = 2
+
     /** R07：setPaneOptions 路由——直接设置动态 pane 高度。 */
     fun setExtraPaneHeight(paneId: String, heightPx: Float) {
         extraPaneHeightOverride[paneId] = heightPx.coerceAtLeast(minSubPanePx)

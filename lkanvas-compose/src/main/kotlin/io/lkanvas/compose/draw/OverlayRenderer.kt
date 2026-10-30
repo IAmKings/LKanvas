@@ -126,10 +126,7 @@ object OverlayRenderer {
                         // 上游 priceLine.ts:25-33；修复前固定 2 位无分隔/折叠）
                         val textStyles = if (styles.containsKey("rawValue")) {
                             val raw = styles["rawValue"]?.toDoubleOrNull() ?: 0.0
-                            val formatted = io.lkanvas.core.common.utils.Format.formatPrecision(
-                                raw, resolvePricePrecision(state, paneId),
-                            )
-                            styles + mapOf("text" to formatted)
+                            styles + mapOf("text" to formatPriceText(state, paneId, raw))
                         } else {
                             styles
                         }
@@ -148,13 +145,25 @@ object OverlayRenderer {
         }
     }
 
-    /** T07：价格文本精度——蜡烛 pane=品种精度；指标 pane=pane 内指标精度最大值。 */
-    private fun resolvePricePrecision(state: ChartState, paneId: String): Int {
-        if (paneId != "main") {
-            val inPane = state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
-            return inPane.maxOfOrNull { it.definition.precision } ?: 0
+    /**
+     * Q06（第四轮复审 2026-10-30）：价格文本格式链——精度（蜡烛 pane=
+     * **state.pricePrecision**（品种设置，修复前写死 2）；指标 pane=pane 内
+     * 指标精度最大值）+ 千分位 + 小数折叠（复用 state.formatConfig，
+     * 上游 priceLine.ts:24-33 契约；不再在 renderer 建立固定规则）。
+     */
+    private fun formatPriceText(state: ChartState, paneId: String, raw: Double): String {
+        val precision = if (paneId != "main") {
+            state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
+                .maxOfOrNull { it.definition.precision } ?: state.pricePrecision
+        } else {
+            state.pricePrecision
         }
-        return 2 // 品种默认精度（SymbolDefaultPrecisionConstants.PRICE）
+        val cfg = state.formatConfig
+        var text = io.lkanvas.core.common.utils.Format.formatPrecision(raw, precision)
+        cfg.thousandsSign?.takeIf { it.isNotEmpty() }?.let { sign ->
+            text = io.lkanvas.core.common.utils.Format.formatThousands(text, sign)
+        }
+        return text
     }
 
     /** styles["color"]（'#RRGGBB'）→ Compose Color；非法返回 null（回退主题色）。 */
@@ -247,9 +256,14 @@ object OverlayRenderer {
             }
         }
         // 3) 其他对象（层级从高到低；与绘制遍历同一排序）
+        // Q09（第四轮复审 2026-10-30）：fixedZLevel 的选中对象保留在普通 z 顺序
+        // 候选中（上游语义=不临时浮起，不禁用命中/编辑；修复前被本段跳过，
+        // 选中后同位置返回 null）
         for (inst in ordered) {
-            if (inst.id == selectedId) continue
-            if (hitBody(state, inst, x, y, contentRight, paneBottom)) return OverlayHit(inst.id, null, wholeDrag = false)
+            if (inst.id == selectedId && !inst.fixedZLevel) continue
+            if (hitBody(state, inst, x, y, contentRight, paneBottom)) {
+                return OverlayHit(inst.id, null, wholeDrag = inst.id == selectedId && !inst.locked)
+            }
         }
         return null
     }

@@ -63,10 +63,17 @@ object FigureRenderer {
                     isAntiAlias = true
                 },
             )
-            is Figure.Arc -> drawArc(
+            is Figure.Arc -> {
+                // Q08（第四轮复审 2026-10-30）：跨度归一——与 FigureHit.withinAngle
+                // 同一顺时针规则（end<start 时取模得正向跨度；≥360° 整圆）。
+                // 修复前直接传 end-start，负值绘制反向弧，与命中判定不一致
+                val rawSweep = figure.endAngleDeg - figure.startAngleDeg
+                val sweep = if (kotlin.math.abs(rawSweep) >= 360.0) 360.0
+                else ((rawSweep % 360.0) + 360.0) % 360.0
+                drawArc(
                 color,
                 startAngle = figure.startAngleDeg.toFloat(),
-                sweepAngle = (figure.endAngleDeg - figure.startAngleDeg).toFloat(),
+                sweepAngle = sweep.toFloat(),
                 useCenter = false,
                 topLeft = androidx.compose.ui.geometry.Offset(
                     (figure.centerX - figure.radius).toFloat(),
@@ -75,6 +82,7 @@ object FigureRenderer {
                 size = androidx.compose.ui.geometry.Size(figure.radius.toFloat() * 2, figure.radius.toFloat() * 2),
                 style = Stroke(strokeWidth),
             )
+            }
             is Figure.Path -> if (figure.points.size >= 2) {
                 val path = Path()
                 path.moveTo(figure.points[0].x.toFloat(), figure.points[0].y.toFloat())
