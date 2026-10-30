@@ -1263,14 +1263,18 @@ class ChartState(
     suspend fun reset(key: MarketKey, candles: List<Candle>): ChangeResult =
         engine.apply(ChangeRequest.Reset(key, candles))
 
-    suspend fun upsertLatest(candle: Candle): ChangeResult =
-        engine.apply(ChangeRequest.UpsertLatest(candle))
+    /** T01：expectedSessionId = 发起时会话快照（引擎写入入口复核；null=不门禁）。 */
+    /** T01：引擎当前会话快照（门面 Host 发起动作时捕获）。 */
+    fun engineSessionId(): Long = engine.currentSessionId
 
-    suspend fun appendBatch(candles: List<Candle>): ChangeResult =
-        engine.apply(ChangeRequest.AppendBatch(candles))
+    suspend fun upsertLatest(candle: Candle, expectedSessionId: Long? = null): ChangeResult =
+        engine.apply(ChangeRequest.UpsertLatest(candle, expectedSessionId))
 
-    suspend fun prependHistory(candles: List<Candle>): ChangeResult =
-        engine.apply(ChangeRequest.PrependHistory(candles))
+    suspend fun appendBatch(candles: List<Candle>, expectedSessionId: Long? = null): ChangeResult =
+        engine.apply(ChangeRequest.AppendBatch(candles, expectedSessionId))
+
+    suspend fun prependHistory(candles: List<Candle>, expectedSessionId: Long? = null): ChangeResult =
+        engine.apply(ChangeRequest.PrependHistory(candles, expectedSessionId))
 
     /** 显式纠正已存在历史值（R-02 PatchHistory；指标后缀重算）。 */
     suspend fun patchHistory(patches: List<Candle>): ChangeResult =

@@ -466,19 +466,23 @@ class LKanvasChart private constructor(
         }
 
         override fun applyBackward(key: MarketKey, data: List<Candle>): Boolean {
-            scope.launch { state.appendBatch(data) }
+            // T01：发起时会话快照随动作携带（引擎写入入口复核；A→B→A 旧动作失效）
+            scope.launch { state.appendBatch(data, engineSessionId()) }
             return true
         }
 
         override fun applyForward(key: MarketKey, data: List<Candle>): Boolean {
-            scope.launch { state.prependHistory(data) }
+            scope.launch { state.prependHistory(data, engineSessionId()) }
             return true
         }
 
         override fun applyUpdate(key: MarketKey, candle: Candle): Boolean {
-            scope.launch { state.upsertLatest(candle) }
+            scope.launch { state.upsertLatest(candle, engineSessionId()) }
             return true
         }
+
+        /** 引擎当前会话 id 快照（接受时点捕获，经状态透传到写入门禁）。 */
+        private fun engineSessionId(): Long = state.engineSessionId()
 
         override fun candleCount(): Int = state.dataSnapshot.candles.size
 

@@ -19,6 +19,10 @@ enum class DataOp { RESET, REPLACE_LATEST, UPSERT_LATEST, APPEND_BATCH, PREPEND_
 
 /** 拒绝原因（明确错误，不静默修正）。 */
 enum class RejectReason {
+
+    /** T01：写入时会话复核失败（发起时快照 ≠ 当前会话，旧回调数据丢弃） */
+    SESSION_MISMATCH,
+
     /** candle/批次校验失败，详见 issues */
     VALIDATION_FAILED,
 

@@ -169,7 +169,8 @@ class Store(private val host: Host) {
                 callback = { data, more ->
                     if (gen != generation) return@GetBarsParams // 旧代次回调丢弃
                     loading = false
-                    addData(data, type, more, requestKey)
+                    // T01：携带请求代次——addData 锁内复核（检查与写入原子）
+                    addData(data, type, more, requestKey, gen, subGen)
                     if (type == DataLoader.DataLoadType.INIT) {
                         l.subscribeBar(
                             DataLoader.SubscribeBarParams(s, p) { candle ->
@@ -192,7 +193,16 @@ class Store(private val host: Host) {
         type: DataLoader.DataLoadType,
         more: DataLoader.DataLoadMore?,
         requestKey: MarketKey? = null,
+        requestGen: Long = generation,
+        requestSubGen: Long = subscriptionGeneration,
     ) = synchronized(lock) {
+        // T01（第三轮复审 2026-10-30）：**锁内复核**——回调入口的代次检查与
+        // 真正写入之间隔锁等待/切换（TOCTOU）；请求捕获的代次在临界区内与
+        // 当前代次比对，过期即整体丢弃（INIT/实时更新一视同仁）
+        if (requestGen != generation) return@synchronized
+        if (type == DataLoader.DataLoadType.UPDATE && requestSubGen != subscriptionGeneration) {
+            return@synchronized
+        }
         // R02：key 在接受检查的同一锁临界区内确定——排队中的切换在本块
         // 之后才能改 symbol，应用动作使用检查点绑定的会话 key
         val key = requestKey ?: MarketKey(symbol?.ticker ?: "UNKNOWN", period?.toString() ?: "UNKNOWN")
@@ -238,9 +248,23 @@ class Store(private val host: Host) {
 
     /** 上游 `_addData` 单根分支：大于末根 push（末根右侧留白随动）、等于替换、小于忽略。 */
     fun addUpdate(candle: Candle, requestKey: MarketKey? = null): Boolean = synchronized(lock) {
+        // T01：锁内复核订阅会话代次（入口检查与写入之间的切换在临界区内失效）
+        if (subscriptionGeneration != currentSubscriptionGenFor(requestKey)) return@synchronized false
         val key = requestKey ?: MarketKey(symbol?.ticker ?: "UNKNOWN", period?.toString() ?: "UNKNOWN")
         host.applyUpdate(key, candle)
     }
+
+    /**
+     * T01 辅助：实时推送归属校验——推送属于当前订阅会话当且仅当其
+     * (symbol, period) 与当前上下文一致（订阅回调已按 subscriptionGeneration
+     * 首检，此处锁内二次校验会话上下文未被切换）。
+     */
+    private fun currentSubscriptionGenFor(requestKey: MarketKey?): Long =
+        if (requestKey != null && requestKey != MarketKey(symbol?.ticker ?: "", period?.toString() ?: "")) {
+            subscriptionGeneration + 1 // key 已切换：强制不匹配
+        } else {
+            subscriptionGeneration
+        }
 
     // ---------- 边界触发（上游 _adjustVisibleRange 末尾） ----------
 
