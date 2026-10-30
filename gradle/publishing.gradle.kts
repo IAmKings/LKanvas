@@ -19,7 +19,7 @@ configure<org.gradle.api.publish.PublishingExtension> {
             create<MavenPublication>("lkanvas") {
                 groupId = "io.lkanvas"
                 artifactId = "lkanvas-compose"
-                version = "0.8.0"
+                version = "0.9.0"
                 afterEvaluate {
                     from(components["release"])
                 }
@@ -29,7 +29,7 @@ configure<org.gradle.api.publish.PublishingExtension> {
             create<MavenPublication>("lkanvas") {
                 groupId = "io.lkanvas"
                 artifactId = "lkanvas-core"
-                version = "0.8.0"
+                version = "0.9.0"
                 from(components["java"])
                 pomConfig(this)
             }

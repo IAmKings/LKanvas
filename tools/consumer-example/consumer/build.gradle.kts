@@ -24,7 +24,7 @@ kotlin {
 
 dependencies {
     // 仅 Maven 制品（无 project 依赖）——A-46 关键约束
-    api("io.lkanvas:lkanvas-compose:0.8.0")
+    api("io.lkanvas:lkanvas-compose:0.9.0")
     implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")

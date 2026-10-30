@@ -212,6 +212,14 @@ B-02 帧统计经 dumpsys gfxinfo 手工按协议复采（20 次滑动 reset 后
 | 风险评估 | 本轮触碰帧循环路径的改动：T03 值域计算聚合多实例（与渲染原聚合同量级）、T06 主图/额外轴入口接管线（drawLines 批量保留）、T09 覆盖物排序方向（遍历成本不变）——预期无结构性劣化 |
 | 补测条件 | 同 §4.y；解锁后 `./gradlew :benchmark:connectedBenchmarkAndroidTest` 对照 0.6.0 基线（median 412.8ms / P50 23ms / P95 32ms） |
 
+## 4.w 0.9.0 发版回归（2026-10-30，豁免延续）
+
+| 项 | 状态 |
+|---|---|
+| 设备状态 | 冻结设备仍安全锁屏（同 §4.y/z）——B-01/B-02 实采豁免延续 |
+| 风险评估 | 本轮触碰帧循环：VOL/MACD 改经 drawInstanceFigures（drawLines 批量保留在管线内部；VOL 柱经 drawBarPlots 批量矩形，与原 drawVolumeBars 同量级）；值域计算统一走 paneVisibleRange（一次聚合，原 renderer 自扫同量级）——预期无结构性劣化 |
+| 补测条件 | 同 §4.y；解锁后 `./gradlew :benchmark:connectedBenchmarkAndroidTest` 对照 0.6.0 基线 |
+
 ## 5. 后续动作（T-34 输入）
 
 - B-02 首轮数据 vs 门槛差距分析 → 超标项进入 T-34 优化循环（视口裁剪、覆盖物批量绘制、指标线分帧）

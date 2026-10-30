@@ -431,3 +431,18 @@
 | R12 | check.py SLA 豁免/台账坏引用 | 07 | tools/alignment/check.py SLA/R 行纳入证据检查 + structure-map 校验接入 main + structure-map.md 台账修正；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt（check.py 引用校验守护样本） | 行为通过 |
 | R13 | 演练缺 before/after 证据 | 07 | docs/upstream-sync.md 演练 5；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt | 行为通过 |
 | R14 | arc 端点容差缺失 | 07 | lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt FigureHit Arc 端点容差；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt | 行为通过 |
+
+
+## 15. 第四轮复审追踪（structure-logic-audit-round4-2026-10-30.zh-CN.md Q01-Q09；0.9.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| Q01 | 会话身份未贯穿（ABA/首推/拒绝订阅） | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt dataEpoch 接受时点身份 + lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt 锁内 subGen 复核/拒绝不订阅；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity11SessionIdentityTest.kt | 行为通过 |
+| Q02 | 副轴坐标错接 + renderer 忽略绑定轴 + 回读丢字段 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt axisValueToY/At 相对坐标 + lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt 绑定轴消费；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity6AxisConvertTest.kt | 行为通过 |
+| Q03 | 共享值域未进渲染，BAR 两套范围 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawExtraPane/drawIndicatorPaneInstances 消费 paneVisibleRange；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| Q04 | 输入反算双加 top + 创建上下文 + 裁剪缺失 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt overlayPointFromPx + lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt CREATE 上下文 + lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt clipRect；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity5OverlayHooksTest.kt | 行为通过 |
+| Q05 | attrs 零消费 + VOL/MACD 旁路 | 09 | lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/Volume.kt + lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/MovingAverageConvergenceDivergence.kt styles 回调 + PaneRenderers.kt attrs 几何/全实例；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
+| Q06 | priceLine 格式近似（主图精度写死/无千分位） | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt pricePrecision + lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt formatPriceText；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/LKanvasChartTest.kt | 行为通过 |
+| Q07 | 动态 pane Layout 两份禁用状态/高度忽略 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt disabledExtraDrags 单一状态 + lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt setLayoutOptions 全 pane 路由；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity8ViewportEventsTest.kt | 行为通过 |
+| Q08 | arc 绘制与命中跨度不一致 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/FigureRenderer.kt sweep 顺时针归一；lkanvas-core/src/test/kotlin/io/lkanvas/core/figure/ArcEndpointDrillTest.kt 基线保持 | 行为通过 |
+| Q09 | fixedZLevel 选中后不可命中 | 09 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 命中第三段保留 fixedZLevel 候选；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity5OverlayHooksTest.kt | 行为通过 |
