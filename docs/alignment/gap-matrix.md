@@ -485,4 +485,11 @@
 |---|---|---|---|---|
 | R8-01 | 复用 ChartState 后旧拒绝水位拦住新门面合法更新 | 13 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt 会话提交身份移入 state（nextInitEpoch/currentInitEpoch/markInitRejected/isEpochRejected——与引擎同生命周期、跨门面连续）；lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt 门面侧改用 state 身份；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity19StateReuseIdentityTest.kt | 行为通过 |
 | R8-02 | LINE 几何段属当前行、样式却取后一行 | 13 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawLinePlots 默认段样式改取所属前行（与几何同归属，样式回调 row/value/candles 对应段所属行）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
-| R8-03 | 自定义 LINE 段缺下一点有效性门禁 | 13 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt 自定义段登记条件 = 当前行与下一点均有效且 i+1 在可见区（上游共同门禁）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+| R8-03 | 自定义 LINE 段缺下一点有效性门禁 | 13 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt 自定义段登记条件 = 当前行与下一点均有效（上游数据有效性共同门禁；R9-01 纠正本轮误加的可见区限制）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+
+## 20. 第九轮复审追踪（structure-logic-audit-round9-2026-10-31.zh-CN.md R9-01..R9-02；0.14.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| R9-01 | 用可见范围代替数据范围判断下一点（末可见行合法覆盖段丢失） | 14 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawLinePlots 下一点取完整结果列 result[i+1]（数据有效性门禁；末可见行默认段同步越窗延伸）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+| R9-02 | 默认段延迟到覆盖段之后提交（重合时覆盖顺序相反） | 14 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt 遇自定义段先 flush 此前默认批次再绘制（提交顺序=行登记顺序；flushGroups 后清组复位）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
