@@ -459,4 +459,76 @@ class Parity15FigureAttrsTest {
         // 默认批次 = row 0 样式与几何 (P0,P1)
         assertEquals(listOf(4f, 100f, 12f, 101f), batchPoints(fake), "默认批次对应 row 0 红色样式与几何")
     }
+
+    // ---------- R10-01（第十轮复审）：默认样式折返不重排提交顺序 ----------
+
+    @Test
+    fun `默认样式ABA折返保持行序提交（R10-01）`() {
+        // 审计复现：4 行 (4,100),(12,110),(20,100),(28,110)，段所属行 0/1/2
+        // 颜色红/蓝/红、线宽 6——上游三个连续批次顺序 [0,1,2]；修复前 segFor
+        // 全局复用最早红组 → 提交 [0,2,1]
+        val styleRows = mutableListOf<Int>()
+        val def = object : IndicatorDefinition {
+            override val name = "LINE_RETURN"
+            override val shortName = "LR"
+            override val calcParams = emptyList<Double>()
+            override val precision = 2
+            override val plots = listOf(
+                PlotDef("v", "V", PlotType.LINE, styles = { row: Int ->
+                    styleRows += row
+                    mapOf("color" to if (row == 1) "#0000FF" else "#FF0000", "lineWidth" to 6.0)
+                }),
+            )
+            override fun initScratch(params: List<Double>) = null
+            override fun stepScratch(prev: Any?, c: List<Candle>, p: List<Double>, i: Int) = null
+            override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) =
+                mapOf("v" to if (i % 2 == 0) 100.0 else 110.0)
+        }
+        val cs = candles(4).mapIndexed { idx, c ->
+            c.copy(close = if (idx % 2 == 0) 100.0 else 110.0)
+        }
+        val state = IndicatorEngine.recompute(def, emptyList(), cs)
+        val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
+        val fake = TestDrawScope(Size(600f, 600f))
+        with(fake) {
+            drawInstanceFigures(
+                inst, state, Viewport(), VisibleRange(0, cs.size - 1),
+                { v -> v }, ChartTheme(), 0, lastValueMark = false,
+                candles = cs, paneTop = 0f,
+            )
+        }
+        // 样式回调取值正确（[0,1,2]——与审计一致，差异在分组提交）
+        assertEquals(listOf(0, 1, 2), styleRows, "样式回调行序")
+        // 三个连续批次按行序提交（修复前 [0,2,1] 两批次）
+        val arrays = fake.drawContext.canvas.nativeCanvas.let { it as TestDrawScope.RecordingNative }.lineArrays
+        assertEquals(3, arrays.size, "红/蓝/红三个连续批次")
+        assertEquals(listOf(4f, 100f, 12f, 110f), arrays[0].toList(), "批次 1 = 行 0（红）")
+        assertEquals(listOf(12f, 110f, 20f, 100f), arrays[1].toList(), "批次 2 = 行 1（蓝）")
+        assertEquals(listOf(20f, 100f, 28f, 110f), arrays[2].toList(), "批次 3 = 行 2（红）")
+    }
+
+    @Test
+    fun `连续同样式默认段仍一次批量提交（R10-01基准）`() {
+        // 审计验收条件：连续 A→A→A 仍可一次批量提交（批量优化保留）
+        val def = object : IndicatorDefinition {
+            override val name = "LINE_UNIFORM"
+            override val shortName = "LU"
+            override val calcParams = emptyList<Double>()
+            override val precision = 2
+            override val plots = listOf(
+                PlotDef("v", "V", PlotType.LINE, styles = { _: Int -> mapOf("color" to "#FF0000", "lineWidth" to 6.0) }),
+            )
+            override fun initScratch(params: List<Double>) = null
+            override fun stepScratch(prev: Any?, c: List<Candle>, p: List<Double>, i: Int) = null
+            override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) = mapOf("v" to c[i].close)
+        }
+        val fake = drawLines(def, candlesCount = 4)
+        val arrays = fake.drawContext.canvas.nativeCanvas.let { it as TestDrawScope.RecordingNative }.lineArrays
+        assertEquals(1, arrays.size, "连续同样式一次提交")
+        assertEquals(
+            listOf(4f, 100f, 12f, 101f, 12f, 101f, 20f, 102f, 20f, 102f, 28f, 103f),
+            arrays[0].toList(),
+            "三段合并单批次",
+        )
+    }
 }

@@ -582,15 +582,23 @@ object PaneRenderers {
                 var arr = FloatArray(64)
                 var pos = 0
             }
-            val groups = LinkedHashMap<Seg, Unit>()
-            fun segFor(color: Color, width: Float): Seg =
-                groups.keys.firstOrNull { it.color == color && it.width == width } ?: Seg(color, width).also { groups[it] = Unit }
+            // R10-01（第十轮复审 2026-10-31）：批次容器为**有序 List**（身份语义），
+            // 只复用**最近的连续同样式批次**——上游 mergeLines 仅比较最后一项
+            //（IndicatorView.ts:232），A→B→A 时后一个 A 是新批次、行序保持
+            // [0,1,2]；修复前 Map 按值等价（data class equals）键控——全局查找
+            // 复用最早 A 组且新 A 组被合并回原键位（首现序提交 [0,2,1] 甚至丢段）
+            val groups = ArrayList<Seg>()
+            fun segFor(color: Color, width: Float): Seg {
+                val last = groups.lastOrNull()
+                if (last != null && last.color == color && last.width == width) return last
+                return Seg(color, width).also { groups += it }
+            }
             // R9-02（第九轮复审 2026-10-31）：**提交顺序 = 行登记顺序**——上游按行
             // 登记段后按原顺序合并绘制；自定义段（覆盖段）晚于其之前的默认段提交。
             // 修复前自定义段立即 drawPath、默认段积累到循环后统一 drawLines——
             // 重合时默认线反盖覆盖线（真实 View 对照确认）。
             fun flushGroups() {
-                for (seg in groups.keys) {
+                for (seg in groups) {
                     if (seg.pos >= 4) {
                         drawIntoCanvas { canvas ->
                             val p2 = android.graphics.Paint().apply {
