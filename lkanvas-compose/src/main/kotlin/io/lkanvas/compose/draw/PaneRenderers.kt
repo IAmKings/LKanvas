@@ -284,13 +284,17 @@ object PaneRenderers {
         val insts = state.getIndicators(io.lkanvas.compose.state.ChartState.IndicatorFilter(paneId = paneId))
             .filter { it.visible && it.state != null }
         if (insts.isEmpty()) return
+        // M02：与 drawExtraPane 同一选择入口——绑定副轴实例按其轴投影（修复前
+        // 固定 pane 忽略 yAxisId，全部实例共用普通线性 y）
         val (lo, hi) = state.paneVisibleRange(paneId) ?: return
-        val y: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
+        val defaultY: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             var paletteIdx = 0
             for (inst in insts) {
                 val res = inst.state ?: continue
+                val y = state.instanceBoundYOf(paneId, inst.yAxisId, range.first, range.last, top, bottom)
+                    ?: defaultY
                 val customDraw = inst.definition.draw
                 if (customDraw != null) {
                     customDraw(
@@ -306,7 +310,7 @@ object PaneRenderers {
                 paletteIdx += res.result.keys.size
             }
         }
-        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), y, contentRight)
+        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight)
     }
 
     /**
@@ -332,31 +336,20 @@ object PaneRenderers {
         val range = state.viewport.visibleRange(candles.size)
         if (range.count <= 0) return
 
-        // Q03（第四轮复审 2026-10-30）+ N02（第五轮复审 2026-10-31）：值域单一来源
-        // = paneVisibleRange；按实例 yAxisId 分组投影（修复前 firstOrNull 取第一条
-        // pane 匹配轴应用于整 pane——未绑定实例的 reverse 轴也翻转默认指标）
+        // Q03（第四轮复审 2026-10-30）+ N02/M02（第五/六轮复审 2026-10-31）：值域
+        // 单一来源 = paneVisibleRange；轴解析**移入实例循环**——每实例按 yAxisId
+        // 经 state.instanceBoundYOf 取专属投影（修复前 firstOrNull 在循环外，
+        // 多个有效绑定共用第一条轴；未绑定实例回退普通线性）
         val (lo, hi) = state.paneVisibleRange(paneId) ?: return
-        val boundAxis = state.extraYAxisMeta.entries.firstOrNull {
-            it.value.paneId == paneId && insts.any { inst -> inst.yAxisId == it.key }
-        }
-        val y: (Double) -> Double = if (boundAxis != null) {
-            val (aId, meta) = boundAxis
-            // N02：值域取该轴绑定实例的 extraAxisRange（与 axisValueToY 同式；
-            // 修复前用整 pane 聚合值域——叠加不同轴实例时转换/渲染错位）
-            val axisRange = state.extraAxisRange(aId, range.first, range.last) ?: (lo to hi)
-            val spec = state.effectiveExtraAxisSpec(aId)
-            val (rf, rt) = YAxisMath.realRange(spec, axisRange.first, axisRange.second)
-            val (ylo, yhi) = if (meta.reverse) rt to rf else rf to rt
-            { v -> LinearYAxis.valueToY(YAxisMath.valueToReal(spec, v), ylo, yhi, top.toDouble(), bottom.toDouble()) }
-        } else {
-            { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
-        }
+        val defaultY: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
 
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
             var paletteIdx = 0
             for (inst in insts) {
                 val res = inst.state ?: continue
+                val y = state.instanceBoundYOf(paneId, inst.yAxisId, range.first, range.last, top, bottom)
+                    ?: defaultY
                 val customDraw = inst.definition.draw
                 if (customDraw != null) {
                     customDraw(
@@ -374,7 +367,7 @@ object PaneRenderers {
                 paletteIdx += res.result.keys.size
             }
         }
-        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), y, contentRight)
+        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight)
     }
 
     // ---------- 内部 ----------

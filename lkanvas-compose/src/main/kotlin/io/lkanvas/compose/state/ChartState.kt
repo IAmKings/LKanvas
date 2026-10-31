@@ -400,6 +400,35 @@ class ChartState(
             ?: extraYAxisSpec[axisId]
             ?: io.lkanvas.core.axis.YAxisSpec.Normal
 
+    /**
+     * M02（第六轮复审 2026-10-31）：per-instance 轴投影**单一选择入口**——动态
+     * pane（drawExtraPane）与内置固定 pane（drawIndicatorPaneInstances）共用。
+     * 实例绑定副轴（[yAxisId] 对应轴存在且属于 [paneId]）时返回该轴专属 y 闭包
+     * （extraAxisRange 值域 + effectiveExtraAxisSpec 变换 + reverse 翻转，与
+     * [axisValueToY] 同式、绝对 y 坐标）；未绑定/"main"/轴不存在/轴不属于该 pane
+     * 返回 null（调用方回退 paneVisibleRange 线性投影）。修复前轴解析在实例循环
+     * 外 firstOrNull——多个有效绑定共用第一条轴、内置 pane 完全忽略绑定轴。
+     */
+    fun instanceBoundYOf(
+        paneId: String,
+        yAxisId: String,
+        from: Int,
+        to: Int,
+        paneTop: Float,
+        paneBottom: Float,
+    ): ((Double) -> Double)? {
+        if (yAxisId == "main") return null
+        val meta = extraYAxisMeta[yAxisId]?.takeIf { it.paneId == paneId } ?: return null
+        val (alo, ahi) = extraAxisRange(yAxisId, from, to) ?: return null
+        val spec = effectiveExtraAxisSpec(yAxisId)
+        val t = paneTop.toDouble()
+        val b = paneBottom.toDouble()
+        return { v ->
+            val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, v, alo, ahi, t, b)
+            if (meta.reverse) b - (y - t) else y
+        }
+    }
+
     /** 绑定轴 y 像素 → 数值（[axisValueToY] 的逆；convertFromPixel 用）。 */
     fun axisValueAt(axisId: String, y: Float): Double? {
         if (axisId == "main") return mainPaneValueAt(y)
