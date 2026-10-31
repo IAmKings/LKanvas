@@ -469,3 +469,12 @@
 | M04 | 控点在 clip/translate 外（局部坐标画进主图） | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt drawTemplate 控点块移入裁剪块内+绝对坐标；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity16ControlPointTest.kt | 行为通过 |
 | M05 | 范围入口不执行模板 minValue/maxValue | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt paneVisibleRange 收口合并 specifyMin/Max（上游 YAxis.ts:222-224）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity17RangeConstraintTest.kt | 行为通过 |
 | M06 | fixedZLevel 控点全局第一遍特权（低层控点抢占高层） | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 命中遍历改为单一 z 降序（每实例先控点后线身，跨实例 z 竞争）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity16ControlPointTest.kt | 行为通过 |
+
+## 18. 第七轮复审追踪（structure-logic-audit-round7-2026-10-31.zh-CN.md R7-01..R7-04；0.12.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| R7-01 | 失败 INIT 前已入队的实时推送串写旧会话 | 12 | lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt ChangeRequest.initEpoch 提交归属 + rejectedInitWatermark（Reset 最终拒绝抬升，同代次后续动作引擎处理时 SESSION_MISMATCH 拒绝）；lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt 宿主串行链路携带 epoch + 入口水位复核；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity18SessionSubmissionTest.kt | 行为通过 |
+| R7-02 | 绑定轴范围不执行模板 minValue/maxValue | 12 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt extraAxisRange 聚合绑定实例 specifyMin/Max 并收口合并；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity17RangeConstraintTest.kt | 行为通过 |
+| R7-03 | BAR 部分覆盖默认几何不一致（y 双平移/宽度居中错序） | 12 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawBarPlots 依赖序合成（宽度先行→缺省 x 按有效宽度居中；默认 y 绝对坐标不二次平移）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+| R7-04 | LINE 混合自定义/默认 coordinates 多出桥线 | 12 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawLinePlots 行段归属重构（默认段先落、自定义行独立段+缺省链断开）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
