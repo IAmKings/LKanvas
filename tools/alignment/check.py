@@ -104,11 +104,11 @@ def extract_iface_fields(path, iface):
 def parse_matrix():
     rows = []
     for i, line in enumerate(MATRIX.read_text().split('\n'), 1):
-        is_r_row = bool(re.match(r'^\| [RNQ]\d{2} ', line))
+        is_r_row = bool(re.match(r'^\| [RNQM]\d{2} ', line))
         if not is_r_row and not re.match(r'^\| [A-Z]{2,3}-\d{3}', line):
             continue
         cells = [c.strip() for c in line.split('|')]
-        if cells[1].startswith('SLA-') or re.fullmatch(r'[RNQ]\d{2}', cells[1]):
+        if cells[1].startswith('SLA-') or re.fullmatch(r'[RNQM]\d{2}', cells[1]):
             # SLA 行（§14 审计追踪表）为 5 列：ID | 发现 | 批次 | 备注 | 状态
             if len(cells) < 6:
                 err(f'矩阵:{i} SLA 行列数不足: {line[:60]}')
@@ -221,11 +221,11 @@ def main():
         if v > 1:
             err(f'ID 重复: {k}')
     for r in matrix:
-        if not (re.fullmatch(r'[A-Z]{2,3}-\d{3}(~\d{3})?', r['id']) or re.fullmatch(r'[RNQ]\d{2}', r['id'])):
+        if not (re.fullmatch(r'[A-Z]{2,3}-\d{3}(~\d{3})?', r['id']) or re.fullmatch(r'[RNQM]\d{2}', r['id'])):
             err(f"矩阵:{r['line']} ID 非法: {r['id']}")
         if '-' in r['id'] and r['id'].split('-')[0] not in PREFIXES:
             err(f"矩阵:{r['line']} ID 前缀非法: {r['id']}")
-        if r['id'].startswith('SLA-') or re.fullmatch(r'[RNQ]\d{2}', r['id']):
+        if r['id'].startswith('SLA-') or re.fullmatch(r'[RNQM]\d{2}', r['id']):
             continue
         if r['cls'] not in CLASSES:
             err(f"矩阵:{r['line']} 分类列非法（须单字母）: {r['cls']!r}")

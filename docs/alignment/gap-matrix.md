@@ -452,9 +452,20 @@
 | ID | 复审发现 | 批次 | 实现证据 | 状态 |
 |---|---|---|---|---|
 | N01 | INIT 被拒后新订阅推送写旧会话 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt applyInit Rejected 反馈（unsubscribeData）+ applyUpdate/Backward/Forward key 门禁；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity12CommitResultTest.kt | 行为通过 |
-
 | N02 | 副图按 pane 选第一条轴 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawExtraPane 绑定轴条件加 inst.yAxisId 匹配；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
 | N03 | 内置 pane 值域漏叠加实例 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt paneVisibleRange 全实例聚合；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
 | N04 | attrs 上下文/几何不完整 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt attrs pane 相对坐标+真实上下文；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt | 行为通过 |
 | N05 | 小数折叠/实例精度未消费 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt formatPriceText；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/LKanvasChartTest.kt | 行为通过 |
+| N06 | 控制点未裁剪（越界画进其他 pane） | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 控制点裁剪块（原修复坐标改局部值，在第六轮复审 M04 登记回归并由 Batch D 绝对坐标+裁剪块内收口）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity16ControlPointTest.kt | 行为通过 |
 | N07 | fixedZLevel 禁控制点编辑 | 10 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 命中第一段删 fixedZLevel 排除；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity5OverlayHooksTest.kt | 行为通过 |
+
+## 17. 第六轮复审追踪（structure-logic-audit-round6-2026-10-31.zh-CN.md M01-M06；0.11.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| M01 | INIT 失败清理无会话归属（退订较新会话） | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt applyInit myEpoch+myGen 双门归属复核（dataEpoch 单调不回退）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity13SessionOwnershipTest.kt | 行为通过 |
+| M02 | 轴分组仍在实例循环外（多绑定共用第一轴/内置 pane 忽略绑定轴） | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt instanceBoundYOf 单一选择入口 + PaneRenderers.kt drawExtraPane/drawIndicatorPaneInstances 实例循环内解析；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity14PerInstanceAxisTest.kt | 行为通过 |
+| M03 | BAR attrs 非上游含义（x 当中心/y/height 不消费）+ LINE coordinates 零消费 | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawBarPlots 四键合并（x=左边界）+ drawLinePlots coordinates 逐点覆盖；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+| M04 | 控点在 clip/translate 外（局部坐标画进主图） | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt drawTemplate 控点块移入裁剪块内+绝对坐标；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity16ControlPointTest.kt | 行为通过 |
+| M05 | 范围入口不执行模板 minValue/maxValue | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt paneVisibleRange 收口合并 specifyMin/Max（上游 YAxis.ts:222-224）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity17RangeConstraintTest.kt | 行为通过 |
+| M06 | fixedZLevel 控点全局第一遍特权（低层控点抢占高层） | 11 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt 命中遍历改为单一 z 降序（每实例先控点后线身，跨实例 z 竞争）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity16ControlPointTest.kt | 行为通过 |

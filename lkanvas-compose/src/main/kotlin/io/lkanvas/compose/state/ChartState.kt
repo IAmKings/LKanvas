@@ -518,6 +518,22 @@ class ChartState(
                 }
             }
         }
+        // M05（第六轮复审 2026-10-31）：范围收口处合并可见指标的模板
+        // minValue/maxValue 约束（上游 YAxis.ts:163-172 specifyMin/Max 随实例
+        // 聚合 + :222-224 `min=min(specifyMin,min)/max=max(specifyMax,max)`；
+        // 修复前 VOL minValue=0 恒值 100 范围仍 (99,101) 不含 0）——绘制与
+        // 转换共用本入口，约束随单一来源生效
+        var specifyMin = Double.NaN
+        var specifyMax = Double.NaN
+        for (inst in indicatorInstances) {
+            if (!inst.visible || inst.paneId != paneId) continue
+            inst.definition.minValue?.let { m -> if (specifyMin.isNaN() || m < specifyMin) specifyMin = m }
+            inst.definition.maxValue?.let { m -> if (specifyMax.isNaN() || m > specifyMax) specifyMax = m }
+        }
+        if (!lo.isNaN()) {
+            if (!specifyMin.isNaN() && specifyMin < lo) lo = specifyMin
+            if (!specifyMax.isNaN() && specifyMax > hi) hi = specifyMax
+        }
         if (lo.isNaN()) return null
         return if (lo == hi) lo - 1.0 to hi + 1.0 else lo to hi
     }
