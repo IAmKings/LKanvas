@@ -45,6 +45,31 @@ class ChartState(
 
     val viewport = Viewport()
 
+    /**
+     * R8-01（第八轮复审 2026-10-31）：**会话提交身份（state 生命周期）**——
+     * dataEpoch 与拒绝水位的持有者从门面移入 state（state 可经
+     * LKanvasChart.init(state) 复用重建门面；修复前身份计数随门面归零、
+     * 引擎拒绝水位随 state 存续——旧水位拦住新门面的合法更新）。
+     * 递增连续性保证：失败 INIT 抬升的水位只拦"该代次及更早"的动作，
+     * 新会话（含复用 state 后的新门面）代次必然更大。
+     */
+    private val initEpochCounter = java.util.concurrent.atomic.AtomicLong(0)
+    private val rejectedEpochWatermark = java.util.concurrent.atomic.AtomicLong(0)
+
+    /** 受理时点分配会话提交代次（Q01 语义：applyInit 锁内递增，单调不回退）。 */
+    fun nextInitEpoch(): Long = initEpochCounter.incrementAndGet()
+
+    /** 当前会话提交代次（动作捕获/执行复核用）。 */
+    fun currentInitEpoch(): Long = initEpochCounter.get()
+
+    /** R7-01/R8-01：INIT 最终建会话失败——抬升拒绝水位（取 max，单调）。 */
+    fun markInitRejected(epoch: Long) {
+        rejectedEpochWatermark.updateAndGet { prev -> maxOf(prev, epoch) }
+    }
+
+    /** R7-01/R8-01：该代次（含更早）是否已被失败 INIT 拒绝（执行时门禁）。 */
+    fun isEpochRejected(epoch: Long): Boolean = epoch <= rejectedEpochWatermark.get()
+
     val registry = IndicatorRegistry().apply {
         // 图表级扩展注册表（宿主按图注册；内置 27 模板统一走全局
         // IndicatorTemplates——上游 Store 创建查同一注册入口，SLA-004）

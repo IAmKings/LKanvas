@@ -464,34 +464,26 @@ class LKanvasChart private constructor(
      * _addData → _adjustVisibleRange 提交后链）。
      */
     /**
-     * Q01（第四轮复审 2026-10-30）：**接受时点会话身份**——dataEpoch 在
+     * Q01（第四轮复审 2026-10-30）：**接受时点会话身份**——initEpoch 在
      * applyInit 被 Store 锁内调用的瞬间递增（新会话建立点），其余动作在
      * 接受时捕获该值、在协程执行前复核。与读协程运行时引擎状态不同，
      * 这是发起请求时的不可变身份：ABA 旧动作（旧 epoch）被拒；INIT 后的
      * 合法首推（新 epoch，即使 Reset 协程尚未执行）被接纳。
      */
-    private val dataEpoch = java.util.concurrent.atomic.AtomicLong(0)
-
-    /**
-     * R7-01（第七轮复审 2026-10-31）：**拒绝水位**——INIT 最终建会话失败的
-     * 代次下界；该代次（含更早）的后续动作在协程**执行时**（引擎提交前）丢弃。
-     * 不回写 [dataEpoch]（M01 单调语义保持——审计明确"仅在 rejected continuation
-     * 再改一次全局 epoch 不能保证拦住已进入引擎队列的请求"）：B 失败 Reset 先入队、
-     * 已受理订阅的首推随后入队，Reset 拒绝时同步抬升水位，同一串行队列中排在其
-     * 后的 Update 据此被拒——失败会话的已入队推送不再串写旧会话快照。
-     */
-    private val lastRejectedEpoch = java.util.concurrent.atomic.AtomicLong(0)
+    // R7-01/R8-01：dataEpoch 与拒绝水位已移入 [ChartState]（state 可复用重建
+    // 门面——身份生成者与水位持有者必须同生命周期；门面私有计数在复用场景
+    // 从 0 重新开始，被 state 内存续的引擎旧水位误拒新门面合法更新）
 
     private fun storeHost() = object : Store.Host {
         override fun applyInit(key: MarketKey, data: List<Candle>): Boolean {
             // M01（第六轮复审 2026-10-31）：捕获**自身身份**——异步失败清理前
             // 复核仍属当前会话；代次单调不回退（修复前 decrementAndGet 改写
             // 全局代次 + 无归属 unsubscribeData 退订较新有效会话）。
-            // 归属复核双门：dataEpoch（无更新的 INIT 受理）+ store.generation
+            // 归属复核双门：initEpoch（无更新的 INIT 受理）+ store.generation
             // （无任何会话切换/退订）。仅 epoch 不够——审计复现中 C 的回调
             // 被代次门禁丢弃、epoch 未递增，而 setSymbol(C) 已推进 generation：
             // B 失败延续据此识别自身已非当前会话，不清理、不干扰 C 在途 INIT。
-            val myEpoch = dataEpoch.incrementAndGet()
+            val myEpoch = state.nextInitEpoch()
             val myGen = store.generationForProbe
             scope.launch {
                 val result = state.reset(key, data, myEpoch)
@@ -500,10 +492,10 @@ class LKanvasChart private constructor(
                     // R7-01：先抬升拒绝水位（同步于 Reset 拒绝点、先于同队列后续
                     // 动作执行）——本代次的已入队 Update/Backward/Forward 在其
                     // 协程执行时被拒，不再串写旧会话
-                    lastRejectedEpoch.updateAndGet { prev -> maxOf(prev, myEpoch) }
+                    state.markInitRejected(myEpoch)
                     // 归属复核：仅当本 INIT 仍是当前会话时才清理订阅
                     // （审计 M01 复现：B 失败延续不得退订较新 C 会话）
-                    if (dataEpoch.get() == myEpoch && store.generationForProbe == myGen) {
+                    if (state.currentInitEpoch() == myEpoch && store.generationForProbe == myGen) {
                         store.unsubscribeData()
                     }
                     return@launch
@@ -515,29 +507,29 @@ class LKanvasChart private constructor(
         }
 
         override fun applyBackward(key: MarketKey, data: List<Candle>): Boolean {
-            val epoch = dataEpoch.get() // 接受时点捕获
+            val epoch = state.currentInitEpoch() // 接受时点捕获（state 生命周期身份）
             scope.launch {
                 // R7-01：epoch 复核 + 拒绝水位（执行时判定——失败 INIT 已入队动作
                 // 在引擎提交前丢弃；合法 INIT 同步首推在 Reset 成功路径不受影响）
-                if (epoch != dataEpoch.get() || epoch <= lastRejectedEpoch.get()) return@launch
+                if (epoch != state.currentInitEpoch() || state.isEpochRejected(epoch)) return@launch
                 state.appendBatch(data, epoch)
             }
             return true
         }
 
         override fun applyForward(key: MarketKey, data: List<Candle>): Boolean {
-            val epoch = dataEpoch.get()
+            val epoch = state.currentInitEpoch()
             scope.launch {
-                if (epoch != dataEpoch.get() || epoch <= lastRejectedEpoch.get()) return@launch
+                if (epoch != state.currentInitEpoch() || state.isEpochRejected(epoch)) return@launch
                 state.prependHistory(data, epoch)
             }
             return true
         }
 
         override fun applyUpdate(key: MarketKey, candle: Candle): Boolean {
-            val epoch = dataEpoch.get()
+            val epoch = state.currentInitEpoch()
             scope.launch {
-                if (epoch != dataEpoch.get() || epoch <= lastRejectedEpoch.get()) return@launch
+                if (epoch != state.currentInitEpoch() || state.isEpochRejected(epoch)) return@launch
                 state.upsertLatest(candle, epoch)
             }
             return true
