@@ -474,18 +474,24 @@ class LKanvasChart private constructor(
 
     private fun storeHost() = object : Store.Host {
         override fun applyInit(key: MarketKey, data: List<Candle>): Boolean {
-            dataEpoch.incrementAndGet() // 接受时点（Store 锁内）：新会话建立
+            // M01（第六轮复审 2026-10-31）：捕获**自身身份**——异步失败清理前
+            // 复核仍属当前会话；代次单调不回退（修复前 decrementAndGet 改写
+            // 全局代次 + 无归属 unsubscribeData 退订较新有效会话）。
+            // 归属复核双门：dataEpoch（无更新的 INIT 受理）+ store.generation
+            // （无任何会话切换/退订）。仅 epoch 不够——审计复现中 C 的回调
+            // 被代次门禁丢弃、epoch 未递增，而 setSymbol(C) 已推进 generation：
+            // B 失败延续据此识别自身已非当前会话，不清理、不干扰 C 在途 INIT。
+            val myEpoch = dataEpoch.incrementAndGet()
+            val myGen = store.generationForProbe
             scope.launch {
                 val result = state.reset(key, data)
-                // N01（第五轮复审 2026-10-31）：真实提交结果反馈到订阅与会话身份——
-                // Rejected（如 OHLC 校验失败）时：①退订（递增 subscriptionGeneration，
-                // 受理时建立的订阅推送被代次门禁丢弃）；②**回滚 dataEpoch**——
-                // 排队中携带本世代 epoch 的推送在执行前失效（修复前 Reset 被拒后
-                // 旧内核接纳新会话推送）。Reset 成功时 epoch 保持，INIT 后合法首推
-                // 正常接纳（Q01-b 语义不回退）
+                // N01：真实提交结果反馈到订阅与会话身份
                 if (result is io.lkanvas.core.store.ChangeResult.Rejected) {
-                    dataEpoch.decrementAndGet()
-                    store.unsubscribeData()
+                    // 归属复核：仅当本 INIT 仍是当前会话时才清理订阅
+                    // （审计 M01 复现：B 失败延续不得退订较新 C 会话）
+                    if (dataEpoch.get() == myEpoch && store.generationForProbe == myGen) {
+                        store.unsubscribeData()
+                    }
                     return@launch
                 }
                 // init 重载后按上游 _addData init 分支重放右侧留白（应用完成后）
