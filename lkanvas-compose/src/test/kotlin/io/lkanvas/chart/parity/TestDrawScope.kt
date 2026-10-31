@@ -172,10 +172,14 @@ class TestDrawScope(override val size: Size) : DrawScope {
 
         override fun drawLines(pts: FloatArray, paint: android.graphics.Paint) {
             lineArrays += pts.copyOf()
+            s.ops += "drawLines"
         }
 
         override fun drawLines(pts: FloatArray, offset: Int, count: Int, paint: android.graphics.Paint) {
-            if (count > 0) lineArrays += pts.copyOfRange(offset, offset + count)
+            if (count > 0) {
+                lineArrays += pts.copyOfRange(offset, offset + count)
+                s.ops += "drawLines"
+            }
         }
 
         override fun save(): Int {

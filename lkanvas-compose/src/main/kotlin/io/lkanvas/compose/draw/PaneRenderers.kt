@@ -585,8 +585,27 @@ object PaneRenderers {
             val groups = LinkedHashMap<Seg, Unit>()
             fun segFor(color: Color, width: Float): Seg =
                 groups.keys.firstOrNull { it.color == color && it.width == width } ?: Seg(color, width).also { groups[it] = Unit }
-            val fastSeg = Seg(baseColor, lineSizePx)
-            groups[fastSeg] = Unit
+            // R9-02（第九轮复审 2026-10-31）：**提交顺序 = 行登记顺序**——上游按行
+            // 登记段后按原顺序合并绘制；自定义段（覆盖段）晚于其之前的默认段提交。
+            // 修复前自定义段立即 drawPath、默认段积累到循环后统一 drawLines——
+            // 重合时默认线反盖覆盖线（真实 View 对照确认）。
+            fun flushGroups() {
+                for (seg in groups.keys) {
+                    if (seg.pos >= 4) {
+                        drawIntoCanvas { canvas ->
+                            val p2 = android.graphics.Paint().apply {
+                                this.strokeWidth = seg.width
+                                this.color = seg.color.toArgb()
+                                this.style = android.graphics.Paint.Style.STROKE
+                                this.strokeCap = android.graphics.Paint.Cap.ROUND
+                                eff?.let { this.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 4f), 0f) }
+                            }
+                            canvas.nativeCanvas.drawLines(seg.arr, 0, seg.pos, p2)
+                        }
+                    }
+                }
+                groups.clear() // 已提交组复位——后续段入新组，不重复绘制
+            }
             var lastX = Float.NaN
             var lastY = Float.NaN
             var prevWasFinite = false
@@ -609,7 +628,7 @@ object PaneRenderers {
                         val (c0, w0) = styleOverrideOf(key, i - 1)
                         segFor(c0 ?: baseColor, w0 ?: lineSizePx)
                     } else {
-                        fastSeg
+                        segFor(baseColor, lineSizePx)
                     }
                     if (seg.pos + 4 > seg.arr.size) seg.arr = seg.arr.copyOf(seg.arr.size * 2)
                     seg.arr[seg.pos++] = lastX; seg.arr[seg.pos++] = lastY
@@ -618,11 +637,12 @@ object PaneRenderers {
                 // attrs.coordinates 行 = **独立段**（完全替换本行默认段）：按点列
                 // drawPath（pane 相对 +paneTop）；缺省链自 P_i 断开（prev=false）——
                 // 下一默认段从 P_{i+1} 重新起段，不用自定义终点接续（R7-04）。
-                // R8-03：段存在条件 = 当前行与**下一点均有效**且 i+1 在可见区
-                //（上游 isNumber(current) && isNumber(next) 共同门禁——coordinates
-                // 覆盖位于该条件之内；修复前仅过滤当前 NaN，缺失下一点仍画出
-                // 上游不登记的自定义段）
-                if (attrsOf != null && i < range.last && !column[i + 1].isNaN()) {
+                // R8-03+R9-01（第九轮复审 2026-10-31）：段存在条件 = 当前行与
+                // **下一点均有效**，下一点取**完整结果列** result[i+1]（上游
+                // IndicatorView.ts:116 nextData=result[dataIndex+1]，只检查数据
+                // 有效性——修复前误加 i<range.last 可见区条件：末个可见行的
+                // 合法覆盖段在滚动/缩窗时消失）
+                if (attrsOf != null && i + 1 < column.size && !column[i + 1].isNaN()) {
                     val coords = ((attrsOf(key, i, v) ?: emptyMap<Any?, Any>())["coordinates"] as? List<*>)
                         ?.mapNotNull { p ->
                             (p as? Map<*, *>)?.let { m ->
@@ -632,6 +652,8 @@ object PaneRenderers {
                             }
                         }
                     if (!coords.isNullOrEmpty()) {
+                        // R9-02：先提交此前积累的默认批次（行序），再绘制覆盖段
+                        flushGroups()
                         val path = androidx.compose.ui.graphics.Path()
                         coords.forEachIndexed { pi, pt ->
                             if (pi == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
@@ -652,21 +674,25 @@ object PaneRenderers {
                 lastY = yy
                 prevWasFinite = true
             }
-            // T-34：native drawLines 按样式组批量提交（无回调时恰为单组=原快速路径）
-            for (seg in groups.keys) {
-                if (seg.pos >= 4) {
-                    drawIntoCanvas { canvas ->
-                        val p2 = android.graphics.Paint().apply {
-                            this.strokeWidth = seg.width
-                            this.color = seg.color.toArgb()
-                            this.style = android.graphics.Paint.Style.STROKE
-                            this.strokeCap = android.graphics.Paint.Cap.ROUND
-                            eff?.let { this.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 4f), 0f) }
-                        }
-                        canvas.nativeCanvas.drawLines(seg.arr, 0, seg.pos, p2)
-                    }
+            // R9-01：末个可见行自己的段（P_last, P_last+1）——下一点取完整结果列，
+            // 越过绘制窗口仍登记（上游每可见行登记 segment_k=(P_k,P_{k+1})，无
+            // "下一行也在可见列表"要求）；prev=false（末行被自定义替换）或数据
+            // 末端/NaN 不登记。lastX/lastY 保持末个可见点（lastValueMark 语义）
+            if (prevWasFinite && range.last + 1 < column.size && !column[range.last + 1].isNaN()) {
+                val xNext = x0 + barSpacing * (range.last + 1)
+                val yNext = y(column[range.last + 1]).toFloat()
+                val seg = if (styleOverrideOf != null) {
+                    val (c0, w0) = styleOverrideOf(key, range.last)
+                    segFor(c0 ?: baseColor, w0 ?: lineSizePx)
+                } else {
+                    segFor(baseColor, lineSizePx)
                 }
+                if (seg.pos + 4 > seg.arr.size) seg.arr = seg.arr.copyOf(seg.arr.size * 2)
+                seg.arr[seg.pos++] = lastX; seg.arr[seg.pos++] = lastY
+                seg.arr[seg.pos++] = xNext; seg.arr[seg.pos++] = yNext
             }
+            // T-34：native drawLines 按样式组批量提交（无回调时恰为单组=原快速路径）
+            flushGroups()
             // Styles indicator.lastValueMark.show：线末端值点
             if (lastValueMark && !lastX.isNaN()) {
                 val (c0, w0) = if (styleOverrideOf != null) styleOverrideOf(key, range.last) else null to null

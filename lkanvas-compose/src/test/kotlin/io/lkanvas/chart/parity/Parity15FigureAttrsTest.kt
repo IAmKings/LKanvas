@@ -355,4 +355,108 @@ class Parity15FigureAttrsTest {
         // 默认段 row 0 (P0,P1) + row 3 (P3,P4)
         assertEquals(listOf(4f, 100f, 12f, 101f, 28f, 103f, 36f, 104f), pts, "默认段 [0,3] 独立登记")
     }
+
+    // ---------- R9-01（第九轮复审）：下一点取完整结果列，非可见区 ----------
+
+    @Test
+    fun `末可见行自定义段在下一点越窗时保留（R9-01）`() {
+        // 审计复现：完整行值 [100,101,102]，仅遍历行 [0,1]；row 1 返回覆盖段——
+        // 下一点 row 2（值 102）在完整结果列有效 → 覆盖段登记（修复前 i<range.last
+        // 可见区误限：attrs 只求值 row 0、drawPath=0）
+        val def = lineTemplatePerRow { row ->
+            if (row == 1) mapOf("coordinates" to listOf(mapOf("x" to 4.0, "y" to 20.0), mapOf("x" to 12.0, "y" to 30.0)))
+            else null
+        }
+        val cs = candles(3)
+        val state = IndicatorEngine.recompute(def, emptyList(), cs)
+        val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
+
+        fun draw(last: Int): TestDrawScope {
+            val fake = TestDrawScope(Size(600f, 600f))
+            with(fake) {
+                drawInstanceFigures(
+                    inst, state, Viewport(), VisibleRange(0, last),
+                    { v -> v }, ChartTheme(), 0, lastValueMark = false,
+                    candles = cs, paneTop = 0f,
+                )
+            }
+            return fake
+        }
+        val narrow = draw(1)
+        assertEquals(1, narrow.ops.count { it == "path" }, "末可见行覆盖段保留（R9-01 复现收口）")
+        assertEquals(1, narrow.ops.count { it == "drawLines" }, "默认段 P0→P1 一次提交")
+        assertEquals(listOf(4f, 100f, 12f, 101f), batchPoints(narrow), "默认段 [P0,P1]")
+        // 对照：遍历范围扩大到 [0,2] → 相同两项 figure
+        val wide = draw(2)
+        assertEquals(1, wide.ops.count { it == "path" }, "扩窗后仍 1 覆盖段")
+        assertEquals(listOf(4f, 100f, 12f, 101f), batchPoints(wide), "扩窗后默认段相同")
+    }
+
+    @Test
+    fun `末可见行默认段延伸到窗外有效下一点（R9-01）`() {
+        // 上游 segment_k=(P_k,P_{k+1}) 对每可见行登记——末可见行默认段同样
+        // 延伸到完整结果列的窗外下一点（数据末端/NaN 不登记）
+        val def = lineTemplate(null)
+        val cs = candles(3)
+        val state = IndicatorEngine.recompute(def, emptyList(), cs)
+        val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
+        val fake = TestDrawScope(Size(600f, 600f))
+        with(fake) {
+            drawInstanceFigures(
+                inst, state, Viewport(), VisibleRange(0, 1),
+                { v -> v }, ChartTheme(), 0, lastValueMark = false,
+                candles = cs, paneTop = 0f,
+            )
+        }
+        // 段 (P0,P1) + 末可见行段 (P1,P2)（P2 在窗外但数据有效）
+        assertEquals(listOf(4f, 100f, 12f, 101f, 12f, 101f, 20f, 102f), batchPoints(fake),
+            "末可见行默认段延伸到窗外下一点（与全量遍历同段集）")
+        // 真正数据末端：全量遍历 (0,2) → range.last+1 越界 → 不延伸（同段集）
+        val fake2 = TestDrawScope(Size(600f, 600f))
+        with(fake2) {
+            drawInstanceFigures(
+                inst, state, Viewport(), VisibleRange(0, 2),
+                { v -> v }, ChartTheme(), 0, lastValueMark = false,
+                candles = cs, paneTop = 0f,
+            )
+        }
+        assertEquals(batchPoints(fake), batchPoints(fake2), "窗口内外段集一致（数据末端不延伸）")
+    }
+
+    // ---------- R9-02（第九轮复审）：默认批次先于覆盖段提交 ----------
+
+    @Test
+    fun `重合段默认先提交覆盖后提交（R9-02）`() {
+        // 审计复现：3 行 (4,100),(12,101),(20,102)；row 0 默认段红色宽 6，
+        // row 1 coordinates 与 (P0,P1) 完全重合、蓝色宽 6——上游先提交红色默认
+        // figure 再提交蓝色覆盖 figure（修复后顺序一致；修复前覆盖路径先画、
+        // 默认批次循环后统一提交——反盖）
+        val def = object : IndicatorDefinition {
+            override val name = "LINE_OVERLAP"
+            override val shortName = "LO"
+            override val calcParams = emptyList<Double>()
+            override val precision = 2
+            override val plots = listOf(
+                PlotDef(
+                    "v", "V", PlotType.LINE,
+                    styles = { row: Int ->
+                        mapOf("color" to if (row == 0) "#FF0000" else "#0000FF", "lineWidth" to 6.0)
+                    },
+                    attrs = { row: Int ->
+                        if (row == 1) mapOf("coordinates" to listOf(mapOf("x" to 4.0, "y" to 100.0), mapOf("x" to 12.0, "y" to 101.0)))
+                        else null
+                    },
+                ),
+            )
+            override fun initScratch(params: List<Double>) = null
+            override fun stepScratch(prev: Any?, c: List<Candle>, p: List<Double>, i: Int) = null
+            override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) = mapOf("v" to c[i].close)
+        }
+        val fake = drawLines(def)
+        // 提交顺序：默认批次（drawLines）先于覆盖段（path）
+        val seq = fake.ops.filter { it == "drawLines" || it == "path" }
+        assertEquals(listOf("drawLines", "path"), seq, "默认批次先提交、覆盖段后提交（R9-02 复现收口）")
+        // 默认批次 = row 0 样式与几何 (P0,P1)
+        assertEquals(listOf(4f, 100f, 12f, 101f), batchPoints(fake), "默认批次对应 row 0 红色样式与几何")
+    }
 }
