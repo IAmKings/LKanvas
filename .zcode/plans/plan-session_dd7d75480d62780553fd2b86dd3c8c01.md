@@ -1,100 +1,49 @@
-# 0.11.0「第六轮复审收口」实施计划（M01-M06 全项 + 台账修复）
+# 0.15.0 验收收尾轮实施计划（K60U 真机 + 发布路径验证）
 
 ## Context
 
-第六方审计 `structure-logic-audit-round6-2026-10-31.zh-CN.md` 对 0.10.0（`f0b8dc0`）提出 6 项发现（M01-M06：4×P1、2×P2），55 项探针中 8 项复现差异。规划前经 2 个核查代理逐项验证：**六项全部成立**，另确认台账缺 N06 行 + 两处注释与实现不符。审计确认 0.10.0 的 N01-N07 成果真实（原 ABA/首推/非法 INIT 单例/坐标/格式/arc 全部保留，不回退）；本轮核心主题仍是「同一规则多处保存」——轴选择在实例循环外、控制点在裁剪块外且拥有全局第一遍特权、失败清理无归属。三项设计决策采用推荐方案：M01 单调代次+归属复核、M03 BAR 四键+LINE coordinates、M06 单一 z 序遍历。版本 0.11.0。
+第十一轮审计宣布**源码审计阶段收口**（零新增发现，历轮条目 16→…→0），建议冻结 `78a281b`（0.15.0）为已审计基线，剩余为验证证据缺口：设备绘制/触摸、TalkBack、Macrobenchmark（B-01/B-02 自 0.7.0 起连续豁免，最近实采 0.6.0）、R8/发布路径。K60U 真机（小米 23078PND5G，serial 6D8H6TXSDYXC85PZ，corot——即台账冻结设备）现已连接，本轮执行验收收尾。
 
-## 一、问题总账（已验证）
+**范围口径**：性能实采只补 B-01/B-02（既有豁免项；B-03~B-05 已有 JVM 数据、B-06 长测另行安排）；验证方式为我经 adb/UiAutomator 驱动真机 + screencap 留证；**全绿则冻结 0.15.0 不发新版本**（证据回填台账），发现具体问题才返修发 0.16.0。
 
-| # | 问题（验证结论） | 修复方向 |
-|---|---|---|
-| M01 | applyInit Rejected 分支 `decrementAndGet` 改写全局代次 + 无归属 `unsubscribeData` 退订较新 C 会话 | 捕获 `myEpoch`；Rejected 分支先复核仍属当前会话再清理；代次单调不回退 |
-| M02 | drawExtraPane 的 boundAxis 在实例循环外 firstOrNull、y 单一函数传全部实例；drawIndicatorPaneInstances 不读绑定轴 | 轴解析移入实例循环，每实例按 yAxisId 构建专属 y（未绑定回退普通线性） |
-| M03 | BAR attrs：x 被当中心（上游=左边界）、y/height 不消费；LINE attrs 零消费（structure-map 登记理由不成立） | BAR 按类型合并 attrs（默认几何+attrs 覆盖，x=左边界、消费 y/height）；drawLinePlots 支持 coordinates 覆盖（有 attrs 逐点、无 attrs 批量快路径） |
-| M04 | 控制点在 clipRect/translate 块外（0243715 只改坐标为局部、块未移入）→ 副图控点画进主图 | 控制点块移入 clipRect 内、改回绝对坐标（最小修复） |
-| M05 | paneVisibleRange 不消费模板 minValue/maxValue（VOL minValue=0 恒值 100 得 (99,101) 不含 0） | 范围收口处合并可见指标的 min/max 约束（上游 YAxis.ts:163-172/222-224 语义） |
-| M06 | hitTest 控制点第一遍全局特权——低层固定控点抢占被高层遮住的位置 | 控制点并入单一 z 降序遍历（每实例先控点后线身，随实例 z 竞争） |
-| 台账 | gap-matrix 缺 N06 行 + 455 行空行截断表格 | 补 N06 行（注明 M04 回归）+ 修格式 |
+**既有基建（全部复用，不新造）**：`:benchmark` 模块 3 个基准类（StartupBenchmark=B-01、B02GfxInfoBenchmark=B-02 等价口径含「计量不可得即失败」护栏、B02StressBenchmark 按 MIUI 限制保持 @Ignore）；`:app-sample` 可安装 demo（stress_mode 注入、诊断面板、PNG 导出）；`docs/alignment/demo-checklist.md` A-G 验收清单（首轮已过 A1-A4/C1-C4/D1-D5/E1-E2/F1/G3-G4，**顺延项：B2-B4 真机、C5-C7、E3-E4、F2、G1-G2** 及历轮视觉复核）；发布链 = `./gradlew publish` + `tools/consumer-example` 编译（A-46）+ app-sample release R8。
 
-## 二、实施批次（每批收口：全量测试绿 + 提交）
+## 实施批次
 
-### Batch A：会话失败归属（M01，P1 最高优先）
+### Batch 0：设备预检
+- `adb devices` 确认 6D8H6TXSDYXC85PZ 在线；`adb shell input keyevent KEYCODE_WAKEUP` + `wm dismiss-keyguard`；确认屏幕解锁、SDK 34、存储充足。
+- **闸门**：若安全锁屏仍无法解除（历史问题）→ 停下请用户手动解锁，不继续。
 
-**A1** `LKanvasChart.applyInit`：`val myEpoch = dataEpoch.incrementAndGet()` 捕获自身身份；协程内 reset 结果 Rejected 时先复核 `dataEpoch.get() == myEpoch`（仍属当前会话）才执行 `store.unsubscribeData()` 清理；**删除 `decrementAndGet()`**（代次单调，用失效机制代替回滚——保 Q01-b 首推语义：myEpoch 匹配时 Reset 成功、后续推送正常）。
+### Batch 1：设备功能验收（demo-checklist 回填）
+1. `./gradlew :app-sample:assembleDebug` + `adb install -r`，启动 `io.lkanvas.sample`。
+2. 经 UiAutomator 驱动逐项走查 A-G 七组（重点顺延项）：
+   - A1-A4 数据加载/实时末根/追加/历史分页；B1-B4 指标创建/27 模板/移除/参数覆盖
+   - C1-C7 覆盖物（16 工具、segment 拖动/删除/锁定、斐波那契、brush）
+   - D1-D5 手势（平移/双指缩放/长按十字线/pane 分隔条/轴区缩放）
+   - E1-E4 主图类型/轴模式/Styles 树/明暗主题
+   - F1 PNG 导出（**图片编码集成**验证点）、F2 诊断开关
+   - G1-G2 TalkBack/替代动作（`uiautomator dump` 验证语义树 contentDescription + customActions；MIUI 无 TalkBack 服务时如实记录语义树证据）、G3 字体 2.0、G4 横屏
+3. 每个关键状态 `adb shell screencap` 留证至 `docs/evidence/0.15.0-device/`。
+4. 回填 `docs/alignment/demo-checklist.md` 新节「0.15.0 真机复核记录（验收收尾）」——逐项 ✅/❌/⬜，关闭历轮顺延。
 
-**A2** `Store.unsubscribeData` 增归属参数（可选 `expectedEpoch: Long? = null`——Host 传入；Store 内部记录 epoch 快照或仅依赖 Host 侧复核；最小修复只做 Host 侧门禁，Store 签名不动）。
+### Batch 2：B-01/B-02 性能实采（豁免补测）
+1. `./gradlew :benchmark:connectedBenchmarkAndroidTest`——跑 StartupBenchmark.coldStartup（B-01，StartupTimingMetric 5×COLD）+ B02GfxInfoBenchmark.stressScroll（B-02 等价口径：50k candle + 10 MA + 100 segment，20 次滑动 + gfxinfo 解析，含护栏）；B02StressBenchmark 维持 @Ignore（MIUI 14 vendor 计量限制，豁免理由不变）。
+2. 数据落 `benchmark/build/outputs/connected_android_test_additional_output/` + logcat `B02_GFXINFO` 双通道。
+3. 对照门槛（§2）：B-01 热进程首帧 P95 ≤500ms；B-02 超时帧 ≤5%；对照 0.6.0 基线（412.8ms / P50 23ms、P95 32ms）——**P95 劣化 >10% → 记入 T-34 循环并按审计口径判定是否返修**。
+4. 结果回填 `docs/performance-baseline.md` 新节（0.15.0 冻结基线实采，关闭自 0.7.0 起的豁免序列）。
 
-**A3 parity-13**：审计 M01 复现（A 就绪 → B 非法 INIT 提交 → 切 C 合法 INIT → 调度后 C 推送仍生效、unsubscribeBar 记录含归属不误退 C）；ABA/首推/单 B 失败既有 parity-11/12 基准保持。
+### Batch 3：发布路径验证
+1. R8：`./gradlew :app-sample:assembleRelease`（release 开 R8）→ 安装 release 包 → 冒烟启动 + 截图（README 发布链的「R8 release 真机验证」）。
+2. `./gradlew publish` 重发 0.15.0 制品 + `cd tools/consumer-example && ./gradlew :consumer:build`（A-46 制品编译验证）。
 
-### Batch B：per-instance 轴投影（M02，P1）
+### Batch 4：台账收口与冻结声明
+- `docs/compatibility.md` 新条目：0.15.0 验收收尾——冻结 `78a281b` 为已审计基线；设备/触摸/性能/发布证据登记；无代码修改。
+- 全部通过 → **不发新版本**；任何具体问题 → 修复批次 + 0.16.0（返修预案）。
 
-**B1** `drawExtraPane`：轴解析移入实例循环——每实例按 `inst.yAxisId` 查 `extraYAxisMeta`（且 paneId 匹配），有绑定轴则用 `extraAxisRange(inst.yAxisId,…)` + `effectiveExtraAxisSpec` + reverse 构建专属 y；未绑定（yAxisId="main" 或轴不存在/不属于该 pane）回退普通线性 + paneVisibleRange；删除循环外 firstOrNull 单 y。绑定轴值域改 `extraAxisRange(aId,…)`（与 axisValueToY 同式）。
+## 关键文件
+- 只读复用：`benchmark/src/main/kotlin/io/lkanvas/benchmark/*`、`app-sample/**`、`docs/alignment/demo-checklist.md`（回填）、`docs/performance-baseline.md`（回填）
+- 预期修改：`docs/alignment/demo-checklist.md`、`docs/performance-baseline.md`、`docs/compatibility.md`、新增 `docs/evidence/0.15.0-device/*.png`
+- **预期零源码修改**；发现问题时返修范围另定
 
-**B2** `drawIndicatorPaneInstances`（vol/macd 入口）同样 per-instance：有绑定轴实例用其 spec/reverse/范围投影。
-
-**B3** 网格/标签：主轴网格用未绑定实例的范围或 paneVisibleRange；绑定轴实例的轴标签列消费该轴（若主图模式已有则复用）。
-
-**B4 测试**：同 pane 双实例双轴（reverse+normal）各自投影正确（N02 复现）；内置 vol 绑定 reverse RSI 轴后投影正确；未绑定轴不影响默认实例。
-
-### Batch C：figure 几何契约（M03，P1）
-
-**C1 BAR attrs 合并**：`drawBarPlots` 改为「默认几何 + attrs 按类型覆盖」——先算默认 (x=candleCenterX-aw/2 左边界, y=min(vy,baseY), width=bodyWidth, height=|vy-baseY|)，再以 attrs 提供的键覆盖：`x`=左边界（不再减半宽）、`y`=顶边（+paneTop）、`width`、`height`（+paneTop 语义同 y）；无 attrs 走现有快路径不变。
-
-**C2 LINE attrs.coordinates**：`drawLinePlots` 增可选 attrs 几何参数——有 `coordinates` 时按点列绘制（逐点 lineTo 路径），无 attrs 维持 drawLines 批量快路径；structure-map LINE 行登记理由同步修订（批量渲染与几何覆盖不互斥）。
-
-**C3 注释纠偏**：PaneRenderers.kt:335-337（N02 注释）、:712-715（M03 注释）修正为与实现一致。
-
-**C4 测试**：{x:20,y:30,width:7,height:9} 零偏移绘制 [20,30,7,9]（M03 复现收口）；LINE coordinates 覆盖；无 attrs 批量快路径回归。
-
-### Batch D：控制点层级与裁剪（M04+M06，P1+P2）
-
-**D1 控制点移入裁剪块（M04）**：把控制点 if 块移入 clipRect 内（translate 外），坐标改回绝对 `Offset(it.x, it.y)`（clipRect 边界已是绝对值）——修复「局部坐标直接画到整图」的回归。
-
-**D2 单一 z 序命中（M06）**：hitTest 合并为单一 z 降序遍历——每实例先判控点（选中且非连续模板）再判线身；删除独立控制点第一遍。同实例内控点优先于线身（上游同层 point figure 后画先命中语义）；跨实例按 z 竞争（z=10 对象先于 z=0 控点命中）。
-
-**D3 注释修正**：PRD R-09「控制点全局优先」表述改为「同实例内控点优先于线身、跨实例按 z 序」。
-
-**D4 测试**：M04 复现（控点绘制坐标=命中坐标）；M06 复现（z=10 宽线覆盖 z=0 控点时命中高层）；单对象端点编辑保持（N07 基准）。
-
-### Batch E：范围约束与台账（M05 + 台账修复）
-
-**E1 minValue/maxValue（M05）**：`paneVisibleRange` 范围收口处（return 前）合并可见指标的 `definition.minValue/maxValue`（非 null 时 `lo = min(lo, minValue)`、`hi = max(hi, maxValue)`，对齐上游 YAxis.ts:222-224）——三分支统一在实例循环内取。
-
-**E2 台账修复**：gap-matrix §16 补 N06 行（注明 M04 回归已修）+ 删 455 行空行；新增 §17 M01-M06 追踪节。
-
-**E3 测试**：VOL minValue=0 恒值 100 → 范围含 0（M05 复现 a）；minValue=-50/maxValue=500 BAR → 范围 (-50,500)（M05 复现 b）。
-
-### Batch F：0.11.0 发版回归
-
-- check.py 解析扩展 `M\d{2}`（延续 R/Q/N 先例）；gap-matrix §17 M 行引用补全。
-- 全量测试（--no-build-cache）+ oracle + 双路径 + parity-4~13。
-- README/compatibility：0.11.0 条目 + 表述纠偏审计 §6 指出项。
-- 发布 0.11.0 制品 + consumer 重编；B-01/B-02 豁免延续（§4.u 口径；本轮渲染分组/attrs 改动风险评估登记）。
-- 版本切 0.11.0。
-
-## 三、关键文件
-
-- compose：`chart/LKanvasChart.kt`（A1 applyInit 归属复核）、`compose/state/ChartState.kt`（E1 范围约束）、`compose/draw/PaneRenderers.kt`（B1-B2 per-instance 轴、C1-C2 attrs 合并、C3 注释）、`compose/draw/OverlayRenderer.kt`（D1-D3 控点/层级）
-- 测试：`parity/Parity13SessionOwnershipTest.kt`（新）、Parity5/6 增强为主
-- 工具/文档：`tools/alignment/check.py`（M 前缀）、`gap-matrix.md`（§16 修 + §17）、`structure-map.md`（C2 LINE 行修订）、`README.md`、`compatibility.md`
-
-## 四、风险与对策
-
-- **D2 命中顺序变更可能破坏既有选中行为**：单对象端点编辑（N07 基准）与 Parity5 用例守护；审计确认上游即为 z 序竞争模型。
-- **C2 LINE coordinates 逐点绘制性能**：有 attrs 时才走逐点路径（无 attrs 批量快路径不变）——正常指标无 attrs 不受影响。
-- **B1 per-instance 分组**：轴解析从循环外移入循环内为 O(实例×轴) 查表（extraYAxisMeta 为 Map，O(1) 查询）——量级不变。
-- 顺序：A（正确性）→B（轴单一来源）→C（figure 契约）→D（控点层级）→E（约束+台账）→F（发版）。
-
-## 五、验收对照（审计 §7.2 五条）
-
-| 审计要求 | 落点 |
-|---|---|
-| 异步失败只清理发起会话，代次单调 | A1-A3 |
-| 轴选择与投影在实例/分组内，固定与动态 pane 复用 | B1-B2 |
-| 默认几何与 attrs 上游含义，控点裁剪/平移/层级与命中一致 | C1-C2 + D1-D2 |
-| 范围入口执行模板约束，真实消费者验证 | E1 |
-| 根因修复后独立复审 | F 发版回归 + N/M 台账 |
-
-## 验证
-
-每批：`./gradlew :lkanvas-core:test :lkanvas-compose:testDebugUnitTest`；收口：`--no-build-cache` 全量 + `python3 tools/alignment/check.py`（M 行纳入）+ publish/consumer 重编；设备解锁后补 connectedBenchmarkAndroidTest 与真机视觉项（台账登记为待办条件）。
+## 验证方式
+每批次产出即验证：Batch 1 清单逐项回填 + 截图证据；Batch 2 基准 JSON/gfxinfo 数据 vs 门槛表；Batch 3 R8 包真机启动 + consumer 编译绿；最终以 compatibility.md 冻结声明收口。全部命令真实执行并汇报原始结果（含失败），不预设通过。
