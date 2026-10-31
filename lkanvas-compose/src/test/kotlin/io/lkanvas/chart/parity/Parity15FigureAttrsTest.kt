@@ -52,15 +52,20 @@ class Parity15FigureAttrsTest {
         override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) = mapOf("v" to c[i].close)
     }
 
-    private fun drawFigures(def: IndicatorDefinition, paneTop: Float = 0f): TestDrawScope {
+    private fun drawFigures(
+        def: IndicatorDefinition,
+        paneTop: Float = 0f,
+        yOf: (Double) -> Double = { v -> v },
+        vp: Viewport = Viewport(),
+    ): TestDrawScope {
         val cs = candles()
         val state = IndicatorEngine.recompute(def, emptyList(), cs)
         val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
         val fake = TestDrawScope(Size(600f, 600f))
         with(fake) {
             drawInstanceFigures(
-                inst, state, Viewport(), VisibleRange(0, cs.size - 1),
-                { v -> v }, ChartTheme(), 0, lastValueMark = false,
+                inst, state, vp, VisibleRange(0, cs.size - 1),
+                yOf, ChartTheme(), 0, lastValueMark = false,
                 candles = cs, paneTop = paneTop,
             )
         }
@@ -119,6 +124,50 @@ class Parity15FigureAttrsTest {
         for (r in fake.rects) {
             assertEquals(5f, r.t, "top 键（pane 相对 +paneTop）")
             assertEquals(50f, r.b, "bottom 键")
+        }
+    }
+
+    // ---------- R7-03（第七轮复审）：部分覆盖的默认几何依赖序合成 ----------
+
+    @Test
+    fun `BAR heightOnly保持默认top不二次平移（R7-03）`() {
+        // 审计复现：pane top=481，值 100、范围 [0,100]——y(100)=481(顶)、y(0)=561?? 
+        // yOf 模拟 pane 映射：v → 481 + (100-v)?? 用恒定基线口径：yOf(v)=v+481，
+        // 值 100 → vy=581，base 0 → baseY=481，默认 top=min=481、height=100。
+        // attrs {height:9}：top 保持默认 481（修复前 481+481=962）、height=9
+        val fake = drawFigures(
+            barTemplate(mapOf("height" to 9.0)),
+            paneTop = 481f,
+            yOf = { v -> v + 481.0 },
+        )
+        assertEquals(3, fake.rects.size)
+        for (r in fake.rects) {
+            assertEquals(481f, r.t, "默认 top 保持绝对坐标（修复前 962）")
+            assertEquals(490f, r.b, "top+height=9")
+        }
+    }
+
+    @Test
+    fun `BAR widthOnly按有效宽度居中（R7-03）`() {
+        // 审计复现：默认槽宽 8、柱中心 x=4，attrs {width:10} → 左边界 = 4-10/2 = -1
+        // （修复前按旧 bodyWidth=6 计算 left=1，中心偏移 2px）
+        val vp = Viewport(barSpacing = 8.0)
+        val fake = drawFigures(barTemplate(mapOf("width" to 10.0)), vp = vp)
+        assertEquals(3, fake.rects.size)
+        assertEquals(-1f, fake.rects[0].l, "缺省左边界按有效宽度居中")
+        assertEquals(9f, fake.rects[0].r, "left+width")
+        // 宽度生效：10（非默认 bodyWidth=6）
+        assertEquals(10f, fake.rects[0].r - fake.rects[0].l)
+    }
+
+    @Test
+    fun `BAR完整四键非零paneTop只平移y一次（R7-03基准）`() {
+        val fake = drawFigures(barTemplate(mapOf("x" to 20.0, "y" to 30.0, "width" to 7.0, "height" to 9.0)), paneTop = 40f)
+        for (r in fake.rects) {
+            assertEquals(20f, r.l, "x 不受 paneTop 影响")
+            assertEquals(70f, r.t, "attrs.y + paneTop（一次）")
+            assertEquals(27f, r.r)
+            assertEquals(79f, r.b)
         }
     }
 

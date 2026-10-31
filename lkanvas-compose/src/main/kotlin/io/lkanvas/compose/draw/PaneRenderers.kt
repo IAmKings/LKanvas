@@ -736,19 +736,24 @@ object PaneRenderers {
                 if (v.isNaN()) continue
                 val vy = y(v).toFloat()
                 val geo = attrsGeo?.invoke(key, i, v, candles)
-                // M03（第六轮复审 2026-10-31）：默认几何与 attrs 按**上游含义**四键合并
-                //（上游 IndicatorView.ts:177-185——先算默认 {x: center-barWidth/2,
-                // y: min(valueY,baseY), width: barWidth, height}，再 attrs 展开覆盖；
-                // x=矩形**左边界**（修复前被当中心再减半宽）、y=顶边、height=柱高
-                //（修复前不消费）；pane 相对坐标 +paneTop 语义同 N04）
-                val ax = geo?.get("x")?.toFloat()
-                    ?: (vp.candleCenterX(i.toDouble()).toFloat() - bodyWidth / 2f)
+                // M03（第六轮复审 2026-10-31）+ R7-03（第七轮复审 2026-10-31）：默认
+                // 几何与 attrs 按**上游含义**依赖序合成（上游 IndicatorView.ts:177-185
+                // ——先算完整默认矩形再 attrs 展开覆盖；几何字段有依赖，非各自独立
+                // 覆盖即等价）：
+                // 1. 宽度先行——attrs.width ?? barWidth；缺省 x 按**有效宽度**居中
+                //   （修复前缺省 x 先按 bodyWidth 定死，width-only 覆盖时柱中心偏移）
+                // 2. y 坐标系分明——默认 y=min(vy,baseY) 已是绝对画布坐标（不再加
+                //   paneTop）；仅显式 attrs.y 为 pane 相对、平移一次（修复前分支内
+                //   无条件 +paneTop——height-only 覆盖把柱体移出 pane 顶 962>481）
+                // 3. x=矩形**左边界**、height=柱高（M03）；pane 相对坐标 +paneTop 语义同 N04
                 val aw = (geo?.get("width")?.toFloat() ?: bodyWidth).coerceAtLeast(1f)
+                val ax = geo?.get("x")?.toFloat()
+                    ?: (vp.candleCenterX(i.toDouble()).toFloat() - aw / 2f)
                 val top: Float
                 val hgt: Float
                 when {
                     geo != null && (geo.containsKey("y") || geo.containsKey("height")) -> {
-                        top = (geo.get("y")?.toFloat() ?: minOf(vy, baseY)) + paneTop
+                        top = geo.get("y")?.toFloat()?.plus(paneTop) ?: minOf(vy, baseY)
                         hgt = (geo.get("height")?.toFloat() ?: kotlin.math.abs(vy - baseY))
                             .coerceAtLeast(0.5f)
                     }
