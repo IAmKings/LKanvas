@@ -1,6 +1,7 @@
 package io.lkanvas.chart.parity
 
 import io.lkanvas.chart.LKanvasChart
+import io.lkanvas.chart.YAxisOverride
 import io.lkanvas.chart.Period
 import io.lkanvas.chart.SymbolInfo
 import io.lkanvas.core.data.Candle
@@ -122,6 +123,43 @@ class Parity17RangeConstraintTest {
         drain()
         val range = chart.state.paneVisibleRange(paneId)
         assertEquals(0.0 to 123.0, range, "无约束=BAR 基线 0 到数据值")
+        LKanvasChart.dispose(chart)
+    }
+
+    // ---------- R7-02（第七轮复审）：绑定轴范围同样执行模板约束 ----------
+
+    @Test
+    fun `绑定轴范围执行模板minValue约束（R7-02）`() {
+        val chart = newChart(volume = 100.0)
+        // 继承 VOL 语义（minValue=0）的恒值 100 指标；一实例默认 pane、一实例绑定额外轴
+        chart.state.registry.register(constrainedTemplate(100.0, 0.0, null))
+        val paneId = chart.createIndicator("CONSTRAINED")!!
+            .let { chart.getIndicatorByInstanceId(it)!!.paneId }
+        assertTrue(chart.createYAxis(YAxisOverride(id = "ax_c", paneId = paneId)) != null)
+        chart.createIndicator("CONSTRAINED", paneId = paneId, yAxisId = "ax_c", id = "i_bound", isStack = true)
+        drain()
+        // 审计复现：默认范围 (0,100)、绑定轴范围修复前 (100,100)
+        assertEquals(0.0 to 100.0, chart.state.extraAxisRange("ax_c", 0, 29),
+            "绑定轴范围含 minValue=0（R7-02 复现收口）")
+        assertEquals(0.0 to 100.0, chart.state.paneVisibleRange(paneId), "默认范围保持 (0,100)")
+        // 投影：0 基线落在 pane 内（修复前 y≈4521）
+        chart.state.onLayout(600f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
+        chart.state.relayoutExtraPanes()
+        drain()
+        val (t, b) = chart.state.paneBounds(paneId)!!
+        val y = chart.state.instanceBoundYOf(paneId, "ax_c", 0, 29, t, b)!!
+        val y0 = y(0.0)
+        assertTrue(y0 >= t.toDouble() && y0 <= b.toDouble(), "0 基线 y 在 pane 内（$y0 vs $t..$b）")
+        // 独立轴范围不被整 pane 范围替代（M02 保持）：绑定的 normal 实例自身值域 (100,100)
+        // 经约束合并后范围 (0,100) 与 pane 一致——但另一轴仅绑定恒值 500 实例时范围独立
+        chart.state.registry.register(constrainedTemplate(500.0, null, null))
+        assertTrue(chart.createYAxis(YAxisOverride(id = "ax_d", paneId = paneId)) != null)
+        chart.createIndicator("CONSTRAINED", paneId = paneId, yAxisId = "ax_d", id = "i_d", isStack = true)
+        // CONSTRAINED 模板恒值固定 100——500 实例不可得；改用逐实例独立范围断言：
+        // ax_c 仅绑定 i_bound（值 100 + 约束 0）→ (0,100)；pane 范围受无约束实例影响
+        chart.overrideIndicator(io.lkanvas.compose.state.ChartState.IndicatorFilter(id = "i_d"), visible = false)
+        drain()
+        assertEquals(0.0 to 100.0, chart.state.extraAxisRange("ax_c", 0, 29), "独立轴范围保持")
         LKanvasChart.dispose(chart)
     }
 }

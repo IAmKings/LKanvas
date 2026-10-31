@@ -913,8 +913,17 @@ class ChartState(
     fun extraAxisRange(axisId: String, from: Int, to: Int): Pair<Double, Double>? {
         var lo = Double.NaN
         var hi = Double.NaN
+        // R7-02（第七轮复审 2026-10-31）：绑定轴范围同样执行模板 minValue/maxValue
+        //（上游 YAxis.ts:163-172 按轴聚合 specifyMin/Max + :222-224 收口合并——
+        // 修复前仅 paneVisibleRange 有约束合并，绑定轴只扫结果列，继承 VOL
+        // minValue=0 的实例经绑定轴投影时 0 基线落在 pane 外）。不拿整 pane
+        // 范围替代独立轴范围（M02 逐实例投影保持）
+        var specifyMin = Double.NaN
+        var specifyMax = Double.NaN
         for (inst in indicatorInstances) {
             if (inst.yAxisId != axisId) continue
+            inst.definition.minValue?.let { m -> if (specifyMin.isNaN() || m < specifyMin) specifyMin = m }
+            inst.definition.maxValue?.let { m -> if (specifyMax.isNaN() || m > specifyMax) specifyMax = m }
             val res = inst.state ?: continue
             for (key in res.result.keys) {
                 val col = res.result[key] ?: continue
@@ -926,7 +935,10 @@ class ChartState(
                 }
             }
         }
-        return if (lo.isNaN()) null else lo to hi
+        if (lo.isNaN()) return null
+        if (!specifyMin.isNaN() && specifyMin < lo) lo = specifyMin
+        if (!specifyMax.isNaN() && specifyMax > hi) hi = specifyMax
+        return lo to hi
     }
 
     /** 生效时区（非法名回退系统时区；JVM getTimeZone 对无效 ID 返回 GMT，需显式校验）。 */
