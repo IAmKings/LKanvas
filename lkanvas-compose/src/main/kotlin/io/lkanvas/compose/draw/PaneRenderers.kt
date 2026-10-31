@@ -598,14 +598,15 @@ object PaneRenderers {
                 }
                 val x = x0 + barSpacing * i
                 val yy = y(v).toFloat()
-                // R7-04（第七轮复审 2026-10-31）：**行段归属**——默认段 (i-1,i) 属于
-                // row i-1 的几何定义，须先于本行的自定义判定落段（上游
-                // IndicatorView.ts:191-196：segment_k = attrs_k.coordinates ??
-                // (P_k,P_{k+1})，每行为独立 figure 段）
+                // R7-04（第七轮复审 2026-10-31）+ R8-02（第八轮复审 2026-10-31）：
+                // **行段归属统一**——默认段 (i-1,i) 属于 row i-1（上游
+                // IndicatorView.ts:191-196 segment_k = attrs_k.coordinates ??
+                // (P_k,P_{k+1})，同一次 eachFigures(dataIndex) 登记段与 styles——
+                // 几何与**行级样式同属前行**，修复前几何归前行、样式取后行）；
+                // 样式回调 row/value/candles 亦对应段所属行
                 if (prevWasFinite) {
-                    // 逐行求值样式：线段 (i-1, i) 的样式由后行决定
                     val seg = if (styleOverrideOf != null) {
-                        val (c0, w0) = styleOverrideOf(key, i)
+                        val (c0, w0) = styleOverrideOf(key, i - 1)
                         segFor(c0 ?: baseColor, w0 ?: lineSizePx)
                     } else {
                         fastSeg
@@ -616,10 +617,12 @@ object PaneRenderers {
                 }
                 // attrs.coordinates 行 = **独立段**（完全替换本行默认段）：按点列
                 // drawPath（pane 相对 +paneTop）；缺省链自 P_i 断开（prev=false）——
-                // 下一默认段从 P_{i+1} 重新起段，不用自定义终点接续（修复前把
-                // 自定义终点写回连续状态 → 伪桥线 (500,600)→(12,110)）。
-                // 无 coords 行维持批量 drawLines 快路径——批量渲染与几何覆盖不互斥
-                if (attrsOf != null) {
+                // 下一默认段从 P_{i+1} 重新起段，不用自定义终点接续（R7-04）。
+                // R8-03：段存在条件 = 当前行与**下一点均有效**且 i+1 在可见区
+                //（上游 isNumber(current) && isNumber(next) 共同门禁——coordinates
+                // 覆盖位于该条件之内；修复前仅过滤当前 NaN，缺失下一点仍画出
+                // 上游不登记的自定义段）
+                if (attrsOf != null && i < range.last && !column[i + 1].isNaN()) {
                     val coords = ((attrsOf(key, i, v) ?: emptyMap<Any?, Any>())["coordinates"] as? List<*>)
                         ?.mapNotNull { p ->
                             (p as? Map<*, *>)?.let { m ->

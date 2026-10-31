@@ -193,22 +193,21 @@ class Parity15FigureAttrsTest {
         )
         val fake = drawFigures(lineTemplate(mapOf("coordinates" to coords)))
         assertTrue("path" in fake.ops, "coordinates 行走 drawPath 点列（修复前零消费）")
-        assertEquals(3, fake.ops.count { it == "path" }, "3 行各一点列")
+        // R8-03：段存在=当前+下一点均有效——row 2 无下一点不登记
+        assertEquals(2, fake.ops.count { it == "path" }, "row 0/1 点列登记（row 2 末端无下一点不登记）")
     }
 
     @Test
     fun `LINE coordinates paneTop平移（N04同语义）`() {
         val coords = listOf(mapOf("x" to 0.0, "y" to 10.0), mapOf("x" to 20.0, "y" to 10.0))
         val def = lineTemplate(mapOf("coordinates" to coords))
-        val cs = candles(1)
+        val cs = candles(2)
         val state = IndicatorEngine.recompute(def, emptyList(), cs)
         val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
         val fake = TestDrawScope(Size(600f, 600f))
         with(fake) {
-            // 记录 translate 后的路径点：经 clips/ops 无法读 path 点——
-            // 用 drawLine 等价探针：无。直接验证 ops 出现 path（平移语义与 BAR 同源 +paneTop）
             drawInstanceFigures(
-                inst, state, Viewport(), VisibleRange(0, 0),
+                inst, state, Viewport(), VisibleRange(0, 1),
                 { v -> v }, ChartTheme(), 0, lastValueMark = false,
                 candles = cs, paneTop = 50f,
             )
@@ -291,8 +290,69 @@ class Parity15FigureAttrsTest {
                 candles = cs, paneTop = 0f,
             )
         }
-        assertEquals(1, fake.ops.count { it == "path" })
+        // R8-03：custom row 1 的下一点（row 2）NaN → 自定义段不登记
+        assertEquals(0, fake.ops.count { it == "path" }, "下一点缺失的自定义段不登记（R8-03）")
         val pts = batchPoints(fake)
         assertEquals(listOf(4f, 100f, 12f, 101f), pts, "NaN 断开后无跨断段")
+    }
+
+    // ---------- R8-02（第八轮复审）：行段样式归所属行 ----------
+
+    @Test
+    fun `LINE默认段样式取所属前行（R8-02）`() {
+        // 审计复现：3 行 (4,100),(12,101),(20,102)；row 0 线宽 2、row 1/2 线宽 4——
+        // 段 (P0,P1) 用 row 0 宽 2、(P1,P2) 用 row 1 宽 4（修复前取后行 [1,2] 合同组）
+        val styleRows = mutableListOf<Int>()
+        val def = object : IndicatorDefinition {
+            override val name = "LINE_STYLED"
+            override val shortName = "LS"
+            override val calcParams = emptyList<Double>()
+            override val precision = 2
+            override val plots = listOf(
+                PlotDef("v", "V", PlotType.LINE, styles = { row: Int ->
+                    styleRows += row
+                    mapOf("lineWidth" to if (row == 0) 2.0 else 4.0)
+                }),
+            )
+            override fun initScratch(params: List<Double>) = null
+            override fun stepScratch(prev: Any?, c: List<Candle>, p: List<Double>, i: Int) = null
+            override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) = mapOf("v" to c[i].close)
+        }
+        val fake = drawLines(def)
+        // 样式回调行号 = 段所属行 [0,1]（修复前 [1,2]）
+        assertEquals(listOf(0, 1), styleRows, "默认段样式取前行（R8-02 复现收口）")
+        // 两个宽度组 → 两次 native drawLines（修复前合同组一次提交）
+        val arrays = fake.drawContext.canvas.nativeCanvas.let { it as TestDrawScope.RecordingNative }.lineArrays
+        assertEquals(2, arrays.size, "两段不同样式分组提交")
+        assertEquals(listOf(4f, 100f, 12f, 101f), arrays[0].toList(), "段 (P0,P1) 用 row 0 宽 2")
+        assertEquals(listOf(12f, 101f, 20f, 102f), arrays[1].toList(), "段 (P1,P2) 用 row 1 宽 4")
+    }
+
+    // ---------- R8-03（第八轮复审）：自定义段下一点有效性门禁（审计复现） ----------
+
+    @Test
+    fun `LINE自定义段下一点缺失不登记（R8-03）`() {
+        // 审计复现：行值 [100,101,NaN,103,104]，仅 row 1 返回自定义点列——
+        // 上游登记行 [0,3] 默认段；row 1 下一点缺失，自定义段不登记
+        // （修复前多画 1 次 drawPath；正式测试曾把该差异固定）
+        val cs = candles(5).mapIndexed { idx, c -> if (idx == 2) c.copy(close = Double.NaN) else c }
+        val def = lineTemplatePerRow { row ->
+            if (row == 1) mapOf("coordinates" to listOf(mapOf("x" to 40.0, "y" to 10.0), mapOf("x" to 60.0, "y" to 20.0)))
+            else null
+        }
+        val state = IndicatorEngine.recompute(def, emptyList(), cs)
+        val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
+        val fake = TestDrawScope(Size(600f, 600f))
+        with(fake) {
+            drawInstanceFigures(
+                inst, state, Viewport(), VisibleRange(0, cs.size - 1),
+                { v -> v }, ChartTheme(), 0, lastValueMark = false,
+                candles = cs, paneTop = 0f,
+            )
+        }
+        assertEquals(0, fake.ops.count { it == "path" }, "下一点缺失的自定义段不登记（R8-03 复现收口）")
+        val pts = batchPoints(fake)
+        // 默认段 row 0 (P0,P1) + row 3 (P3,P4)
+        assertEquals(listOf(4f, 100f, 12f, 101f, 28f, 103f, 36f, 104f), pts, "默认段 [0,3] 独立登记")
     }
 }
