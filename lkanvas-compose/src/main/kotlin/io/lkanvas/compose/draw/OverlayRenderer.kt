@@ -96,53 +96,55 @@ object OverlayRenderer {
         ) ?: return
         // 产物为 pane 局部坐标：绘制一次性平移到 pane 绝对位置 + **pane 裁剪**
         //（Q04：越界图形不再干扰其他 pane；边界只在明确边界处理）
+        // M04（第六轮复审 2026-10-31）：控制点块在 **clipRect 内、translate 外**，
+        // 坐标用绝对值（与命中同坐标系；修复前块在裁剪外且坐标改成了
+        // it.y-paneTop 局部值——副图控点画到主图顶部）
         clipRect(left = 0f, top = paneTop, right = contentRight, bottom = paneTop + paneHeight.toFloat()) {
-        translate(left = 0f, top = paneTop) {
-            for ((figureType, attrs, styles) in figures) {
-                val figColor = parseFigureColor(styles["color"]) ?: color
-                val strokeWidth = styles["lineWidth"]?.toFloatOrNull() ?: lineWidth
-                when (figureType) {
-                    "FibLevel" -> {
-                        val value = attrs.getOrNull(0)?.getOrNull(1) ?: continue
-                        // pane 局部 y（paneValueToY 即相对值）
-                        val y = state.paneValueToY(paneId, value) ?: continue
-                        if (y < bounds.top || y > bounds.bottom) continue
-                        val seg = OverlayGeometry.horizontalLine(y, bounds).toOffset()
-                        drawLine(
-                            figColor, seg.first, seg.second,
-                            strokeWidth = if (creating) 1.5f else strokeWidth,
-                            pathEffect = dash?.let { PathEffect.dashPathEffect(it) },
-                        )
-                        val label = styles["label"] ?: ""
-                        drawText(
-                            text, label,
-                            Offset(seg.first.x + 4f, y.toFloat() - text.textHeight),
-                            theme.overlayText,
-                        )
-                    }
-                    else -> {
-                        // T07：rawValue 标记 → 渲染层按状态上下文格式化
-                        // （蜡烛 pane=品种精度；指标 pane=pane 内指标精度最大值——
-                        // 上游 priceLine.ts:25-33；修复前固定 2 位无分隔/折叠）
-                        val textStyles = if (styles.containsKey("rawValue")) {
-                            val raw = styles["rawValue"]?.toDoubleOrNull() ?: 0.0
-                            styles + mapOf("text" to formatPriceText(state, paneId, raw))
-                        } else {
-                            styles
+            translate(left = 0f, top = paneTop) {
+                for ((figureType, attrs, styles) in figures) {
+                    val figColor = parseFigureColor(styles["color"]) ?: color
+                    val strokeWidth = styles["lineWidth"]?.toFloatOrNull() ?: lineWidth
+                    when (figureType) {
+                        "FibLevel" -> {
+                            val value = attrs.getOrNull(0)?.getOrNull(1) ?: continue
+                            // pane 局部 y（paneValueToY 即相对值）
+                            val y = state.paneValueToY(paneId, value) ?: continue
+                            if (y < bounds.top || y > bounds.bottom) continue
+                            val seg = OverlayGeometry.horizontalLine(y, bounds).toOffset()
+                            drawLine(
+                                figColor, seg.first, seg.second,
+                                strokeWidth = if (creating) 1.5f else strokeWidth,
+                                pathEffect = dash?.let { PathEffect.dashPathEffect(it) },
+                            )
+                            val label = styles["label"] ?: ""
+                            drawText(
+                                text, label,
+                                Offset(seg.first.x + 4f, y.toFloat() - text.textHeight),
+                                theme.overlayText,
+                            )
                         }
-                        val fig = figureFromDescription(figureType, attrs, textStyles) ?: continue
-                        with(io.lkanvas.compose.draw.FigureRenderer) {
-                            drawFigure(fig, figColor, strokeWidth = strokeWidth)
+                        else -> {
+                            // T07：rawValue 标记 → 渲染层按状态上下文格式化
+                            // （蜡烛 pane=品种精度；指标 pane=pane 内指标精度最大值——
+                            // 上游 priceLine.ts:25-33；修复前固定 2 位无分隔/折叠）
+                            val textStyles = if (styles.containsKey("rawValue")) {
+                                val raw = styles["rawValue"]?.toDoubleOrNull() ?: 0.0
+                                styles + mapOf("text" to formatPriceText(state, paneId, raw))
+                            } else {
+                                styles
+                            }
+                            val fig = figureFromDescription(figureType, attrs, textStyles) ?: continue
+                            with(io.lkanvas.compose.draw.FigureRenderer) {
+                                drawFigure(fig, figColor, strokeWidth = strokeWidth)
+                            }
                         }
                     }
                 }
             }
-        }
-        }
-        // N06（第五轮复审 2026-10-31）：控制点绘制移入 pane 裁剪块内
-        //（pane 局部坐标；修复前在 clipRect 外用绝对坐标，越界控制点画进其他 pane）
-        if (template.continuous != true && (selected || creating)) {
-            px.forEach { drawControlPoint(Offset(it.x, it.y - paneTop), theme.overlayPoint) }
+            // N06：控制点绘制在 pane 裁剪块内（M04：绝对坐标——越界控制点被裁剪）
+            if (template.continuous != true && (selected || creating)) {
+                px.forEach { drawControlPoint(Offset(it.x, it.y), theme.overlayPoint) }
+            }
         }
     }
 
@@ -238,44 +240,38 @@ object OverlayRenderer {
 
     /**
      * 命中测试（R09/T09：绘制升序、命中降序（绘制的逆序）；模板产物消费）。
-     * 优先级：控制点 > 选中对象 > 其他对象（PRD R-09）。
+     * M06（第六轮复审 2026-10-31）：**单一 z 降序遍历**——每实例先判控点
+     * （选中且非连续模板）再判线身（同实例内控点优先于线身——上游 point
+     * figure 后画先命中语义）；跨实例按 z 竞争（z=10 宽线遮住 z=0 控点时
+     * 命中高层；上游 Eventful 子对象逆序分发 + fixedZLevel 保留声明层级）。
+     * 修复前控制点为独立第一遍全局特权——低层固定控点抢占被高层遮住的位置。
      */
     fun hitTest(state: ChartState, x: Float, y: Float, contentRight: Float, paneBottom: Float): OverlayHit? {
         val all = state.overlays.all().filter { it.visible && it.phase != OverlayPhase.CREATING }
         val selectedId = state.overlays.selectedId
         // T09：命中**降序**（高 z 优先选中——绘制的逆序；上游 hover 置顶语义）
         val ordered = all.sortedWith(compareByDescending { it.zIndex })
-        // 1) 控制点（仅选中实例；连续模板无控制点编辑；fixedZLevel 不随选中浮起）
         for (inst in ordered) {
-            // N07（第五轮复审 2026-10-31）：fixedZLevel 不再排除控制点候选
-            //（上游 Overlay.ts:153 该字段只约束层级浮起，不禁用控制点编辑；
-            // 修复前选中 fixedZLevel 对象后端点点击变整体拖动）
-            if (inst.id != selectedId || inst.locked) continue
-            if (io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName]?.continuous == true) continue
-            val paneId = inst.effectivePaneId
-            // N06：pane 边界预检（触点不在实例所属 pane 内则跳过控制点）
-            val pb = state.paneBounds(paneId)
-            if (pb != null && (y < pb.first || y > pb.second)) continue
-            inst.points.forEachIndexed { i, p ->
-                val px = state.overlayPointToPx(p, paneId) ?: return@forEachIndexed
-                if (hypot(px.x - x, px.y - y) <= POINT_HIT_RADIUS) return OverlayHit(inst.id, i, false)
+            // 控点：仅选中实例；连续模板无控制点编辑；锁定不可编辑
+            // N07：fixedZLevel 不排除控制点候选（上游 Overlay.ts:153 只约束层级浮起）
+            if (inst.id == selectedId && !inst.locked &&
+                io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName]?.continuous != true
+            ) {
+                val paneId = inst.effectivePaneId
+                // N06：pane 边界预检（触点不在实例所属 pane 内则跳过控制点）
+                val pb = state.paneBounds(paneId)
+                if (pb == null || (y >= pb.first && y <= pb.second)) {
+                    inst.points.forEachIndexed { i, p ->
+                        val px = state.overlayPointToPx(p, paneId) ?: return@forEachIndexed
+                        if (hypot(px.x - x, px.y - y) <= POINT_HIT_RADIUS) return OverlayHit(inst.id, i, false)
+                    }
+                }
             }
-        }
-        // 2) 选中对象的线身（fixedZLevel=true 层级固定：不享受选中优先，SLA-013）
-        for (inst in ordered) {
-            if (inst.id != selectedId || inst.fixedZLevel) continue
+            // 线身：Q09——fixedZLevel 的选中对象保留在普通 z 顺序候选中
+            //（上游语义=不临时浮起，不禁用命中/编辑）；选中对象 wholeDrag
+            val wholeDrag = inst.id == selectedId && !inst.locked
             if (hitBody(state, inst, x, y, contentRight, paneBottom)) {
-                return OverlayHit(inst.id, null, wholeDrag = !inst.locked)
-            }
-        }
-        // 3) 其他对象（层级从高到低；与绘制遍历同一排序）
-        // Q09（第四轮复审 2026-10-30）：fixedZLevel 的选中对象保留在普通 z 顺序
-        // 候选中（上游语义=不临时浮起，不禁用命中/编辑；修复前被本段跳过，
-        // 选中后同位置返回 null）
-        for (inst in ordered) {
-            if (inst.id == selectedId && !inst.fixedZLevel) continue
-            if (hitBody(state, inst, x, y, contentRight, paneBottom)) {
-                return OverlayHit(inst.id, null, wholeDrag = inst.id == selectedId && !inst.locked)
+                return OverlayHit(inst.id, null, wholeDrag = wholeDrag)
             }
         }
         return null

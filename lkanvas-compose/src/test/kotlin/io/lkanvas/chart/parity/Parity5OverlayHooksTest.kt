@@ -142,10 +142,10 @@ class Parity5OverlayHooksTest {
         LKanvasChart.dispose(chart)
     }
 
-    // ---------- SLA-013：fixedZLevel 命中优先级 ----------
+    // ---------- SLA-013/M06：命中层级与绘制一致（单一 z 序遍历） ----------
 
     @Test
-    fun `fixedZLevel实例不享受选中优先命中`() {
+    fun `fixedZLevel选中实例在z序内可编辑且被高层覆盖时命中高层（M06）`() {
         val chart = newChart()
         val lowId = chart.createOverlay(
             io.lkanvas.chart.OverlayCreate(
@@ -166,17 +166,19 @@ class Parity5OverlayHooksTest {
                 zLevel = 50,
             ),
         )!!
-        // 选中低 z 实例：两条线完全重合，命中点相同
+        // 选中低 z 实例：两条线完全重合——跨实例按 z 竞争（上游 Eventful
+        // 子对象逆序分发；修复前选中/控点全局第一遍特权）
         chart.state.overlays.select(lowId)
         val inst = chart.state.overlays.get(lowId)!!
         val px0 = chart.state.overlayPointToPx(inst.points[0])!!
-        // 未固定层级：选中实例享受优先命中
-        val hitSelected = io.lkanvas.compose.draw.OverlayRenderer.hitTest(chart.state, px0.x, px0.y, 800f, 400f)
-        assertEquals(lowId, hitSelected?.instanceId, "选中实例优先命中")
-        // N07（第五轮复审）：fixedZLevel 不禁控制点编辑——选中实例的控制点仍可命中
-        chart.overrideOverlay(lowId, io.lkanvas.chart.OverlayOverride(fixedZLevel = true))
+        val hitCovered = io.lkanvas.compose.draw.OverlayRenderer.hitTest(chart.state, px0.x, px0.y, 800f, 400f)
+        assertEquals(highId, hitCovered?.instanceId, "z=50 覆盖 z=0 控点时命中高层（M06 复现收口）")
+        // N07（第五轮复审）保持：高层对象**不覆盖**的端点——fixedZLevel 选中
+        // 实例的控制点在其 z 序内仍可编辑（上游 Overlay.ts:153 只约束浮起）
+        chart.overrideOverlay(highId, io.lkanvas.chart.OverlayOverride(visible = false))
         val hitFixed = io.lkanvas.compose.draw.OverlayRenderer.hitTest(chart.state, px0.x, px0.y, 800f, 400f)
-        assertEquals(lowId, hitFixed?.instanceId, "fixedZLevel 选中实例控制点仍可编辑（上游 Overlay.ts:153 只约束浮起）")
+        assertEquals(lowId, hitFixed?.instanceId, "无高层覆盖时 fixedZLevel 选中实例控制点可编辑（N07 基准）")
+        assertEquals(0, hitFixed?.pointIndex, "端点编辑命中 pointIndex")
         LKanvasChart.dispose(chart)
     }
 }

@@ -251,7 +251,7 @@ flowchart LR
 - 实现 circle、line、polygon、rect、text、arc、path 及其必要命中能力；path 定义为受控 Kotlin 路径指令，不要求嵌入 JS/SVG 运行环境。
 - 覆盖物具有稳定 ID、模板名/版本、pane/axis、控制点、样式、锁定/可见、层级、扩展数据。
 - 状态至少覆盖 Idle、Creating、Selected、Dragging、Completed、Cancelled/Removed；每次开始/完成/取消事件恰好一次。
-- 支持 normal/weak_magnet/strong_magnet；磁吸基准和作用范围按兼容清单约定。命中优先级统一：控制点、选中对象、其他对象、图表拖动；同级按层级和稳定次序处理。
+- 支持 normal/weak_magnet/strong_magnet；磁吸基准和作用范围按兼容清单约定。命中层级与绘制一致（单一 z 序遍历，第六轮复审 M06 口径）：同实例内控制点优先于线身、跨实例按层级竞争（z 序，上游 Eventful 逆序分发模型）；未命中任何对象回落图表拖动。
 - 绘图点用数据/时间锚点保存；补历史、缩放、旋转与 pane 改尺寸后仍锚定原数据。未来点采用显式逻辑锚点及参照，不持久化裸数组 index。
 - 锁定禁止编辑但允许检查/选择；删除必须由明确操作触发。单条异常绘图不破坏其他图形。
 - Alpha 完成 segment；Beta 完成全部 16 种。斐波那契在非线性轴上按价格计算层级再投影，避免标签数值与线位置不一致；与上游屏幕插值差异登记为 D-02。
