@@ -46,6 +46,7 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 - **0.12.0 第七轮复审收口**（R7-01..R7-04 全项，依据 `docs/alignment/structure-logic-audit-round7-2026-10-31.zh-CN.md` + gap-matrix §18）：R7-01 失败 INIT 已入队推送提交归属门禁（ChangeRequest.initEpoch + 引擎拒绝水位——失败会话动作在引擎处理时被拒，不再串写旧会话快照；合法 INIT 同步首推/旧失败不退订新 C/ABA 基准保持）；R7-02 绑定轴范围执行模板 minValue/maxValue；R7-03 BAR 部分覆盖依赖序合成（默认 y 绝对坐标不二次平移、缺省 x 按有效宽度居中）；R7-04 LINE 行段独立语义（自定义行完全替换本行段、缺省链断开——无伪桥线）
 - **0.13.0 第八轮复审收口**（R8-01..R8-03 全项，依据 `docs/alignment/structure-logic-audit-round8-2026-10-31.zh-CN.md` + gap-matrix §19）：R8-01 会话提交身份移入 state 生命周期（修复门面复用 state 重建后旧拒绝水位误拒新会话实时更新——身份生成者与水位持有者同生命周期、代次跨门面连续）；R8-02 LINE 默认段样式归所属前行（几何与样式同归属）；R8-03 自定义段下一点有效性门禁（上游共同门禁，缺失值不登记额外图形）
 - **0.14.0 第九轮复审收口**（R9-01..R9-02 全项，依据 `docs/alignment/structure-logic-audit-round9-2026-10-31.zh-CN.md` + gap-matrix §20）：R9-01 LINE 段下一点取完整结果列（数据有效性门禁；修复可见区误限导致末可见行合法覆盖段在滚动/缩窗时消失，末可见行默认段同步越窗延伸）；R9-02 默认批次先于覆盖段提交（提交顺序=行登记顺序，重合段不再反盖）
+- **0.15.0 第十轮复审收口**（R10-01 全项，依据 `docs/alignment/structure-logic-audit-round10-2026-10-31.zh-CN.md` + gap-matrix §21）：R10-01 LINE 默认段样式折返保持行序（segFor 仅复用最近连续同样式批次——上游 mergeLines 只比较最后一项；批次容器改有序 List 修复 data class 值等价键控的组合并丢段；连续同样式仍单批次提交）
 - **Tooltip 渲染完整版（0.3.0）**：showRule/showType/features 全消费（对齐上游 CandleTooltipView），feature 图标命中→三种 ActionType；样式面板全部开关联动
 - **回调消费端（0.3.0）**：覆盖物 onClick/onDoubleClick/onRightClick(长按)/onTouch 系手势分发、performEventPressedMove 委托、indicator draw 钩子（IndicatorDrawContext）、时区接线；setStylesStrict 修复切回默认值边界
 - **多轴渲染 Alpha（0.4.0）**：createYAxis/removeYAxis/overrideYAxis 渲染消费——绑定自定义轴的指标按独立值域绘制并获独立标签列（reverse 即时生效）
