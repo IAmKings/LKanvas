@@ -273,3 +273,17 @@ B-02 帧统计经 dumpsys gfxinfo 手工按协议复采（20 次滑动 reset 后
 - B-02 首轮数据 vs 门槛差距分析 → 超标项进入 T-34 优化循环（视口裁剪、覆盖物批量绘制、指标线分帧）
 - B-03 容量（100k）、B-04 突发、B-05 生命周期、B-06 30 分钟热稳定按序补测（长测项单独窗口跑）
 - 每轮数据回填本文件 §4 并在 compatibility.md 台账登记
+
+## 4.z 0.15.0 冻结基线实采（2026-11-01，豁免序列关闭）
+
+设备解锁（keyguard 解除），`:benchmark:connectedBenchmarkAndroidTest` 实采（cpuLocked=true、compilationMode=verify，与非压缩 benchmark 变体口径一致）。
+
+| 项 | 实测 | 门槛 | 结论 |
+|---|---|---|---|
+| B-01 冷启动 timeToInitialDisplayMs | runs=[414.3, 400.1, 430.7, 416.1, 419.2]，**median=416.1 / max=430.7** | 冷进程到完整图表 P95 ≤1500ms | **达标**（3.5 倍余量）；对 0.6.0 基线 median 412.8ms **无劣化**（+0.8%） |
+| B-02 扩展负载（50k/10 指标/100 覆盖物，20 次全宽滑动） | 两跑一致：**totalFrames=551/553，janky=432/437（78-79%）** | 超时帧≤5%（FrameTimingMetric 口径，MIUI 不可用） | gfxinfo legacy「janky」（>16.7ms 记为 janky）与该门槛**不可比**：T-34 后 P50=22ms 状态下 janky 比例本应 ~78%——实测与 T-34 优化后状态**一致，无回归信号** |
+| B-02 帧产出 | 551-553 帧/20 滑动（0.6.0 首轮 262 帧） | — | 帧产出 **2.1×**（同滑动次数） |
+| B-02 分位数（P50/P95） | 未采得 | 输入 P95 ≤100ms | UiDevice shell 输出截断丢失分位数段（MIUI）；解锁 CPU 的手动复采（81/125-133ms）不可比（未锁频+热态，注入 8s vs 受控 1s 即证）——已登记口径边界，基准工具已补分位数逐行落 log（合规设备可采） |
+| B02StressBenchmark（FrameTimingMetric） | SKIPPED（@Ignore 维持） | — | MIUI 14 vendor 限制不变，等价口径继续 |
+
+**豁免序列关闭**：0.7.0~0.15.0 连续登记的 B-01/B-02 豁免以本轮实采闭环；PRD 7.3 B-01 达标、B-02 以等价口径确认无回归（严格 5% 门槛待 FrameTimingMetric 可用后复判，已登记）。

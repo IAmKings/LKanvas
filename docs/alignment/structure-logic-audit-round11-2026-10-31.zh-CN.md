@@ -1,0 +1,147 @@
+# Compose 工程与 KLineChart 结构、逻辑一致性第十一轮审计及目标收敛情况
+
+- 日期：2026-10-31（Asia/Shanghai）。
+- 审计对象：`78a281b7f9c470bf7b98908443a7f29fa659a56a`，版本 `0.15.0`。
+- 对比起点：第十轮对象 `22e7095846e753cc215353a06c6a5223c936e6fd`（`0.14.0`）。
+- 固定上游：KLineChart v10.1.0，`d5bb26f706a6bd8f67eed4ecbbf22cb67a0725df`。
+- 标准不变：沿用 S1/S2/S3/L1/L2/L3/V1/U1，按领域职责、数据及参数契约、主循环、条件与调用顺序、实际消费者、共同输入和有限补丁可对应性验收；不按文本相似率、标点或测试数量评分。
+- 工程用途与负载：纯 Kotlin 核心加 Compose 原生图表；按单图表、异步行情、多指标/轴/覆盖物、公开 state 复用、历史滚动及行级样式使用审计。
+- 范围：复核 R10-01，独立复跑历史探针，补验连续批次、样式折返、覆盖段、NaN 和有限可见窗口；保留此前数据、轴、覆盖物和真实补丁证据。
+- 修改边界：开始时工作区干净。本次只新增本报告，未修改工程实现、正式测试、构建配置、快照或既有文档；验证材料均位于仓库外临时目录。
+
+## 1. 审计结论
+
+**第十一轮在既定源码审计范围内通过。R10-01 已关闭，本轮未确认新的 P1/P2 代码阻断项；历史已确认问题在本轮复验范围内闭环。**
+
+关键修复是将样式批次容器从按值分组的 Map 改为有序 List，只检查并复用最后一个连续同样式批次。A→B→A 已按 `[0,1,2]` 提交，连续 A→A→A 仍可一次提交；覆盖前 flush、有限窗口的合法下一点、NaN 和真正数据末端规则继续成立。这次修复的是共同批次规则，符合上游只比较最后合并项的控制流。
+
+独立复验的 72 项外部测试全部确认正确行为，其中一项进一步执行了 **60 组组合、240 段提交序列**，与真实上游 IndicatorView 输出一致。406 项正式测试也全部通过。数据会话和连续 state 复用等历史基准保持，没有以牺牲既有修复换取本轮通过。
+
+**当前可以将源码审计阶段收口，进入冻结基线后的最终验证。** 这不等于对全库任意输入作形式等价证明，也不等于真机、性能或发布制品已经在本轮重新认证。后者是待补的验证证据，不能冒充新的代码缺陷，也不能因尚未执行而预设工程必须再改一轮。
+
+| 验收维度 | 本轮结论 | 依据与边界 |
+|---|---|---|
+| S1 来源与符号可追溯 | 既定范围通过 | 官方 155 个源码快照一致，模板/职责映射、历史差异和实现引用保持；不把台账状态单独当证明 |
+| S2 职责与依赖结构 | 重点链路通过 | state/引擎身份生命周期一致；实例投影、范围和 figure 消费入口保持；批次变为有序连续容器 |
+| S3 算法、循环与分支形态 | 本轮复验通过 | 27 指标共同输入结果保持；LINE 连续合并与上游最后项规则对应，边界和提交顺序组合对照通过 |
+| L1 数据与状态机 | 本轮覆盖通过 | 已入队失败门禁、合法同步首推、旧回调/ABA、重试、连续 state 复用保持；未穷举全部调度 |
+| L2 参数与公共契约 | 本轮覆盖通过 | 样式归属、部分 attrs、范围约束、转换、默认和布局等历史探针保持 |
+| L3 注册→计算→绘制/命中/编辑 | 本轮覆盖通过 | 多轴、figure、控点与层级消费者保持，混合 LINE 实际提交序列对照通过 |
+| V1 差分与门禁证据 | 本轮源码差分通过 | 正式测试、独立历史探针、真实 View 组合对照通过；设备像素、触摸和性能不在本轮认证内 |
+| U1 局部源码补丁同步 | 原 arc 演练限定通过 | 历史 before/after、实际命中消费者和角度基准保持；不能外推任意未来破坏性版本 |
+
+上述“通过”对应本次及历史明确覆盖的领域职责和契约，不宣称 TypeScript 与 Kotlin 每行文本相同。原生 Canvas、协程与 DOM 的必要适配继续保留，验收关注其边界是否保持领域规则。
+
+## 2. 基线与执行证据
+
+| 检查 | 本轮结果 | 证明范围 |
+|---|---|---|
+| core 正式 JVM 测试 | 222 项，失败/错误/跳过均 0 | 当前正式测试覆盖 |
+| Compose 正式 JVM 测试 | 184 项，失败/错误/跳过均 0 | 正式测试合计 406 项 |
+| 外部 `audit.EleventhAuditTest` | 72 项，失败/错误/跳过均 0 | 全部为基准/修复确认，无剩余差异断言 |
+| 原 R10-01 复现 | 提交行 `[0,1,2]`，三个批次 | 原 `[0,2,1]` 差异消除 |
+| 连续同样式优化 | 三个默认段仍一次批量提交 | 未通过取消批量优化规避问题 |
+| 新增真实 View 组合矩阵 | 60 组、240 段，全通过 | 组合行序、默认/覆盖类型；默认段坐标和批次样式一致性；覆盖段实际颜色与线宽 |
+| 既有真实 View 场景 | 7 组重新执行 | 样式折返、覆盖顺序、有限/扩大窗口、默认末行、所属行样式、缺失下一点 |
+| 指标 TS oracle 重生成 | 27 份 JSON，与仓库 fixture 解析后全部一致 | 固定上游真实 calc 与共同输入 |
+| 官方快照比对 | 官方 155、本地 155；修改/缺失/新增均 0 | `third_party/klinechart-v10.1.0/src` 来源完整 |
+| 台账检查 | 通过，319 行 | 七面覆盖、格式、签名及引用存在；不替代运行语义 |
+| 真实 arc 补丁复验 | 通过 | 历史原端点 false、当前 true；实际消费者及负角跨度基准保持 |
+
+正式测试先清理结果后运行，保存计数后才加载外部探针。72 是 JUnit 方法数；60 组组合由其中一个方法执行，不将其重复计入方法数量。测试数量用于说明证据规模，不用于推导完成百分比。
+
+```sh
+./gradlew :lkanvas-core:cleanTest :lkanvas-compose:cleanTestDebugUnitTest \
+  :lkanvas-core:test :lkanvas-compose:testDebugUnitTest \
+  --no-build-cache --console=plain
+
+tools/oracle/node_modules/.bin/tsx /tmp/lkanvas-audit-round11-20261031/view-oracle.mts
+tools/oracle/node_modules/.bin/tsx /tmp/lkanvas-audit-round11-20261031/batch-matrix.mts
+
+./gradlew -I /tmp/lkanvas-audit-round11-20261031/audit.init.gradle \
+  :lkanvas-compose:testDebugUnitTest --tests 'audit.EleventhAuditTest' \
+  --no-build-cache --console=plain
+
+python3 -B tools/alignment/check.py
+```
+
+材料：[正式测试计数](/tmp/lkanvas-audit-round11-20261031/baseline-results.json)、[外部探针源码](/tmp/lkanvas-audit-round11-20261031/src/audit/EleventhAuditTest.kt)、[结果与完整方法清单](/tmp/lkanvas-audit-round11-20261031/probe-results.json)、[既有 View 脚本](/tmp/lkanvas-audit-round11-20261031/view-oracle.mts)、[既有 View 输出](/tmp/lkanvas-audit-round11-20261031/view-oracle.json)、[组合脚本](/tmp/lkanvas-audit-round11-20261031/batch-matrix.mts)、[60 组输入与上游结果](/tmp/lkanvas-audit-round11-20261031/batch-matrix.json)、[本地读取的预期序列](/tmp/lkanvas-audit-round11-20261031/batch-matrix.tsv)、[快照比对](/tmp/lkanvas-audit-round11-20261031/snapshot.json)、[指标生成器](/tmp/lkanvas-audit-round11-20261031/gen-fixtures.mts)、[指标比对](/tmp/lkanvas-audit-round11-20261031/oracle-results.json)、[台账输出](/tmp/lkanvas-audit-round11-20261031/alignment.log)。临时目录可能被清理，关键判定及输入另在下文保留。
+
+### 当前上游状态
+
+本次在线查询 main 仍为 `66dd45b31e93b57a4c75a3e0b98bc2a8393df36e`，比固定 v10.1.0 基线 ahead 3，差异仍是两个 README 和 `src/extension/figure/arc.ts`；相对第十轮没有新源码增量。参见[官方固定 SHA 比较](https://github.com/klinecharts/KLineChart/compare/d5bb26f706a6bd8f67eed4ecbbf22cb67a0725df...66dd45b31e93b57a4c75a3e0b98bc2a8393df36e)。
+
+固定来源保持完整，已知 arc 增量的局部适配证据保持。本地快照仍固定为 v10.1.0；当前结论不能表述为已将第三方目录整体更新到 main，也没有据单个补丁承诺未来全部更新均无需较大适配。
+
+## 3. R10-01 关闭证据
+
+**原问题：** 四行值 `[100,110,100,110]`，默认段行 0/1/2 的颜色为红/蓝/红、线宽均为 6。本地曾把行 0/2 回填到同一早期 A 组，按 `[0,2,1]` 提交；上游按 `[0,1,2]` 提交。
+
+**当前结构：** `groups` 改为有序 `ArrayList<Seg>`；`segFor` 只读取 `lastOrNull()`，仅当最后一项 color/width 均相同才复用，否则追加新批次。A 在 B 后再次出现时成为新的批次，不受 data class 值相等键控合并影响。`flushGroups` 按 List 顺序提交并清空，覆盖段前与末尾的提交位置保持。
+
+实际本地三个批次为：
+
+```text
+行 0 / 红: [4,100,12,110]
+行 1 / 蓝: [12,110,20,100]
+行 2 / 红: [20,100,28,110]
+提交行序: [0,1,2]
+```
+
+真实上游 View 产生相同的红/蓝/红连续顺序。连续 A→A→A 仍是一个本地批次；原默认红→覆盖蓝顺序继续为 `[default-red,custom-blue]`。默认/覆盖末可见行、真正数据末端/NaN、所属行样式及 state 复用等既有基准均未回归。
+
+证据：[有序批次与最后项复用](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:590)、[顺序提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:600)、[完整结果列下一点](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:653)、[覆盖前 flush](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:664)、[默认末行段](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:689)、[上游最后合并项比较](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:233)、[上游按合并结果提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:254)。
+
+**判定：R10-01 在本轮覆盖范围内关闭，未发现需要继续修改该规则的证据。** 台账 [R10-01](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/gap-matrix.md:501)的关闭有独立运行结果支持；本次没有改动台账。
+
+## 4. 组合复核与证据边界
+
+新增矩阵采用以下笛卡尔组合，共 60 组：
+
+| 因素 | 取值 |
+|---|---|
+| 样式序列 | AAAAAA、ABABAB、ABAABA、AABBAA、ABCABC；按序列循环生成各行样式 |
+| 自定义 coordinates 行 | 无；行 1；行 1 和行 3 |
+| 可见窗口末行 | 3；6，完整数据均为 7 行 |
+| 缺失值 | 无；行 2 为 NaN |
+
+共同有限值为 `[100,110,105,115,108,118,111]`。A/B/C 分别使用红/蓝/绿及线宽 2/4/6；覆盖段使用明确点列。有限窗口测试的下一点取完整结果，NaN 场景同时验证缺失前后段条件与顺序。
+
+TS 脚本执行真实 `IndicatorView.drawImp`、继承的 `ChildrenView.eachChildren`、figure 准备、styles 和合并函数，记录实际 figure draw。将合并后的折线展开为逐段行归属和默认/覆盖类型序列，再供 Kotlin 消费者比较。
+
+本地默认段记录实际 native 数组，核对端点及批次内样式一致性；覆盖段核对实际 drawPath 调用、颜色、Stroke 宽度及所属行；最终 60 组的 240 段行序与上游一致。本次不要求两种平台 API 的批次数字逐项相同：在不改变几何、样式和顺序时，独立段数组与连续折线可以采用不同提交形式。
+
+矩阵没有直接读取 mocked Android Path 的内部点列，未认证覆盖路径的实际像素。假宿主提供明确 result、可见行和恒等轴，验证边界仍为真实消费者的宿主录制，尚非完整浏览器/Android UI E2E。实际动态 pane、坐标平移和控点等已有探针另行保持。
+
+台账校验解析 319 行：已声明 237、行为通过 65、已接线 2、不适用 15。check.py 通过说明格式和引用有效；本轮关闭结论来自源码控制流及运行对照，不依赖台账数量。
+
+## 5. 从第一轮到当前的目标收敛
+
+**净收敛成立，本轮从“仍需修复一个已确认规则”进入“源码审计阶段可收口”。**
+
+| 原目标中的领域 | 当前证据与判断 |
+|---|---|
+| 来源和算法可追溯 | 固定 SHA、155 文件官方快照、模板映射、27 个真实 calc 共同输入结果持续保持 |
+| 领域规则由实际入口消费 | 会话身份、注册、pane/轴投影、范围、figure、覆盖物和格式历史探针持续通过，早期仅存值未执行的问题在复验范围内闭环 |
+| 条件与顺序接近上游 | 原分页/会话、每实例轴、几何字段、控点层级、LINE 段归属、数据边界和连续批次问题已复核关闭 |
+| 平台适配有边界 | 协程/引擎、Compose 单画布和原生批量绘制保留；已确认的领域规则没有因这些适配而在本轮复验中分叉 |
+| 后续可局部同步 | 模板与职责有对应入口，arc 真实补丁演练持续通过，本轮最后批次修正也只涉及有限共同入口；已有减少反复重写的工程基础 |
+| 最终设备/发布验证 | 本轮未重做，仍属于待补证据；与已确认源码缺陷分别记录 |
+
+历轮已确认条目数为 **16→14→11→9→7→6→4→3→2→1→0**。最近三轮本次覆盖内均未确认 P1，本轮也未确认新的 P2。条目粒度和深度不同，这不是完成百分比；更重要的证据是历史问题复验闭环、共同入口稳定，以及最后批次规则通过独立真实 View 组合对照。
+
+不能将当前结果外推为任意输入、未来任意大版本的形式等价证明，也不能保证以后所有破坏性变更只需几行。但就原目标而言，当前证据已支持保持领域规则并按对应入口持续局部更新，不再支持为了“继续审计”而无具体问题地重整结构。
+
+### 当前还需要几轮
+
+**不再建议预设新的代码修复轮次。若范围是当前源码审计，本轮可以收口；若最终验收包含设备与发布证据，可预留 1 轮验收收尾，只有发现具体问题时再安排返修。**
+
+建议冻结本次 SHA 为已审计基线，后续上游更新按固定 compare、符号映射、有限适配和既有回归集推进。最后验收应集中在设备绘制/触摸及必要发布检查，并将本轮结果纳入可复用证据；这些是验证工作，不应自动变成新增重构要求。
+
+当前判断为“既定源码审计范围通过，设备/发布验证待补”。没有证据要求再预留固定的两三轮代码迭代，也没有证据要求重写整个库。
+
+## 6. 未检查范围与最终判断
+
+本轮未执行真机/模拟器截图、完整触摸 E2E、TalkBack、Macrobenchmark、R8、Maven 发布/consumer、图片编码集成，未重新认证既有性能数据；未逐行穷举全部 API、参数、图形和异常输入。此前搁置的空 coordinates 上游合并边界未重新裁定，不作为本轮新增验收要求。
+
+**本次只新增报告，没有实施修复。第十一轮未确认新的代码阻断项，R10-01 已关闭，既定源码审计范围通过；目标已进入验收收尾。剩余风险主要是未执行的设备、像素、触摸、性能和发布路径验证，不能据本轮 JVM/宿主录制结果将这些标记为通过。**

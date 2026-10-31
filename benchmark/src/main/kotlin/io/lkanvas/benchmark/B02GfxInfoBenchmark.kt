@@ -69,10 +69,17 @@ class B02GfxInfoBenchmark {
             "gfxinfo 未采集到帧（计量不可得）：\n" + raw.take(800)
         }
 
+        // 验收补强：分位数随摘要落盘（T-34 参照 P50 22/P95 30ms 的对照口径）
         val summary = metrics.entries.joinToString(", ") { "${it.key}=${it.value}" }
         val report = "B02_GFXINFO 50k/10ind/100ovl 20swipes -> $summary"
         println(report)
         android.util.Log.i("B02_GFXINFO", report)
+        // 分位数单独逐行落 log（UiDevice shell 输出可能截断长 dump）
+        metrics.forEach { (k, v) ->
+            if (k != "totalFrames" && k != "janky") {
+                android.util.Log.i("B02_GFXINFO", "PCTL $k=$v")
+            }
+        }
         // JUnit XML system-out 留档（connected 测试报告自动收集）
         device.executeShellCommand(
             "log -t B02_GFXINFO -p i \"$summary\"",
