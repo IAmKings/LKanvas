@@ -478,3 +478,11 @@
 | R7-02 | 绑定轴范围不执行模板 minValue/maxValue | 12 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt extraAxisRange 聚合绑定实例 specifyMin/Max 并收口合并；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity17RangeConstraintTest.kt | 行为通过 |
 | R7-03 | BAR 部分覆盖默认几何不一致（y 双平移/宽度居中错序） | 12 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawBarPlots 依赖序合成（宽度先行→缺省 x 按有效宽度居中；默认 y 绝对坐标不二次平移）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
 | R7-04 | LINE 混合自定义/默认 coordinates 多出桥线 | 12 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawLinePlots 行段归属重构（默认段先落、自定义行独立段+缺省链断开）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+
+## 19. 第八轮复审追踪（structure-logic-audit-round8-2026-10-31.zh-CN.md R8-01..R8-03；0.13.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| R8-01 | 复用 ChartState 后旧拒绝水位拦住新门面合法更新 | 13 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt 会话提交身份移入 state（nextInitEpoch/currentInitEpoch/markInitRejected/isEpochRejected——与引擎同生命周期、跨门面连续）；lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt 门面侧改用 state 身份；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity19StateReuseIdentityTest.kt | 行为通过 |
+| R8-02 | LINE 几何段属当前行、样式却取后一行 | 13 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawLinePlots 默认段样式改取所属前行（与几何同归属，样式回调 row/value/candles 对应段所属行）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+| R8-03 | 自定义 LINE 段缺下一点有效性门禁 | 13 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt 自定义段登记条件 = 当前行与下一点均有效且 i+1 在可见区（上游共同门禁）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |

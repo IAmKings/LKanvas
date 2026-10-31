@@ -33,7 +33,7 @@ UP = ROOT / 'third_party/klinechart-v10.1.0/src'
 MATRIX = ROOT / 'docs/alignment/gap-matrix.md'
 TSINV = ROOT / 'docs/alignment/ts-inventory.md'
 
-PREFIXES = ('CH', 'IDX', 'EVT', 'TYP', 'IND', 'OVL', 'STY', 'NUM', 'SLA', 'R', 'R7')
+PREFIXES = ('CH', 'IDX', 'EVT', 'TYP', 'IND', 'OVL', 'STY', 'NUM', 'SLA', 'R', 'R7', 'R8')
 CLASSES = set('ABCDE')
 VERIFS = {'test', 'diff', 'compile', 'parity', 'manual', 'existing', '—'}
 WORKLOADS = {'S', 'M', 'L', '—'}
