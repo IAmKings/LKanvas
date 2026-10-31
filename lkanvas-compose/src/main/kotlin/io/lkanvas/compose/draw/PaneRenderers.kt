@@ -561,6 +561,9 @@ object PaneRenderers {
         dashed: Boolean = false,
         lastValueMark: Boolean = true,
         styleOverrideOf: ((key: String, index: Int) -> Pair<Color?, Float?>)? = null,
+        /** M03：attrs 原样求值（coordinates 点列覆盖）；null=无 attrs 走批量快路径。 */
+        attrsOf: ((key: String, row: Int, value: Double) -> Map<*, *>?)? = null,
+        paneTop: Float = 0f,
     ) {
         // T-34 第二轮：drawLines(FloatArray) 批量提交替代逐点 Path（B-02 分段定位
         // 指标线占 13ms/帧：65 列 × ~240 点的 Path 构建+drawPath 为 UI 线程大头）。
@@ -595,6 +598,36 @@ object PaneRenderers {
                 }
                 val x = x0 + barSpacing * i
                 val yy = y(v).toFloat()
+                // M03（第六轮复审 2026-10-31）：attrs.coordinates 逐点覆盖（上游
+                // IndicatorView.ts:191-196——`coordinates: attrs?.coordinates ?? 计算值`）；
+                // 有 coords 的行按点列 drawPath（pane 相对 +paneTop），无 coords 行
+                // 维持批量 drawLines 快路径——批量渲染与几何覆盖不互斥
+                if (attrsOf != null) {
+                    val coords = ((attrsOf(key, i, v) ?: emptyMap<Any?, Any>())["coordinates"] as? List<*>)
+                        ?.mapNotNull { p ->
+                            (p as? Map<*, *>)?.let { m ->
+                                val px = (m["x"] as? Number)?.toFloat()
+                                val py = (m["y"] as? Number)?.toFloat()
+                                if (px != null && py != null) Offset(px, py + paneTop) else null
+                            }
+                        }
+                    if (!coords.isNullOrEmpty()) {
+                        val path = androidx.compose.ui.graphics.Path()
+                        coords.forEachIndexed { pi, pt ->
+                            if (pi == 0) path.moveTo(pt.x, pt.y) else path.lineTo(pt.x, pt.y)
+                        }
+                        val (cc, wc) = if (styleOverrideOf != null) styleOverrideOf(key, i) else null to null
+                        drawPath(
+                            path,
+                            cc ?: baseColor,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = wc ?: lineSizePx),
+                        )
+                        lastX = coords.last().x
+                        lastY = coords.last().y
+                        prevWasFinite = true
+                        continue
+                    }
+                }
                 if (prevWasFinite) {
                     // 逐行求值样式：线段 (i-1, i) 的样式由后行决定
                     val seg = if (styleOverrideOf != null) {
@@ -666,7 +699,8 @@ object PaneRenderers {
         }
         // 顺序：先线后柱（与内置 MACD DIF/DEA→柱 口径一致）
         if (lineKeys.isNotEmpty()) {
-            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = override?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } })
+            val lineAttrs = rawAttrsFor(inst)
+            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = override?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } }, attrsOf = lineAttrs?.let { la -> { k: String, r: Int, v: Double -> la(k, r, v, candles) } }, paneTop = paneTop)
         }
         if (barEntries.isNotEmpty()) {
             drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, override, attrsGeo, candles, paneTop)
@@ -700,32 +734,41 @@ object PaneRenderers {
             for (i in range.first..range.last) {
                 val v = col[i]
                 if (v.isNaN()) continue
-                val x = vp.candleCenterX(i.toDouble()).toFloat()
                 val vy = y(v).toFloat()
-                // N04（第五轮复审 2026-10-31）：attrs 几何=**pane 相对坐标**——
-                // 绘制时加 paneTop 平移到绝对位置（修复前被当绝对坐标，副图
-                // attrs 图形落在裁剪区外）；支持 x/width 覆盖（上游 bar 矩形
-                // x/y/width/height 四键；修复前只消费 top/bottom）
                 val geo = attrsGeo?.invoke(key, i, v, candles)
-                val ax = geo?.get("x")?.toFloat() ?: vp.candleCenterX(i.toDouble()).toFloat()
-                val aw = geo?.get("width")?.toFloat() ?: bodyWidth
+                // M03（第六轮复审 2026-10-31）：默认几何与 attrs 按**上游含义**四键合并
+                //（上游 IndicatorView.ts:177-185——先算默认 {x: center-barWidth/2,
+                // y: min(valueY,baseY), width: barWidth, height}，再 attrs 展开覆盖；
+                // x=矩形**左边界**（修复前被当中心再减半宽）、y=顶边、height=柱高
+                //（修复前不消费）；pane 相对坐标 +paneTop 语义同 N04）
+                val ax = geo?.get("x")?.toFloat()
+                    ?: (vp.candleCenterX(i.toDouble()).toFloat() - bodyWidth / 2f)
+                val aw = (geo?.get("width")?.toFloat() ?: bodyWidth).coerceAtLeast(1f)
                 val top: Float
                 val hgt: Float
-                if (geo != null && geo.containsKey("top") && geo.containsKey("bottom")) {
-                    val geoTop = geo.getValue("top").toFloat() + paneTop
-                    val geoBottom = geo.getValue("bottom").toFloat() + paneTop
-                    top = minOf(geoTop, geoBottom)
-                    hgt = kotlin.math.abs(geoBottom - geoTop).coerceAtLeast(0.5f)
-                } else {
-                    top = minOf(vy, baseY)
-                    hgt = kotlin.math.abs(vy - baseY).coerceAtLeast(0.5f)
+                when {
+                    geo != null && (geo.containsKey("y") || geo.containsKey("height")) -> {
+                        top = (geo.get("y")?.toFloat() ?: minOf(vy, baseY)) + paneTop
+                        hgt = (geo.get("height")?.toFloat() ?: kotlin.math.abs(vy - baseY))
+                            .coerceAtLeast(0.5f)
+                    }
+                    // N04 既有 bridge 约定（top/bottom pane 相对）保留兼容
+                    geo != null && geo.containsKey("top") && geo.containsKey("bottom") -> {
+                        val geoTop = geo.getValue("top").toFloat() + paneTop
+                        val geoBottom = geo.getValue("bottom").toFloat() + paneTop
+                        top = minOf(geoTop, geoBottom)
+                        hgt = kotlin.math.abs(geoBottom - geoTop).coerceAtLeast(0.5f)
+                    }
+                    else -> {
+                        top = minOf(vy, baseY)
+                        hgt = kotlin.math.abs(vy - baseY).coerceAtLeast(0.5f)
+                    }
                 }
-                val (c0, w0) = override?.invoke(key, i, v, candles) ?: (null to null)
+                val (c0, _) = override?.invoke(key, i, v, candles) ?: (null to null)
                 val color = c0 ?: palette[(bi + paletteOffset) % palette.size]
-                val w = (w0 ?: 1f) * aw / bodyWidth
                 drawRect(
                     color,
-                    topLeft = Offset(ax - aw / 2f, top),
+                    topLeft = Offset(ax, top),
                     size = androidx.compose.ui.geometry.Size(aw, hgt),
                 )
             }
@@ -789,6 +832,18 @@ object PaneRenderers {
                     (v as? Number)?.let { put(k.toString(), it.toDouble()) }
                 }
             }
+        }
+    }
+
+    /**
+     * M03：attrs **原样**求值（LINE coordinates 点列非 Number，数值过滤器会
+     * 丢弃——rawAttrsFor 保留完整 map 供 drawLinePlots 提取 coordinates）。
+     */
+    private fun rawAttrsFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Map<*, *>?)? {
+        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+        if (plots.values.all { it.attrs == null }) return null
+        return { key, row, colValue, candles ->
+            evaluateStyles(plots[key]?.attrs, row, inst.params, colValue, candles)
         }
     }
 

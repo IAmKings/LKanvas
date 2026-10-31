@@ -16,6 +16,13 @@ android {
         consumerProguardFiles("consumer-rules.pro")
     }
 
+    testOptions {
+        // 渲染管线 JVM 单测（TestDrawScope 录制）：android.graphics 原语默认值
+        // 放行（Path/nativeCanvas drawLines 不再抛 not-mocked；绘制断言经
+        // DrawScope 录制层，不依赖 native 栅格化）
+        unitTests.isReturnDefaultValues = true
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
