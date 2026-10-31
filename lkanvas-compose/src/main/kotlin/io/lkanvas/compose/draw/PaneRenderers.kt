@@ -598,10 +598,27 @@ object PaneRenderers {
                 }
                 val x = x0 + barSpacing * i
                 val yy = y(v).toFloat()
-                // M03（第六轮复审 2026-10-31）：attrs.coordinates 逐点覆盖（上游
-                // IndicatorView.ts:191-196——`coordinates: attrs?.coordinates ?? 计算值`）；
-                // 有 coords 的行按点列 drawPath（pane 相对 +paneTop），无 coords 行
-                // 维持批量 drawLines 快路径——批量渲染与几何覆盖不互斥
+                // R7-04（第七轮复审 2026-10-31）：**行段归属**——默认段 (i-1,i) 属于
+                // row i-1 的几何定义，须先于本行的自定义判定落段（上游
+                // IndicatorView.ts:191-196：segment_k = attrs_k.coordinates ??
+                // (P_k,P_{k+1})，每行为独立 figure 段）
+                if (prevWasFinite) {
+                    // 逐行求值样式：线段 (i-1, i) 的样式由后行决定
+                    val seg = if (styleOverrideOf != null) {
+                        val (c0, w0) = styleOverrideOf(key, i)
+                        segFor(c0 ?: baseColor, w0 ?: lineSizePx)
+                    } else {
+                        fastSeg
+                    }
+                    if (seg.pos + 4 > seg.arr.size) seg.arr = seg.arr.copyOf(seg.arr.size * 2)
+                    seg.arr[seg.pos++] = lastX; seg.arr[seg.pos++] = lastY
+                    seg.arr[seg.pos++] = x; seg.arr[seg.pos++] = yy
+                }
+                // attrs.coordinates 行 = **独立段**（完全替换本行默认段）：按点列
+                // drawPath（pane 相对 +paneTop）；缺省链自 P_i 断开（prev=false）——
+                // 下一默认段从 P_{i+1} 重新起段，不用自定义终点接续（修复前把
+                // 自定义终点写回连续状态 → 伪桥线 (500,600)→(12,110)）。
+                // 无 coords 行维持批量 drawLines 快路径——批量渲染与几何覆盖不互斥
                 if (attrsOf != null) {
                     val coords = ((attrsOf(key, i, v) ?: emptyMap<Any?, Any>())["coordinates"] as? List<*>)
                         ?.mapNotNull { p ->
@@ -622,23 +639,11 @@ object PaneRenderers {
                             cc ?: baseColor,
                             style = androidx.compose.ui.graphics.drawscope.Stroke(width = wc ?: lineSizePx),
                         )
-                        lastX = coords.last().x
-                        lastY = coords.last().y
-                        prevWasFinite = true
+                        lastX = x
+                        lastY = yy
+                        prevWasFinite = false
                         continue
                     }
-                }
-                if (prevWasFinite) {
-                    // 逐行求值样式：线段 (i-1, i) 的样式由后行决定
-                    val seg = if (styleOverrideOf != null) {
-                        val (c0, w0) = styleOverrideOf(key, i)
-                        segFor(c0 ?: baseColor, w0 ?: lineSizePx)
-                    } else {
-                        fastSeg
-                    }
-                    if (seg.pos + 4 > seg.arr.size) seg.arr = seg.arr.copyOf(seg.arr.size * 2)
-                    seg.arr[seg.pos++] = lastX; seg.arr[seg.pos++] = lastY
-                    seg.arr[seg.pos++] = x; seg.arr[seg.pos++] = yy
                 }
                 lastX = x
                 lastY = yy

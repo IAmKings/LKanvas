@@ -2,6 +2,7 @@ package io.lkanvas.chart.parity
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.nativeCanvas
 import io.lkanvas.core.data.Candle
 import io.lkanvas.core.indicator.IndicatorDefinition
 import io.lkanvas.core.indicator.IndicatorEngine
@@ -36,6 +37,17 @@ class Parity15FigureAttrsTest {
         override val calcParams = emptyList<Double>()
         override val precision = 2
         override val plots = listOf(PlotDef("v", "V", PlotType.BAR, baseValue = 0.0, attrs = attrs))
+        override fun initScratch(params: List<Double>) = null
+        override fun stepScratch(prev: Any?, c: List<Candle>, p: List<Double>, i: Int) = null
+        override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) = mapOf("v" to c[i].close)
+    }
+
+    private fun lineTemplatePerRow(attrsOf: (Int) -> Any?) = object : IndicatorDefinition {
+        override val name = "LINE_ATTRS_ROW"
+        override val shortName = "LR"
+        override val calcParams = emptyList<Double>()
+        override val precision = 2
+        override val plots = listOf(PlotDef("v", "V", PlotType.LINE, attrs = attrsOf))
         override fun initScratch(params: List<Double>) = null
         override fun stepScratch(prev: Any?, c: List<Candle>, p: List<Double>, i: Int) = null
         override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) = mapOf("v" to c[i].close)
@@ -202,5 +214,85 @@ class Parity15FigureAttrsTest {
             )
         }
         assertTrue("path" in fake.ops, "paneTop 平移下点列仍绘制")
+    }
+
+    // ---------- R7-04（第七轮复审）：混合自定义/默认 coordinates 行段独立 ----------
+
+    /** 录制 native drawLines 数组与 drawPath 次数。 */
+    private fun drawLines(def: IndicatorDefinition, candlesCount: Int = 3, yOf: (Double) -> Double = { v -> v }): TestDrawScope {
+        val cs = candles(candlesCount)
+        val state = IndicatorEngine.recompute(def, emptyList(), cs)
+        val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
+        val fake = TestDrawScope(Size(600f, 600f))
+        with(fake) {
+            drawInstanceFigures(
+                inst, state, Viewport(), VisibleRange(0, cs.size - 1),
+                yOf, ChartTheme(), 0, lastValueMark = false,
+                candles = cs, paneTop = 0f,
+            )
+        }
+        return fake
+    }
+
+    private fun batchPoints(fake: TestDrawScope): List<Float> =
+        fake.drawContext.canvas.nativeCanvas.let { it as TestDrawScope.RecordingNative }
+            .lineArrays.flatMap { it.toList() }
+
+    @Test
+    fun `LINE混合自定义与默认coordinates无伪桥线（R7-04）`() {
+        // 审计复现口径：默认坐标 (4,100),(12,101),(20,102)（barSpacing=8、行值 close，x 恒等 y）；
+        // 仅第 0 行自定义 [(300,400),(500,600)]——期望自定义点列 + 第 1 行默认段
+        // (12,110)→(20,120)；修复前多出桥线 (500,600)→(12,110)
+        val def = lineTemplatePerRow { row ->
+            if (row == 0) mapOf("coordinates" to listOf(mapOf("x" to 300.0, "y" to 400.0), mapOf("x" to 500.0, "y" to 600.0)))
+            else null
+        }
+        val fake = drawLines(def)
+        assertEquals(1, fake.ops.count { it == "path" }, "1 个自定义点列段")
+        val pts = batchPoints(fake)
+        assertEquals(listOf(12f, 101f, 20f, 102f), pts, "默认段仅 (P1,P2)——无自定义终点桥线（R7-04 复现收口）")
+    }
+
+    @Test
+    fun `LINE默认到覆盖到默认保持独立段（R7-04基准）`() {
+        // 4 行 (4,100),(12,101),(20,102),(28,103)，第 1 行自定义：
+        // 期望段 (P0,P1) + 自定义 + (P2,P3)——无 (P1,P2)、无桥线
+        val def = lineTemplatePerRow { row ->
+            if (row == 1) mapOf("coordinates" to listOf(mapOf("x" to 400.0, "y" to 10.0), mapOf("x" to 600.0, "y" to 20.0)))
+            else null
+        }
+        val fake = drawLines(def, candlesCount = 4)
+        assertEquals(1, fake.ops.count { it == "path" })
+        val pts = batchPoints(fake)
+        assertEquals(
+            listOf(4f, 100f, 12f, 101f, 20f, 102f, 28f, 103f),
+            pts,
+            "默认段 (P0,P1)+(P2,P3) 独立提交",
+        )
+    }
+
+    @Test
+    fun `LINE自定义行后NaN间隔不产生跨断桥接（R7-04基准）`() {
+        // 4 行，第 1 行自定义、第 2 行 NaN：期望段 (P0,P1) + 自定义；(P3) 无下一点不成段
+        val cs = candles(4).mapIndexed { idx, c ->
+            if (idx == 2) c.copy(close = Double.NaN) else c
+        }
+        val def = lineTemplatePerRow { row ->
+            if (row == 1) mapOf("coordinates" to listOf(mapOf("x" to 400.0, "y" to 10.0), mapOf("x" to 600.0, "y" to 20.0)))
+            else null
+        }
+        val state = IndicatorEngine.recompute(def, emptyList(), cs)
+        val inst = io.lkanvas.core.indicator.IndicatorInstance("i", def, def.calcParams, "main", "main", null)
+        val fake = TestDrawScope(Size(600f, 600f))
+        with(fake) {
+            drawInstanceFigures(
+                inst, state, Viewport(), VisibleRange(0, cs.size - 1),
+                { v -> v }, ChartTheme(), 0, lastValueMark = false,
+                candles = cs, paneTop = 0f,
+            )
+        }
+        assertEquals(1, fake.ops.count { it == "path" })
+        val pts = batchPoints(fake)
+        assertEquals(listOf(4f, 100f, 12f, 101f), pts, "NaN 断开后无跨断段")
     }
 }

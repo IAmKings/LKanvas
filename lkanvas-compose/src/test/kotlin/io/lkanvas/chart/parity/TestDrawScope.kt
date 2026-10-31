@@ -57,7 +57,9 @@ class TestDrawScope(override val size: Size) : DrawScope {
     override val drawContext: DrawContext = object : DrawContext {
         override var size: Size = this@TestDrawScope.size
         override val transform: DrawTransform = RecTransform(this@TestDrawScope)
-        override var canvas: Canvas = RecordingCanvas(this@TestDrawScope)
+        // 公共工厂 → AndroidCanvas（internal 类经此注入录制 native）——
+        // 生产 `canvas.nativeCanvas` 路径可达（R7-04 批量 drawLines 录制）
+        override var canvas: Canvas = androidx.compose.ui.graphics.Canvas(RecordingNative(this@TestDrawScope))
         override var layoutDirection: LayoutDirection = LayoutDirection.Ltr
         override var density: androidx.compose.ui.unit.Density = this@TestDrawScope
     }
@@ -159,41 +161,44 @@ class TestDrawScope(override val size: Size) : DrawScope {
         override fun clipPath(path: Path, clipOp: ClipOp) = Unit
     }
 
-    class RecordingCanvas(private val s: TestDrawScope) : Canvas {
+    /**
+     * 录制 native Canvas：生产代码 `drawIntoCanvas → canvas.nativeCanvas` 路径
+     * 由此承接（R7-04 探针录制批量 drawLines 坐标数组）；translate/clip/save/
+     * restore 追踪也在此层（有效屏幕坐标 = 绘制坐标 + 当前平移）。
+     */
+    class RecordingNative(private val s: TestDrawScope) : android.graphics.Canvas() {
+        val lineArrays = mutableListOf<FloatArray>()
         private val stack = ArrayDeque<Triple<Float, Float, Int>>()
-        override fun save() {
-            stack.addLast(Triple(s.tx, s.ty, s._clipDepth))
+
+        override fun drawLines(pts: FloatArray, paint: android.graphics.Paint) {
+            lineArrays += pts.copyOf()
         }
+
+        override fun drawLines(pts: FloatArray, offset: Int, count: Int, paint: android.graphics.Paint) {
+            if (count > 0) lineArrays += pts.copyOfRange(offset, offset + count)
+        }
+
+        override fun save(): Int {
+            stack.addLast(Triple(s.tx, s.ty, s._clipDepth))
+            return 1
+        }
+
         override fun restore() {
             val top = stack.removeLastOrNull() ?: return
             s.tx = top.first; s.ty = top.second; s._clipDepth = top.third
         }
-        override fun saveLayer(bounds: Rect, paint: Paint) = save()
-        override fun translate(dx: Float, dy: Float) { s.tx += dx; s.ty += dy }
-        override fun scale(sx: Float, sy: Float) = Unit
-        override fun rotate(degrees: Float) = Unit
-        override fun skew(sx: Float, sy: Float) = Unit
-        override fun concat(matrix: Matrix) = Unit
-        override fun clipRect(left: Float, top: Float, right: Float, bottom: Float, clipOp: ClipOp) {
+
+        override fun translate(dx: Float, dy: Float) {
+            s.ops += "translate($dx,$dy)"
+            s.tx += dx; s.ty += dy
+        }
+
+        override fun clipRect(left: Float, top: Float, right: Float, bottom: Float): Boolean {
+            s.ops += "clip"
             s._clipDepth++
             s.clips += Rect(s.effX(left), s.effY(top), s.effX(right), s.effY(bottom)) to s._clipDepth
+            return true
         }
-        override fun clipPath(path: Path, clipOp: ClipOp) = Unit
-        override fun drawRect(rect: Rect, paint: Paint) = Unit
-        override fun drawRect(left: Float, top: Float, right: Float, bottom: Float, paint: Paint) = Unit
-        override fun drawRoundRect(left: Float, top: Float, right: Float, bottom: Float, radiusX: Float, radiusY: Float, paint: Paint) = Unit
-        override fun drawOval(left: Float, top: Float, right: Float, bottom: Float, paint: Paint) = Unit
-        override fun drawArc(left: Float, top: Float, right: Float, bottom: Float, startAngle: Float, sweepAngle: Float, useCenter: Boolean, paint: Paint) = Unit
-        override fun drawPath(path: Path, paint: Paint) = Unit
-        override fun drawLine(p1: Offset, p2: Offset, paint: Paint) = Unit
-        override fun drawCircle(center: Offset, radius: Float, paint: Paint) = Unit
-        override fun drawImage(image: ImageBitmap, topLeftOffset: Offset, paint: Paint) = Unit
-        override fun drawImageRect(image: ImageBitmap, srcOffset: IntOffset, srcSize: IntSize, dstOffset: IntOffset, dstSize: IntSize, paint: Paint) = Unit
-        override fun drawPoints(pointMode: PointMode, points: List<Offset>, paint: Paint) = Unit
-        override fun drawRawPoints(pointMode: PointMode, points: FloatArray, paint: Paint) = Unit
-        override fun drawVertices(vertices: Vertices, blendMode: BlendMode, paint: Paint) = Unit
-        override fun enableZ() = Unit
-        override fun disableZ() = Unit
     }
 }
 
