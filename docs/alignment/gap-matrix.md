@@ -493,3 +493,9 @@
 |---|---|---|---|---|
 | R9-01 | 用可见范围代替数据范围判断下一点（末可见行合法覆盖段丢失） | 14 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt drawLinePlots 下一点取完整结果列 result[i+1]（数据有效性门禁；末可见行默认段同步越窗延伸）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
 | R9-02 | 默认段延迟到覆盖段之后提交（重合时覆盖顺序相反） | 14 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt 遇自定义段先 flush 此前默认批次再绘制（提交顺序=行登记顺序；flushGroups 后清组复位）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+
+## 21. 第十轮复审追踪（structure-logic-audit-round10-2026-10-31.zh-CN.md R10-01；0.15.0 收口）
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| R10-01 | 默认段样式 A→B→A 复用早先组，提交行序重排 [0,2,1] | 15 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt segFor 仅复用最近连续同样式批次 + 批次容器改有序 List（身份语义，修复 data class 值等价键控合并丢段）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
