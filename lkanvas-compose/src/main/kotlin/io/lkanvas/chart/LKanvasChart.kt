@@ -472,6 +472,16 @@ class LKanvasChart private constructor(
      */
     private val dataEpoch = java.util.concurrent.atomic.AtomicLong(0)
 
+    /**
+     * R7-01（第七轮复审 2026-10-31）：**拒绝水位**——INIT 最终建会话失败的
+     * 代次下界；该代次（含更早）的后续动作在协程**执行时**（引擎提交前）丢弃。
+     * 不回写 [dataEpoch]（M01 单调语义保持——审计明确"仅在 rejected continuation
+     * 再改一次全局 epoch 不能保证拦住已进入引擎队列的请求"）：B 失败 Reset 先入队、
+     * 已受理订阅的首推随后入队，Reset 拒绝时同步抬升水位，同一串行队列中排在其
+     * 后的 Update 据此被拒——失败会话的已入队推送不再串写旧会话快照。
+     */
+    private val lastRejectedEpoch = java.util.concurrent.atomic.AtomicLong(0)
+
     private fun storeHost() = object : Store.Host {
         override fun applyInit(key: MarketKey, data: List<Candle>): Boolean {
             // M01（第六轮复审 2026-10-31）：捕获**自身身份**——异步失败清理前
@@ -484,9 +494,13 @@ class LKanvasChart private constructor(
             val myEpoch = dataEpoch.incrementAndGet()
             val myGen = store.generationForProbe
             scope.launch {
-                val result = state.reset(key, data)
+                val result = state.reset(key, data, myEpoch)
                 // N01：真实提交结果反馈到订阅与会话身份
                 if (result is io.lkanvas.core.store.ChangeResult.Rejected) {
+                    // R7-01：先抬升拒绝水位（同步于 Reset 拒绝点、先于同队列后续
+                    // 动作执行）——本代次的已入队 Update/Backward/Forward 在其
+                    // 协程执行时被拒，不再串写旧会话
+                    lastRejectedEpoch.updateAndGet { prev -> maxOf(prev, myEpoch) }
                     // 归属复核：仅当本 INIT 仍是当前会话时才清理订阅
                     // （审计 M01 复现：B 失败延续不得退订较新 C 会话）
                     if (dataEpoch.get() == myEpoch && store.generationForProbe == myGen) {
@@ -503,8 +517,10 @@ class LKanvasChart private constructor(
         override fun applyBackward(key: MarketKey, data: List<Candle>): Boolean {
             val epoch = dataEpoch.get() // 接受时点捕获
             scope.launch {
-                if (epoch != dataEpoch.get()) return@launch // 旧会话动作丢弃
-                state.appendBatch(data)
+                // R7-01：epoch 复核 + 拒绝水位（执行时判定——失败 INIT 已入队动作
+                // 在引擎提交前丢弃；合法 INIT 同步首推在 Reset 成功路径不受影响）
+                if (epoch != dataEpoch.get() || epoch <= lastRejectedEpoch.get()) return@launch
+                state.appendBatch(data, epoch)
             }
             return true
         }
@@ -512,8 +528,8 @@ class LKanvasChart private constructor(
         override fun applyForward(key: MarketKey, data: List<Candle>): Boolean {
             val epoch = dataEpoch.get()
             scope.launch {
-                if (epoch != dataEpoch.get()) return@launch
-                state.prependHistory(data)
+                if (epoch != dataEpoch.get() || epoch <= lastRejectedEpoch.get()) return@launch
+                state.prependHistory(data, epoch)
             }
             return true
         }
@@ -521,8 +537,8 @@ class LKanvasChart private constructor(
         override fun applyUpdate(key: MarketKey, candle: Candle): Boolean {
             val epoch = dataEpoch.get()
             scope.launch {
-                if (epoch != dataEpoch.get()) return@launch
-                state.upsertLatest(candle)
+                if (epoch != dataEpoch.get() || epoch <= lastRejectedEpoch.get()) return@launch
+                state.upsertLatest(candle, epoch)
             }
             return true
         }

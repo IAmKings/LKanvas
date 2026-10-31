@@ -23,11 +23,17 @@ import java.util.concurrent.atomic.AtomicInteger
  * 首推场景均不成立）。
  */
 sealed interface ChangeRequest {
-    data class Reset(val key: MarketKey?, val candles: List<Candle>) : ChangeRequest
+    /**
+     * R7-01（第七轮复审 2026-10-31）：**提交归属**——请求所属的 INIT 尝试代次
+     * （[Long.MIN_VALUE] = 不受归属门禁约束的内部/无主请求）。INIT 最终建会话
+     * 失败（Reset 被拒）时，同代次已入队的后续动作在引擎处理时（FIFO 于该
+     * Reset 之后）被拒——失败会话的已入队推送不再串写旧会话快照。
+     */
+    data class Reset(val key: MarketKey?, val candles: List<Candle>, val initEpoch: Long = Long.MIN_VALUE) : ChangeRequest
     data class ReplaceLatest(val candle: Candle) : ChangeRequest
-    data class UpsertLatest(val candle: Candle) : ChangeRequest
-    data class AppendBatch(val candles: List<Candle>) : ChangeRequest
-    data class PrependHistory(val candles: List<Candle>) : ChangeRequest
+    data class UpsertLatest(val candle: Candle, val initEpoch: Long = Long.MIN_VALUE) : ChangeRequest
+    data class AppendBatch(val candles: List<Candle>, val initEpoch: Long = Long.MIN_VALUE) : ChangeRequest
+    data class PrependHistory(val candles: List<Candle>, val initEpoch: Long = Long.MIN_VALUE) : ChangeRequest
 
     /** 显式纠正已存在历史值（R-02 PatchHistory）。 */
     data class PatchHistory(val patches: List<Candle>) : ChangeRequest
@@ -232,19 +238,37 @@ class ChartEngine(
         configVersion = configVersions[instanceId] ?: 0L,
     )
 
+    /** R7-01：失败 INIT 尝试的代次水位（Reset 拒绝时抬升；FIFO 保证其后同代次动作在此之后处理）。 */
+    private var rejectedInitWatermark = Long.MIN_VALUE
+
+    private fun sessionRejected(op: DataOp): ChangeResult.Rejected =
+        ChangeResult.Rejected(op, RejectReason.SESSION_MISMATCH, detail = "R7-01：所属 INIT 尝试建会话失败（提交归属门禁）")
+
     private fun applyToStore(request: ChangeRequest): ChangeResult = when (request) {
             is ChangeRequest.Reset -> {
                 val r = store.reset(request.key, request.candles)
                 if (r is ChangeResult.Accepted) {
                     // 新会话：全部旧结果作废
                     appliedDataRevision.clear()
+                } else {
+                    // R7-01：Reset 最终拒绝 = 该 INIT 尝试建会话失败——抬升拒绝
+                    // 水位，同代次已入队后续动作在引擎处理时被拒（宿主协程入口
+                    // 的水位门禁不够：Reset 经引擎 channel 挂起等待时，后续
+                    // Update 已先行入队并被处理）
+                    rejectedInitWatermark = maxOf(rejectedInitWatermark, request.initEpoch)
                 }
                 r
             }
             is ChangeRequest.ReplaceLatest -> store.replaceLatest(request.candle)
-            is ChangeRequest.UpsertLatest -> store.upsertLatest(request.candle)
-            is ChangeRequest.AppendBatch -> store.appendBatch(request.candles)
-            is ChangeRequest.PrependHistory -> store.prependHistory(request.candles)
+            is ChangeRequest.UpsertLatest ->
+                if (request.initEpoch > Long.MIN_VALUE && request.initEpoch <= rejectedInitWatermark) sessionRejected(DataOp.UPSERT_LATEST)
+                else store.upsertLatest(request.candle)
+            is ChangeRequest.AppendBatch ->
+                if (request.initEpoch > Long.MIN_VALUE && request.initEpoch <= rejectedInitWatermark) sessionRejected(DataOp.APPEND_BATCH)
+                else store.appendBatch(request.candles)
+            is ChangeRequest.PrependHistory ->
+                if (request.initEpoch > Long.MIN_VALUE && request.initEpoch <= rejectedInitWatermark) sessionRejected(DataOp.PREPEND_HISTORY)
+                else store.prependHistory(request.candles)
             is ChangeRequest.PatchHistory -> store.patchHistory(request.patches)
     }
 }

@@ -1364,18 +1364,18 @@ class ChartState(
 
     // ---------- 公开数据操作（挂起经引擎队列；主线程调用） ----------
 
-    suspend fun reset(key: MarketKey, candles: List<Candle>): ChangeResult =
-        engine.apply(ChangeRequest.Reset(key, candles))
+    suspend fun reset(key: MarketKey, candles: List<Candle>, initEpoch: Long = Long.MIN_VALUE): ChangeResult =
+        engine.apply(ChangeRequest.Reset(key, candles, initEpoch))
 
     /** T01：expectedSessionId = 发起时会话快照（引擎写入入口复核；null=不门禁）。 */
-    suspend fun upsertLatest(candle: Candle): ChangeResult =
-        engine.apply(ChangeRequest.UpsertLatest(candle))
+    suspend fun upsertLatest(candle: Candle, initEpoch: Long = Long.MIN_VALUE): ChangeResult =
+        engine.apply(ChangeRequest.UpsertLatest(candle, initEpoch))
 
-    suspend fun appendBatch(candles: List<Candle>): ChangeResult =
-        engine.apply(ChangeRequest.AppendBatch(candles))
+    suspend fun appendBatch(candles: List<Candle>, initEpoch: Long = Long.MIN_VALUE): ChangeResult =
+        engine.apply(ChangeRequest.AppendBatch(candles, initEpoch))
 
-    suspend fun prependHistory(candles: List<Candle>): ChangeResult =
-        engine.apply(ChangeRequest.PrependHistory(candles))
+    suspend fun prependHistory(candles: List<Candle>, initEpoch: Long = Long.MIN_VALUE): ChangeResult =
+        engine.apply(ChangeRequest.PrependHistory(candles, initEpoch))
 
     /** 显式纠正已存在历史值（R-02 PatchHistory；指标后缀重算）。 */
     suspend fun patchHistory(patches: List<Candle>): ChangeResult =
