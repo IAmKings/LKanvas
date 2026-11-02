@@ -76,7 +76,7 @@ python3 -B tools/alignment/check.py
 | R8-02：默认段取后一行样式 | 回调行号为 `[0,1]`，两段分别进入宽度 2/4 的两个批次；上游实际 View 输出也分别使用 2/4 | 原发现关闭 |
 | R8-03：下一点缺失仍画自定义段 | `[100,110,NaN,130,140]` 的自定义路径为 0，仅默认行 0、3 的段保留；正式 NaN 测试也已纠偏 | 缺失下一点原复现关闭；新添的可见范围限制导致 R9-01，行段边界尚未整体关闭 |
 
-证据：[state 级身份与水位](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:56)、[门面从 state 分配身份](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:486)、[默认段样式取所属前行](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:609)、[下一点检查与额外可见区限制](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:625)。
+证据：[state 级身份与水位](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:56)、[门面从 state 分配身份](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:486)、[默认段样式取所属前行](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:609)、[下一点检查与额外可见区限制](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:625)。
 
 ## 4. 剩余发现
 
@@ -95,7 +95,7 @@ python3 -B tools/alignment/check.py
 
 **控制流根因：** 修复 R8-03 时使用了 `attrsOf != null && i < range.last && !column[i+1].isNaN()`。`range.last` 是本次绘制窗口的末行，既不是结果列末行，也不是下一点有效性的定义。上游从完整 `result[dataIndex+1]` 构造 nextCoordinate，只检查数据有效性，没有要求下一行也出现在可见行列表。
 
-**证据：** [本地多出的可见区条件](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:625)、[动态 pane 的实际 range 来源](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:336)、[实际通用 figure 消费](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:365)、[上游 next 取完整结果](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:116)、[上游有效点条件](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)、[上游可见行遍历](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/ChildrenView.ts:23)。
+**证据：** [本地多出的可见区条件](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:625)、[动态 pane 的实际 range 来源](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:336)、[实际通用 figure 消费](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:365)、[上游 next 取完整结果](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:116)、[上游有效点条件](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)、[上游可见行遍历](../../third_party/klinechart-v10.1.0/src/view/ChildrenView.ts:23)。
 
 **最小处理方向：** 在现有 `drawLinePlots` 共同分支中，依据完整结果列判断下一点是否存在且有效，保持当前行的绘制遍历范围与 pane 裁剪。保留真正数据末端、NaN、前行样式和自定义段断链基准；无需扩大为全量绘制或重写渲染器。同步纠正台账 R8-03 将“i+1 在可见区”称为上游共同门禁的表述。
 
@@ -110,7 +110,7 @@ python3 -B tools/alignment/check.py
 
 **控制流根因：** 自定义行在循环中立即调用 drawPath，默认段则积累到 groups，在整个循环结束后才调用 native drawLines。即使段归属和各自 styles 正确，两个绘制出口仍把默认段统一移到覆盖段之后。这个缺口在本轮之前已经存在；本轮真实 View 对照将其确认。
 
-**证据：** [本地立即绘制覆盖段](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:640)、[循环结束后才提交默认批次](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[native 提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:666)、[上游按行登记段](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:195)、[上游按合并结果顺序绘制](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:254)。
+**证据：** [本地立即绘制覆盖段](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:640)、[循环结束后才提交默认批次](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[native 提交](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:666)、[上游按行登记段](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:195)、[上游按合并结果顺序绘制](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:254)。
 
 **最小处理方向：** 保留按行顺序形成的连续批次；遇到自定义段时先提交它之前的默认批次，再绘制自定义段并继续。不要跨覆盖段或样式变化全局重排。无需移除批量优化，但所有出口必须遵守同一实际绘制顺序。
 
@@ -134,7 +134,7 @@ python3 -B tools/alignment/check.py
 
 本地 JVM 探针录制实际 DrawScope/native Canvas 调用和批次数组；Android 默认返回值使其能执行绘制路径，但未证明 GPU 栅格、真实 Path 像素、屏幕触摸或性能。上游同样记录图形定义和 draw 调用，未执行浏览器像素输出。
 
-台账解析 316 行：已声明 237、行为通过 62、已接线 2、不适用 15。R8 三行可解析且引用存在，见[第八轮追踪](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/gap-matrix.md:482)。引用校验不能发现这两项运行差异；R8-03 的原 NaN 修复与本轮可见边界差异应分别记录，不能撤销前者，也不能以其通过覆盖后者。本次未修改台账。
+台账解析 316 行：已声明 237、行为通过 62、已接线 2、不适用 15。R8 三行可解析且引用存在，见[第八轮追踪](gap-matrix.md:482)。引用校验不能发现这两项运行差异；R8-03 的原 NaN 修复与本轮可见边界差异应分别记录，不能撤销前者，也不能以其通过覆盖后者。本次未修改台账。
 
 ## 6. 当前目标收敛情况
 

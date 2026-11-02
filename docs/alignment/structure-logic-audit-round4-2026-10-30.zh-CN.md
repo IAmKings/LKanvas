@@ -101,7 +101,7 @@ python3 -B tools/alignment/check.py
 - INIT close=100，subscribeBar 立即推送 ts=2000、close=999，让 Reset 与 Upsert 在引擎处理前先入队。最终只剩 `[100]`，合法首推被拒绝。同样结果可经公开 ChartState(externalScope) 构造复现，门面立即执行、引擎延后串行处理即可；没有修改生产会话字段。这是受支持的异步调度，不表示默认主线程下每次同步订阅必定丢数据。
 - 原 A INIT 在锁内被拒绝后，回调仍无条件调用旧 loader.subscribeBar；本次受控序列的订阅记录为 `[B,A]`。旧 A 的订阅动作发生在 B 退订旧上下文之后，拒绝数据并未阻止过期生命周期副作用。
 
-**证据：** [Store.kt:169](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:169)、[Store.kt:250](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:250)、[LKanvasChart.kt:469](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:469)、[ChartEngine.kt:239](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:239)。Parity10SessionGateTest 的迟到回调场景主要在切换后才进入首次检查，未覆盖本次锁等待 ABA 和提交前首推交错。
+**证据：** [Store.kt:169](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:169)、[Store.kt:250](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:250)、[LKanvasChart.kt:469](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:469)、[ChartEngine.kt:239](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:239)。Parity10SessionGateTest 的迟到回调场景主要在切换后才进入首次检查，未覆盖本次锁等待 ABA 和提交前首推交错。
 
 **最小处理方向：** 在会话建立/配置变更时确定身份，捕获并随 INIT、分页、实时请求传到现有引擎写入入口；锁内比较捕获代次，避免用 key 相等代替代次相等。订阅动作使用同一门禁及真实提交结果，处理好新 INIT 与首推的顺序；不需要另造第二个数据引擎。
 
@@ -117,7 +117,7 @@ python3 -B tools/alignment/check.py
 
 轴构造默认字段已修，但 getYAxisTemplate 只桥接 name/createSpec，注册 reverse=true 后，新轴为 true，模板回读仍为 false。
 
-**证据：** [ChartState.kt:382](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:382)、[LKanvasChart.kt:295](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:295)、[LKanvasChart.kt:325](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:325)、[PaneRenderers.kt:332](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:332)、[LkanvasRegistry.kt:154](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LkanvasRegistry.kt:154)。
+**证据：** [ChartState.kt:382](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:382)、[LKanvasChart.kt:295](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:295)、[LKanvasChart.kt:325](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:325)、[PaneRenderers.kt:332](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:332)、[LkanvasRegistry.kt:154](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LkanvasRegistry.kt:154)。
 
 **最小处理方向：** 明确内部绝对/局部坐标的边界，在门面只转换一次；按实际绑定轴给每个实例提供投影与标签，构造/查询复用完整配置。不能仅在 metadata 加 paneId 后让下游继续按普通轴绘制。
 
@@ -131,7 +131,7 @@ python3 -B tools/alignment/check.py
 
 **运行复现：** 动态 pane 的 VOL 各可见列均为 100。转换范围为 `(0,100)`，100 映射到 pane 顶 y=481；实际 renderer 范围仍按恒值扩成 `(99,101)`，draw 钩子收到的 yOf(100)=521，相差 40 px。纯线 MA+BOLL 的原样例现在正确，不能据此推断 BAR 也正确。
 
-**证据：** [ChartState.kt:437](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:437)、[ChartState.kt:503](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:503)、[PaneRenderers.kt:332](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:332)。
+**证据：** [ChartState.kt:437](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:437)、[ChartState.kt:503](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:503)、[PaneRenderers.kt:332](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:332)。
 
 **最小处理方向：** renderer 使用同一份范围结果，按 figure.baseValue、minValue/maxValue 和轴规则处理基线，删除重复扫描分支；保留已正确的全部可见实例聚合。
 
@@ -147,7 +147,7 @@ renderer 的模板局部 bounds/pixelPoints 与 translate 已修，但没有相�
 
 **运行复现：** RSI pane 的 value=50 先转为屏幕触点，再经当前拖动所用函数并显式传入正确 paneId，反算得到≈-476.405492。另将 RSI 覆盖物设为 pane 相对 y=-20 的水平线，当前 hitTest 在 `paneTop-20` 的主图区仍返回该副图覆盖物。创建分支问题由调用链静态确认，本次未运行完整触摸 E2E。
 
-**证据：** [ChartState.kt:516](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:516)、[ChartState.kt:586](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:586)、[ChartGestures.kt:81](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:81)、[ChartGestures.kt:101](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:101)、[ChartGestures.kt:366](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:366)、[OverlayRenderer.kt:98](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:98)、[OverlayRenderer.kt:262](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:262)。
+**证据：** [ChartState.kt:516](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:516)、[ChartState.kt:586](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:586)、[ChartGestures.kt:81](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:81)、[ChartGestures.kt:101](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:101)、[ChartGestures.kt:366](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:366)、[OverlayRenderer.kt:98](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:98)、[OverlayRenderer.kt:262](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:262)。
 
 **最小处理方向：** 从实例解析创建和编辑的 pane/轴，绝对触点在输入边界减一次 top；模板局部坐标在输出边界平移一次，并共享绘制裁剪和命中边界。保留已正确的模板局部坐标修改。
 
@@ -163,9 +163,9 @@ renderer 的模板局部 bounds/pixelPoints 与 translate 已修，但没有相�
 
 **静态确认的组合情形：** `macd` pane 以 isStack=true 再绑定 RSI，管理表可以包含两个实例，drawMacdPane 却只读取 macdPaneResult 的一个结果；后一个不会通过通用实例循环绘制。其自定义 draw/attrs/styles 也不经过动态 pane 的入口。未以真机截图复核该组合。
 
-**证据：** [PaneRenderers.kt:699](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:699)、[PaneRenderers.kt:733](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:733)、[PaneRenderers.kt:803](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:803)、[PaneRenderers.kt:250](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:250)、[PaneRenderers.kt:286](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:286)、[AxisAndInstanceFieldsTest.kt:591](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt:591)；上游对照为 [IndicatorView.ts:134](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:134)。
+**证据：** [PaneRenderers.kt:699](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:699)、[PaneRenderers.kt:733](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:733)、[PaneRenderers.kt:803](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:803)、[PaneRenderers.kt:250](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:250)、[PaneRenderers.kt:286](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:286)、[AxisAndInstanceFieldsTest.kt:591](../../lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisAndInstanceFieldsTest.kt:591)；上游对照为 [IndicatorView.ts:134](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:134)。
 
-VOL 的涨跌色也不是必须绕过模板的 Android 特例：上游 [volume.ts:33](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/extension/indicator/volume.ts:33) 本身就在 figure.styles 中表达，仍由通用指标绘制消费。
+VOL 的涨跌色也不是必须绕过模板的 Android 特例：上游 [volume.ts:33](../../third_party/klinechart-v10.1.0/src/extension/indicator/volume.ts:33) 本身就在 figure.styles 中表达，仍由通用指标绘制消费。
 
 **最小处理方向：** 所有 pane 的全部实例复用现有 figure 执行入口，几何 attrs 真正传给图形绘制，styles 与实例配置按原契约合并；保留 main/额外轴已经接通的两处调用，消除固定 pane 的规则旁路。
 
@@ -177,7 +177,7 @@ VOL 的涨跌色也不是必须绕过模板的 Android 特例：上游 [volume.t
 
 因此 123.45678 在主图应按品种精度显示为 123.45678，当前分支会生成 123.46；配置千分位或小数折叠后，同一值也可能与上游/其他格式链不同。精度结果已运行验证，文本最终像素未执行集成测试。
 
-**证据：** [OverlayRenderer.kt:125](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:125)、[OverlayRenderer.kt:149](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:149)、[上游 priceLine.ts:24](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/extension/overlay/priceLine.ts:24)。
+**证据：** [OverlayRenderer.kt:125](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:125)、[OverlayRenderer.kt:149](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:149)、[上游 priceLine.ts:24](../../third_party/klinechart-v10.1.0/src/extension/overlay/priceLine.ts:24)。
 
 **最小处理方向：** 将实际品种/实例精度及已有格式链传到该模板执行上下文并复用；不在 renderer 再建立一份固定精度规则。
 
@@ -189,7 +189,7 @@ VOL 的涨跌色也不是必须绕过模板的 Android 特例：上游 [volume.t
 
 同一动态 pane 的 paneHeights 设置也被忽略：setter 只路由 main/vol/macd，输入 `{paneId:123}` 后仍为原来的 80，尽管 getter 现在能列出动态 pane 高度。
 
-**证据：** [LKanvasChart.kt:981](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:981)、[LKanvasChart.kt:994](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:994)、[LKanvasChart.kt:1028](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:1028)、[ChartState.kt:1258](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:1258)。
+**证据：** [LKanvasChart.kt:981](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:981)、[LKanvasChart.kt:994](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:994)、[LKanvasChart.kt:1028](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:1028)、[ChartState.kt:1258](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:1258)。
 
 **最小处理方向：** 删除一份禁用列表，让 setter/getter/手势使用同一状态；高度设置遍历实际 pane 集合并复用现有 setPaneOptions 路由。
 
@@ -201,7 +201,7 @@ VOL 的涨跌色也不是必须绕过模板的 Android 特例：上游 [volume.t
 
 上游 drawArc 调用 Canvas ctx.arc 默认方向；本次采纳的补丁也明确按 increasing-angle sweep 判断。Compose 的 drawArc 使用 start+sweep 表达终点，正方向为顺时针；平台替代必须显式适配该差异。[官方 DrawScope 说明](https://developer.android.com/reference/kotlin/androidx/compose/ui/graphics/drawscope/DrawScope)。
 
-**证据：** [FigureRenderer.kt:66](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/FigureRenderer.kt:66)、[Figures.kt:87](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt:87)、[上游 arc.ts:42](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/extension/figure/arc.ts:42)。
+**证据：** [FigureRenderer.kt:66](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/FigureRenderer.kt:66)、[Figures.kt:87](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt:87)、[上游 arc.ts:42](../../third_party/klinechart-v10.1.0/src/extension/figure/arc.ts:42)。
 
 **最小处理方向：** 命中、绘制及 arcSample 共享同一跨度规则，在平台调用前处理负差值及整圆；保留已经修复的公共命中入口。
 
@@ -213,7 +213,7 @@ VOL 的涨跌色也不是必须绕过模板的 Android 特例：上游 [volume.t
 
 上游 fixedZLevel 的含义是保留声明层级、不临时浮起，并不禁用命中或编辑。本地把“没有选中优先级”实现成“从所有候选中移除”。
 
-**证据：** [OverlayRenderer.kt:229](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:229)、[OverlayRenderer.kt:239](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:239)、[OverlayRenderer.kt:246](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:246)、[上游 Overlay.ts:153](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/Overlay.ts:153)。
+**证据：** [OverlayRenderer.kt:229](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:229)、[OverlayRenderer.kt:239](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:239)、[OverlayRenderer.kt:246](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:246)、[上游 Overlay.ts:153](../../third_party/klinechart-v10.1.0/src/component/Overlay.ts:153)。
 
 **最小处理方向：** 固定层级对象保留在普通 z 顺序命中候选中，选中和控制点编辑按契约处理；不要因取消浮起而取消可交互性。
 

@@ -20,6 +20,8 @@ v3 既有七面校验保留：
   ⑦ Overlay.ts Overlay 实例接口 24 字段 → 矩阵 OVL- 行逐一对应
 另：行格式（ID 唯一/前缀/分类单字母/验收/工作量/批次枚举）与
     方法名纠错护栏（getConvertPictureUrl）。
+另（2026-11-03 定名治理）：命名一致性护栏——项目定名 LKanvas，旧建名不得再
+    出现于产品文档与构建配置（docs/evidence/ 历史证据豁免；详见 validate_naming）。
 
 用法：python3 tools/alignment/check.py   （失败退出码 1，可挂 CI/pre-commit）
 """
@@ -162,6 +164,42 @@ def collect_kt_files():
             for f in d.rglob('*.kt'):
                 files[f.name] = f
     return files
+
+
+# ---- 命名一致性护栏（2026-11-03 定名治理）----
+# 项目定名 LKanvas（Maven io.lkanvas）；仓库与目录已于 2026-11-03 由旧建名
+# 更正为 LKanvas（旧建名全文见 PRD「命名说明」的更正记录，产品文件中仅此一处）。
+# 旧建名及其变体不得再出现于产品文档与构建配置。docs/evidence/ 为历史证据
+# 存档（当时构建日志原文），整体豁免；PRD 更正记录允许保留 1 次（显式登记）。
+NAMING_ALLOWED = {
+    'docs/PRD-KLineChart-Kotlin-Compose.zh-CN.md': 1,
+}
+OLD_NAME_RE = re.compile(r'k{2}[-_ ]?line', re.I)
+
+
+def validate_naming():
+    scan = []
+    docs = ROOT / 'docs'
+    if docs.is_dir():
+        for f in docs.rglob('*.md'):
+            rel = f.relative_to(ROOT).as_posix()
+            if not rel.startswith('docs/evidence/'):
+                scan.append((rel, f))
+    for name in ('README.md', 'DESIGN.md'):
+        p = ROOT / name
+        if p.exists():
+            scan.append((name, p))
+    for f in list(ROOT.rglob('*.gradle.kts')) + list(ROOT.rglob('gradle.properties')):
+        rel = f.relative_to(ROOT).as_posix()
+        if rel.startswith(('build/', '.gradle/', '.kotlin/')) or '/build/' in f'/{rel}':
+            continue
+        scan.append((rel, f))
+    for rel, f in scan:
+        n = len(OLD_NAME_RE.findall(f.read_text(errors='ignore')))
+        limit = NAMING_ALLOWED.get(rel, 0)
+        if n > limit:
+            err(f'[命名] {rel} 旧建名出现 {n} 次（上限 {limit}）——'
+                f'项目定名 LKanvas，请改用 LKanvas/lkanvas；历史日志证据请归档 docs/evidence/')
 
 
 def validate_states(rows, kt_files):
@@ -318,6 +356,7 @@ def main():
     kt_files = collect_kt_files()
     by_state = validate_states(matrix, kt_files)
     validate_structure_map()
+    validate_naming()
 
     # ---- 方法名纠错护栏 ----
     for name in ('convertToPictureUrl',):
@@ -340,7 +379,7 @@ def main():
         for e in errors[:50]:
             print('  -', e, file=sys.stderr)
         sys.exit(1)
-    print('\n校验通过：七面覆盖完整、格式合法、签名列非空、状态列合法且引用文件存在')
+    print('\n校验通过：七面覆盖完整、格式合法、签名列非空、状态列合法且引用文件存在、命名一致（LKanvas）')
 
 
 if __name__ == '__main__':

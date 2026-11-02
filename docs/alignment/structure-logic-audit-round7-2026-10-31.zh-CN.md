@@ -72,7 +72,7 @@ python3 -B tools/alignment/check.py
 | M05：模板 min/max 不执行 | `paneVisibleRange` 合并约束；VOL 得到 `[0,100]`，自定义约束得到 `[-50,500]` | 默认 pane 原复现已修；绑定轴范围仍遗漏相同约束，R7-02 |
 | M06：低层固定控点全局优先 | 单一 z 降序遍历，同实例先控点后主体；被 z=10 宽线覆盖时命中高层，单对象固定控点仍可编辑 | 在本轮覆盖范围内关闭 |
 
-结构证据：[双路径实例轴入口](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:412)、[内置 pane 实际调用](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:296)、[动态 pane 实际调用](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:351)、[控点裁剪上下文](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:102)、[单一命中遍历](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:253)。
+结构证据：[双路径实例轴入口](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:412)、[内置 pane 实际调用](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:296)、[动态 pane 实际调用](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:351)、[控点裁剪上下文](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:102)、[单一命中遍历](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:253)。
 
 上述“关闭”仅指明确复核的发现与覆盖范围，不构成该领域全部配置、全部异常路径的穷举证明。
 
@@ -86,7 +86,7 @@ python3 -B tools/alignment/check.py
 
 这与第六轮“旧失败退订新 C”是不同的先后顺序。双身份清理修复有效，但没有给失败 INIT 的排队动作提供提交归属。原来“失败后排空，再推送”的用例没有覆盖本顺序。
 
-**证据：** [INIT 受理与异步结果](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:476)、[Update 仅检查 epoch](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:521)、[Store 依受理结果订阅](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:173)、[引擎队列提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:127)、[Reset 拒绝后保留旧数据](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/ChartDataStore.kt:177)、[UpsertLatest 提交未带身份](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:245)。
+**证据：** [INIT 受理与异步结果](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:476)、[Update 仅检查 epoch](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:521)、[Store 依受理结果订阅](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:173)、[引擎队列提交](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:127)、[Reset 拒绝后保留旧数据](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/ChartDataStore.kt:177)、[UpsertLatest 提交未带身份](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:245)。
 
 **最小处理方向：** 在既有串行链路中，让 INIT 的后续动作受其最终建会话结果约束，提交前拒绝失败会话动作。仅在 rejected continuation 再改一次全局 epoch 不能保证拦住已进入引擎队列的请求。保留旧失败不干扰新 C、ABA 旧回调门禁，以及合法 INIT 同步首推能够保留的基准。
 
@@ -100,7 +100,7 @@ python3 -B tools/alignment/check.py
 
 上游 YAxis 在本轴对应的指标集合中先聚合 specifyMin/specifyMax，再与观测范围合并，范围约束并不限于未绑定的默认 pane。
 
-**证据：** [pane 约束合并](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:526)、[额外轴范围扫描](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:913)、[绑定投影消费者](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:422)、[上游按轴选指标](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/YAxis.ts:142)、[上游模板约束聚合](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/YAxis.ts:163)、[上游范围合并](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/YAxis.ts:222)。
+**证据：** [pane 约束合并](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:526)、[额外轴范围扫描](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:913)、[绑定投影消费者](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:422)、[上游按轴选指标](../../third_party/klinechart-v10.1.0/src/component/YAxis.ts:142)、[上游模板约束聚合](../../third_party/klinechart-v10.1.0/src/component/YAxis.ts:163)、[上游范围合并](../../third_party/klinechart-v10.1.0/src/component/YAxis.ts:222)。
 
 **最小处理方向：** 将已有 min/max 聚合规则应用于实际绑定的轴集合，使额外轴的绘制、转换和标签消费相同的正确范围。不能直接拿整个 pane 的范围替代独立轴范围，否则会撤销本轮多轴修复。
 
@@ -117,7 +117,7 @@ python3 -B tools/alignment/check.py
 
 **逻辑根因：** `y(v)` 已经是绝对画布坐标。进入“有 y 或 height”的分支后，缺省 y 取 `min(vy,baseY)`，随后无条件再加 `paneTop`。只有自定义 attrs.y 是 pane 局部坐标，需要这次平移；默认 y 已经完成平移。该分支把两种坐标来源合在了同一次加法里。另一个分支中，默认 ax 在读取有效 width 前已经按 bodyWidth 决定；上游则先取 `attrs.width ?? 默认宽度`，再生成缺省 x。因此，几何字段需要按依赖顺序合成，并非四个字段各自独立覆盖就已等价。
 
-**证据：** [默认 x 与覆盖宽度的计算顺序](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:744)、[动态 pane 的绝对 defaultY](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:344)、[BAR 部分字段分支](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:750)、[上游默认矩形后展开 attrs](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:180)。
+**证据：** [默认 x 与覆盖宽度的计算顺序](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:744)、[动态 pane 的绝对 defaultY](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:344)、[BAR 部分字段分支](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:750)、[上游默认矩形后展开 attrs](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:180)。
 
 **最小处理方向：** 保持默认几何先计算、attrs 按键覆盖；明确默认 y 与 attrs.y 的坐标系，只对后者平移一次；缺省 x 按有效宽度居中，同时保留显式 attrs.x 的左边界含义。保留完整四字段、无 attrs、局部 top/bottom 兼容输入。
 
@@ -137,7 +137,7 @@ python3 -B tools/alignment/check.py
 
 **结构根因：** 自定义行绘制后，把点列末尾写入全局 `lastX/lastY`，并置 `prevWasFinite=true`。下一默认行于是从这个自定义终点接续。上游每行把 `attrs.coordinates ?? [currentCoordinate,nextCoordinate]` 作为独立 figure 段登记，不将自定义终点改写为下一行的默认起点。这里仍把逐行几何覆盖改成了连续路径状态。
 
-**证据：** [自定义行写回连续状态](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:625)、[下一行生成批量段](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:632)、[上游独立段语义](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)。
+**证据：** [自定义行写回连续状态](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:625)、[下一行生成批量段](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:632)、[上游独立段语义](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)。
 
 **最小处理方向：** 按上游行段定义决定默认段与覆盖段，再按样式批量提交；批量优化仍可保留，但不能用上一自定义终点决定下一默认段。验证默认→覆盖→默认、NaN 间隔和行级样式，避免只靠清空 prev 状态而漏画另一侧合法默认段。
 
@@ -159,7 +159,7 @@ python3 -B tools/alignment/check.py
 
 当前 Compose 构建配置启用了 `unitTests.isReturnDefaultValues=true`。正式 `TestDrawScope` 和本次探针录制真实绘制调用、参数及 clip/translate 深度；LINE 探针另用 Android Canvas 子类记录批量坐标。**这些是消费者和几何参数证据，不是真机像素栅格、截图或手势 E2E 证据。** 没有把 mocked Android Path 的默认返回值当成图形已经正确显示。
 
-台账校验结果为 309 行：已声明 237、行为通过 55、已接线 2、不适用 15。M 编号和此前遗漏的 N06 已进入解析/台账，文档完整性改善。[M01–M06 台账](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/gap-matrix.md:462)与[figure 结构映射](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/structure-map.md:30)均已更新，但 M01/M03/M05 的“行为通过”不能再解释为覆盖全部组合。当前工具检查引用存在，不执行上述输入，更不能因本轮 check.py 通过就判定完整验收通过。
+台账校验结果为 309 行：已声明 237、行为通过 55、已接线 2、不适用 15。M 编号和此前遗漏的 N06 已进入解析/台账，文档完整性改善。[M01–M06 台账](gap-matrix.md:462)与[figure 结构映射](structure-map.md:30)均已更新，但 M01/M03/M05 的“行为通过”不能再解释为覆盖全部组合。当前工具检查引用存在，不执行上述输入，更不能因本轮 check.py 通过就判定完整验收通过。
 
 上述范围说明是对现有状态的审计意见，本次没有修改台账状态，也没有撤销已经成立的修复证据。
 

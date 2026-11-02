@@ -87,7 +87,7 @@ python3 -B tools/alignment/check.py
 
 非法INIT本身被校验器正确拦截；错误在于拒绝结果没有约束后续生命周期，不能以“输入非法”解释为允许新订阅污染旧会话。此用例走公开DataLoader回调，没有修改生产字段或注入会话状态。
 
-**证据：** [LKanvasChart.kt:475](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:475)、[LKanvasChart.kt:504](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:504)、[Store.kt:173](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:173)、[Store.kt:223](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:223)、[ChartDataStore.kt:177](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/ChartDataStore.kt:177)。
+**证据：** [LKanvasChart.kt:475](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:475)、[LKanvasChart.kt:504](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:504)、[Store.kt:173](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:173)、[Store.kt:223](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:223)、[ChartDataStore.kt:177](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/ChartDataStore.kt:177)。
 
 **最小处理方向：** 把真实提交结果反馈到INIT/订阅及会话状态；失败时不能对旧内核接纳新会话推送。复用现有ChangeResult与串行写入入口，明确失败、重试及缓冲首推的顺序，保留本轮已经正确的ABA与首推行为。
 
@@ -102,7 +102,7 @@ python3 -B tools/alignment/check.py
 - RSI实例仍绑定默认main，在其pane注册一条未绑定任何实例的reverse额外轴。绘制y由应有541变为501；仅增加未使用的轴就翻转了默认指标。
 - 同pane中RSI绑定log+reverse轴，MA绑定默认轴。RSI同一点的轴转换绝对y≈539.856431，renderer实际提供≈534.334726；只有一个实例时两者已经相等，叠加后重新不同。
 
-**证据：** [PaneRenderers.kt:341](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:341)、[PaneRenderers.kt:355](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:355)、[PaneRenderers.kt:287](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:287)、[ChartState.kt:382](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:382)、[ChartState.kt:878](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:878)。
+**证据：** [PaneRenderers.kt:341](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:341)、[PaneRenderers.kt:355](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:355)、[PaneRenderers.kt:287](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:287)、[ChartState.kt:382](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:382)、[ChartState.kt:878](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:878)。
 
 **最小处理方向：** 按实例绑定的轴分组，绘制、转换和标签复用该轴上下文及可见绑定实例范围；未使用的轴不改变其他实例投影。不要用pane内第一条轴代替每实例的轴选择。
 
@@ -117,7 +117,7 @@ python3 -B tools/alignment/check.py
 - 内置vol各可见列及成交量恒为100：renderer通过paneVisibleRange得到`(99,101)`，yOf(100)=520；转换仍按`(0,100)`得到绝对y=480，差40px。用相同top/bottom隔离了范围公式，未把差异归于分隔线像素。
 - macd pane首个实例为MA，叠加一个结果为1000的合法注册指标。后者确实被绘制，但范围仍为`(0,122.557...)`，其yOf(1000)≈-92.757，pane top=480，落在裁剪区外。
 
-**证据：** [ChartState.kt:463](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:463)、[ChartState.kt:492](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:492)、[PaneRenderers.kt:284](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:284)。
+**证据：** [ChartState.kt:463](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:463)、[ChartState.kt:492](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:492)、[PaneRenderers.kt:284](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:284)。
 
 **最小处理方向：** 全部pane基于实际可见实例与其figure基线/范围约束计算，转换读取同一个结果。删除内置pane的首实例近似与单独转换公式，保留本轮已接通的全实例绘制。
 
@@ -133,7 +133,7 @@ python3 -B tools/alignment/check.py
 - 输入上游矩形attrs `{x:20,y:30,width:7,height:9}`，实际绘制参数为`[-3,0,6,100]`，没有覆盖默认矩形。
 - 图形列实际值为100、行情200根，真实动态pane入口调用attrs时却收到value=NaN、candles.size=0；styles的candles.size也为0。内置VOL的新增配色回调对缺失candle返回中性色，因此该上下文缺失会影响正常默认新建pane路径。
 
-**证据：** [PaneRenderers.kt:120](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:120)、[PaneRenderers.kt:369](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:369)、[PaneRenderers.kt:656](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[PaneRenderers.kt:707](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:707)、[PaneRenderers.kt:776](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:776)、[上游IndicatorView.ts:142](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:142)、[Volume.kt:39](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/Volume.kt:39)。
+**证据：** [PaneRenderers.kt:120](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:120)、[PaneRenderers.kt:369](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:369)、[PaneRenderers.kt:656](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[PaneRenderers.kt:707](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:707)、[PaneRenderers.kt:776](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:776)、[上游IndicatorView.ts:142](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:142)、[Volume.kt:39](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/Volume.kt:39)。
 
 **最小处理方向：** 统一传入实际行值、行情及pane/轴/几何上下文；按图形类型把attrs合并为最终几何，在确定边界只平移一次。补齐所有入口的实际参数，保留已经统一的实例循环，不能用空参数适配已声明的回调。
 
@@ -145,7 +145,7 @@ python3 -B tools/alignment/check.py
 
 **问题与复现：** formatPriceText末尾直接return，没有使用formatConfig.decimalFoldThreshold。品种精度8、threshold=3、value=0.00001234，当前输出`0.00001234`，现有公共格式函数和上游契约对应`0.0{4}1234`。另将指标实例公开的precisionOverride设为6后，12.345678仍输出12.35，因为renderer只读definition.precision。
 
-**证据：** [OverlayRenderer.kt:154](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:154)、[Format.kt:67](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Format.kt:67)、[IndicatorEngine.kt:217](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/indicator/IndicatorEngine.kt:217)、[上游priceLine.ts:24](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/extension/overlay/priceLine.ts:24)。
+**证据：** [OverlayRenderer.kt:154](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:154)、[Format.kt:67](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Format.kt:67)、[IndicatorEngine.kt:217](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/indicator/IndicatorEngine.kt:217)、[上游priceLine.ts:24](../../third_party/klinechart-v10.1.0/src/extension/overlay/priceLine.ts:24)。
 
 **最小处理方向：** 以实例有效精度执行precision→thousands→decimalFold，复用已有格式函数，补上最后一步消费。
 
@@ -155,7 +155,7 @@ python3 -B tools/alignment/check.py
 
 **问题与复现：** 控制点绘制位于新clipRect块之外，命中第一段也在hitBody的pane边界检查之前。RSI覆盖物控制点位于pane相对y=-20，选中后在主图区仍命中pointIndex=0；真实绘制调用记录两个控制圆心y=461，所属pane top=481。
 
-**证据：** [OverlayRenderer.kt:99](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:99)、[OverlayRenderer.kt:142](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:142)、[OverlayRenderer.kt:241](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:241)。上游[OverlayView.ts:494](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/OverlayView.ts:494)与[默认控制点:577](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/OverlayView.ts:577)在所属pane/widget绘制上下文中执行，Compose单画布需显式保留这个边界。
+**证据：** [OverlayRenderer.kt:99](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:99)、[OverlayRenderer.kt:142](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:142)、[OverlayRenderer.kt:241](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:241)。上游[OverlayView.ts:494](../../third_party/klinechart-v10.1.0/src/view/OverlayView.ts:494)与[默认控制点:577](../../third_party/klinechart-v10.1.0/src/view/OverlayView.ts:577)在所属pane/widget绘制上下文中执行，Compose单画布需显式保留这个边界。
 
 **最小处理方向：** 控制点与主体使用相同pane裁剪和输入归属，边缘可触达容差在该边界内明确处理。
 
@@ -165,7 +165,7 @@ python3 -B tools/alignment/check.py
 
 **问题与复现：** hitTest控制点分支仍把inst.fixedZLevel作为continue条件。选中未锁定segment，普通状态点第一个端点得到pointIndex=0；只将fixedZLevel改为true后，同一点变为pointIndex=null、wholeDrag=true。实际手势因此进入WHOLE_DRAG而非POINT_DRAG。
 
-**证据：** [OverlayRenderer.kt:243](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:243)、[OverlayRenderer.kt:265](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:265)、[ChartGestures.kt:128](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:128)、[上游Overlay.ts:153](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/Overlay.ts:153)。上游该字段只约束层级浮起，不禁用控制点编辑。
+**证据：** [OverlayRenderer.kt:243](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:243)、[OverlayRenderer.kt:265](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:265)、[ChartGestures.kt:128](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/gesture/ChartGestures.kt:128)、[上游Overlay.ts:153](../../third_party/klinechart-v10.1.0/src/component/Overlay.ts:153)。上游该字段只约束层级浮起，不禁用控制点编辑。
 
 **最小处理方向：** 固定层级对象在声明的z顺序中保留控制点候选，把是否浮起与是否可以编辑分开判断。
 

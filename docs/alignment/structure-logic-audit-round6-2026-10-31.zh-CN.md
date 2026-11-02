@@ -76,7 +76,7 @@ python3 -B tools/alignment/check.py
 
 该用例未修改生产字段或锁，仅固定“较早异步失败晚于新会话受理”的正常交错。单个失败B的原复现已修，本项是该反馈逻辑的跨会话组合问题。
 
-**证据：** [LKanvasChart.kt:476](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:476)、[失败分支:486](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:486)、[数据操作门禁:497](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:497)。
+**证据：** [LKanvasChart.kt:476](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:476)、[失败分支:486](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:486)、[数据操作门禁:497](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:497)。
 
 **最小处理方向：** INIT捕获自身身份，处理失败及其他后续副作用前确认仍属于当前会话；只清理其所属订阅。代次保持单调，用失效机制代替减1回滚，保留首推与合法重试行为。
 
@@ -88,7 +88,7 @@ python3 -B tools/alignment/check.py
 
 **运行复现：** 同pane创建两个RSI实例，分别绑定reverse轴和normal轴。第一条轴为reverse，第二个normal实例某值的正确绝对y=541，实际renderer提供y=501。另在内置vol绑定reverse RSI，正确轴转换为500，renderer实际约540.665691。
 
-**证据：** [PaneRenderers.kt:339](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:339)、[实例循环:358](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:358)、[固定pane:287](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:287)。
+**证据：** [PaneRenderers.kt:339](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:339)、[实例循环:358](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:358)、[固定pane:287](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:287)。
 
 **最小处理方向：** 在每个实例或实际轴分组内解析yAxisId及其范围、spec、reverse，再传入绘制；固定和动态pane使用同一选择入口。过滤第一项并不等于按实例分组。
 
@@ -100,7 +100,7 @@ python3 -B tools/alignment/check.py
 
 LINE attrs仍没有绘制消费者。本轮structure-map将其登记为平台差异，但批量drawLines是本地优化选择，不能据此把上游几何覆盖契约改成不适用。登记满足了追溯需要，没有自动满足本次结构/逻辑验收，也没有用户变更原标准的依据。
 
-**证据：** [PaneRenderers.kt:716](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:716)、[矩形输出:733](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:733)、[上游IndicatorView.ts:142](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:142)、[差异登记:30](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/structure-map.md:30)。
+**证据：** [PaneRenderers.kt:716](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:716)、[矩形输出:733](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:733)、[上游IndicatorView.ts:142](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:142)、[差异登记:30](structure-map.md:30)。
 
 **最小处理方向：** 按类型合并上游完整attrs；只给未提供的字段生成默认几何。保留无attrs的批量快路径，提供attrs时执行几何覆盖，再送入现有绘制入口，不需要重写全部renderer。
 
@@ -114,7 +114,7 @@ LINE attrs仍没有绘制消费者。本轮structure-map将其登记为平台差
 
 这是相较上一版可定位的坐标回归。控点pane外命中已被修复，但注释“移入pane裁剪块内”与大括号控制范围不符。
 
-**证据：** [OverlayRenderer.kt:99](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:99)、[闭合与控点:140](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:140)、[命中映射:259](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:259)。
+**证据：** [OverlayRenderer.kt:99](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:99)、[闭合与控点:140](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:140)、[命中映射:259](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:259)。
 
 **最小处理方向：** 真正将控点放入相应裁剪/平移块，或统一在绝对坐标下绘制并使用相同裁剪；只在一个明确边界变换一次，并同时验证可见位置和命中位置。
 
@@ -128,7 +128,7 @@ LINE attrs仍没有绘制消费者。本轮structure-map将其登记为平台差
 
 转换与绘制现在共享这一结果，原来的40px差异已消失；但共享一个漏掉约束的结果仍不符合上游。上游YAxis在计算默认范围时明确合并指标声明的上下界。
 
-**证据：** [ChartState.kt:442](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:442)、[VOL分支:467](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:467)、[Volume.kt](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/Volume.kt)、[上游YAxis.ts:163](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/YAxis.ts:163)、[范围合并:224](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/YAxis.ts:224)。
+**证据：** [ChartState.kt:442](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:442)、[VOL分支:467](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:467)、[Volume.kt](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/Volume.kt)、[上游YAxis.ts:163](../../third_party/klinechart-v10.1.0/src/component/YAxis.ts:163)、[范围合并:224](../../third_party/klinechart-v10.1.0/src/component/YAxis.ts:224)。
 
 **最小处理方向：** 在现有范围入口中合并实际绑定、可见指标的上下界约束，供绘制和转换共同使用；无需重新拆出独立VOL转换公式。
 
@@ -140,7 +140,7 @@ LINE attrs仍没有绘制消费者。本轮structure-map将其登记为平台差
 
 上游在绘制顺序中注册figure，Eventful按子对象逆序分发事件；fixedZLevel保留声明层级。恢复控点可编辑不能顺便给固定层级对象全局最高命中优先级。
 
-**证据：** [OverlayRenderer.kt:248](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:248)、[后续主体遍历:271](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:271)、[上游Eventful.ts:42](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/common/Eventful.ts:42)、[OverlayView.ts:481](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/OverlayView.ts:481)、[fixedZLevel契约:153](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/Overlay.ts:153)。
+**证据：** [OverlayRenderer.kt:248](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:248)、[后续主体遍历:271](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:271)、[上游Eventful.ts:42](../../third_party/klinechart-v10.1.0/src/common/Eventful.ts:42)、[OverlayView.ts:481](../../third_party/klinechart-v10.1.0/src/view/OverlayView.ts:481)、[fixedZLevel契约:153](../../third_party/klinechart-v10.1.0/src/component/Overlay.ts:153)。
 
 **最小处理方向：** 以一致的实际层级顺序处理主体和控点；选中浮起与固定层级分别按原契约处理，保留单对象端点编辑的修复。
 

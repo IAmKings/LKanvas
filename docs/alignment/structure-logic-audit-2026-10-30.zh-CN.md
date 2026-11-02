@@ -58,14 +58,14 @@
 
 ### 2.2 已确认的修复
 
-- **27 个指标均拆到 `extension/indicator/`，并且 27 个都覆写 calc。** MA 恢复了“输出后减滑出值”的顺序；全量引擎执行 calc，Scratch 用于增量边界状态。现有 oracle 和双路径测试通过。这解决了上轮“没有可对照全量入口”的主要问题。见 [MovingAverage.kt:33](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/MovingAverage.kt:33)、[IndicatorEngine.kt:282](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/indicator/IndicatorEngine.kt:282)。
+- **27 个指标均拆到 `extension/indicator/`，并且 27 个都覆写 calc。** MA 恢复了“输出后减滑出值”的顺序；全量引擎执行 calc，Scratch 用于增量边界状态。现有 oracle 和双路径测试通过。这解决了上轮“没有可对照全量入口”的主要问题。见 [MovingAverage.kt:33](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/indicator/MovingAverage.kt:33)、[IndicatorEngine.kt:282](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/indicator/IndicatorEngine.kt:282)。
 - **指标输出列已按实例参数生成。** 五个周期的 MA 能输出五列，没有再出现原来的 ma5 错误。
 - **指标/覆盖物全局注册已进入创建查询。** 本轮临时用例确认，在既有图表中注册自定义指标后也能创建。
 - **初始不再预置 MA/VOL/MACD，批量删除不再保留内置实例。** 临时用例确认创建两个 RSI 后无参删除可清空实例及动态 pane。
 - **程序滚动/缩放开关和 scale=1 的旧问题已修复。** 两个开关在 ChartState 共用入口检查；zoomAtDataIndex 不再预先居中。
 - **交互式覆盖物创建配置已应用。** paneId、groupId、lock、visible 的上轮复现已通过。
 - **主轴 log 转换、reverse、格式链与部分模板回调已接线。** 这些是真实新增的消费者；以下发现针对剩余路径，不能解读为上述工作没有发生。
-- **原 meta 测试的自证问题已修。** shouldOhlc/shouldFormatBigNumber 现在读取 Kotlin 属性比较，函数型 figures 也开始比较顺序。见 [IndicatorMetaDiffTest.kt:146](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/test/kotlin/io/lkanvas/core/indicator/builtin/IndicatorMetaDiffTest.kt:146)。
+- **原 meta 测试的自证问题已修。** shouldOhlc/shouldFormatBigNumber 现在读取 Kotlin 属性比较，函数型 figures 也开始比较顺序。见 [IndicatorMetaDiffTest.kt:146](../../lkanvas-core/src/test/kotlin/io/lkanvas/core/indicator/builtin/IndicatorMetaDiffTest.kt:146)。
 
 ## 3. 上轮 16 项逐项复核
 
@@ -98,7 +98,7 @@
 
 **问题与复现：** processDataLoad 每次请求都 `++generation`，实时订阅却一直捕获 INIT 请求的 gen。首次 FORWARD/BACKWARD 请求一发出，同品种现有订阅的所有推送都会被 `gen != generation` 丢弃；分页完成也没有重新订阅。临时用例中，200 根数据后触发 FORWARD，再发第 201 根，数据仍为 200 根。
 
-**证据：** [Store.kt:128](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:128)、[Store.kt:150](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:150)。上游分页不会替换或废弃同会话实时订阅：[上游 Store.ts:779](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/Store.ts:779)。
+**证据：** [Store.kt:128](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:128)、[Store.kt:150](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:150)。上游分页不会替换或废弃同会话实时订阅：[上游 Store.ts:779](../../third_party/klinechart-v10.1.0/src/Store.ts:779)。
 
 **最小修复：** 区分会话/订阅代次与单次分页请求；普通分页不能使同一会话的 feed token 失效。
 
@@ -112,7 +112,7 @@
 
 临时测试按公开接口顺序执行 `setSymbol(B)` → A callback → 调度队列，得到 B 的 symbol 与 marketKey、A 的 close=99，B 请求仍在等待。
 
-**证据：** [LKanvasChart.kt:65](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:65)、[Store.kt:146](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:146)、[LKanvasChart.kt:426](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:426)、[LKanvasChart.kt:475](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:475)。
+**证据：** [LKanvasChart.kt:65](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:65)、[Store.kt:146](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:146)、[LKanvasChart.kt:426](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:426)、[LKanvasChart.kt:475](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:475)。
 
 **最小修复：** 将回调上下文绑定到请求的 key/会话，在唯一串行应用入口复核；Host 应返回真正提交结果，不能先宣称成功、再按可变当前上下文异步提交。
 
@@ -124,7 +124,7 @@
 
 **问题与复现：** 当前只有 panBy/zoomAt 调用 emitRangeChange。Store.onDataAdjusted 没有在数据实际提交完成后触发边界检查，engine.onSnapshot 也没有发送该事件。INIT 只返回一根、more=true，即使视口已经处于边界，仍只出现一次 INIT；需要额外手势才能触发分页。后续分页填不满窗口时也缺少自动继续加载链。
 
-**证据：** [Store.kt:201](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:201)、[LKanvasChart.kt:453](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:453)、[ChartState.kt:742](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:742)、[ChartState.kt:844](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:844)；对照 [上游 Store.ts:672](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/Store.ts:672)、[上游 Store.ts:771](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/Store.ts:771)。
+**证据：** [Store.kt:201](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/store/Store.kt:201)、[LKanvasChart.kt:453](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:453)、[ChartState.kt:742](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:742)、[ChartState.kt:844](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:844)；对照 [上游 Store.ts:672](../../third_party/klinechart-v10.1.0/src/Store.ts:672)、[上游 Store.ts:771](../../third_party/klinechart-v10.1.0/src/Store.ts:771)。
 
 **最小修复：** 在真实数据提交及视口调整完成后统一通知范围、执行边界检查；保留 loading 和 more 防重复门禁。
 
@@ -136,7 +136,7 @@
 
 **问题与复现：** merge 不再跳过默认值，但 Styles 及子类仍是带完整默认字段的 data class；传 `Styles(grid=GridStyle(show=false))` 时，未填写的 candle/axis/separator 也被看成已提供。临时测试先设 dark，再只隐藏 grid，separator 从暗色回到 Styles() 默认浅色。
 
-**证据：** [Merge.kt:25](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Merge.kt:25)、[StylesMerge.kt:13](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesMerge.kt:13)、[StylesMergeTest.kt:13](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/test/kotlin/io/lkanvas/chart/styles/StylesMergeTest.kt:13)。新的测试通过 round-trip copy 携带全部旧值，绕开了最常见的局部补丁场景；上游只遍历提供的 key：[typeChecks.ts:16](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/common/utils/typeChecks.ts:16)。
+**证据：** [Merge.kt:25](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/common/utils/Merge.kt:25)、[StylesMerge.kt:13](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/styles/StylesMerge.kt:13)、[StylesMergeTest.kt:13](../../lkanvas-compose/src/test/kotlin/io/lkanvas/chart/styles/StylesMergeTest.kt:13)。新的测试通过 round-trip copy 携带全部旧值，绕开了最常见的局部补丁场景；上游只遍历提供的 key：[typeChecks.ts:16](../../third_party/klinechart-v10.1.0/src/common/utils/typeChecks.ts:16)。
 
 **最小修复：** patch 必须保留字段存在信息；在“没提供”和“显式提供默认值”之间建立可表达区别。恢复 skip-defaults 或要求所有宿主手工深 copy 都不能同时满足两种语义。
 
@@ -150,7 +150,7 @@
 
 临时测试中，相同时间戳仅切 absolute 就改变 x；同一点传 main 与 RSI pane 得到完全相同坐标。现有 Parity6 甚至断言“absolute 按索引解释”，把错误语义固化成绿色测试。
 
-**证据：** [LKanvasChart.kt:259](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:259)、[LKanvasChart.kt:269](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:269)、[Parity6AxisConvertTest.kt:124](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity6AxisConvertTest.kt:124)；对照 [上游 Chart.ts:1201](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/Chart.ts:1201)。
+**证据：** [LKanvasChart.kt:259](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:259)、[LKanvasChart.kt:269](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:269)、[Parity6AxisConvertTest.kt:124](../../lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity6AxisConvertTest.kt:124)；对照 [上游 Chart.ts:1201](../../third_party/klinechart-v10.1.0/src/Chart.ts:1201)。
 
 **最小修复：** 使用包含 timestamp/dataIndex/value 的数据点契约，保持 absolute 原义；按 paneId 与 yAxisId 选取实际绘制轴和布局边界。相同时间戳切 absolute 不应改变 x。
 
@@ -169,7 +169,7 @@
 
 前三项均有临时测试复现。主轴 reverse 的旧例已修复，不能因此将这些轴路径一并判为通过。
 
-**证据：** [LkanvasRegistry.kt:121](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LkanvasRegistry.kt:121)、[YAxisTemplates:9](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/yaxis/Index.kt:9)、[LKanvasChart.kt:966](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:966)、[LKanvasChart.kt:988](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:988)、[ChartState.kt:379](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:379)、[LKanvasChart.kt:1063](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:1063)。
+**证据：** [LkanvasRegistry.kt:121](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LkanvasRegistry.kt:121)、[YAxisTemplates:9](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/yaxis/Index.kt:9)、[LKanvasChart.kt:966](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:966)、[LKanvasChart.kt:988](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:988)、[ChartState.kt:379](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:379)、[LKanvasChart.kt:1063](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:1063)。
 
 **最小修复：** 统一公开注册与构造表；将 spec、pane、reverse 和几何边界留在同一轴实例/上下文，由绘制与转换消费。创建额外轴不应通过改全局主轴来模拟生效。
 
@@ -183,7 +183,7 @@
 
 固定 main/vol/macd 也始终参与布局；createIndicator 缺省新建 pane 后，VOL/MACD 还可能经 resultOfName 回退到固定副图，形成和上游不同的重复归属。
 
-**证据：** [LKanvasChart.kt:517](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:517)、[ChartState.kt:124](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:124)、[LKanvasChart.kt:850](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:850)、[ChartState.kt:910](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:910)、[ChartRenderer.kt:97](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/ChartRenderer.kt:97)。
+**证据：** [LKanvasChart.kt:517](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:517)、[ChartState.kt:124](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:124)、[LKanvasChart.kt:850](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:850)、[ChartState.kt:910](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:910)、[ChartRenderer.kt:97](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/ChartRenderer.kt:97)。
 
 **最小修复：** 让查询、布局、覆写迁移和删除共同使用实际 pane 集合。示例的固定副图配置应成为显式初始布局，而不是库内另一套无法通过公共查询维护的 pane。
 
@@ -197,7 +197,7 @@
 
 主 pane 按 yAxisId 分流后同样不是完整 figure 类型管线，内置 VOL/MACD 分支仍有专用规则。此项结论来自静态调用链，未声称本次做过屏幕截图比对。
 
-**证据：** [PaneRenderers.kt:315](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:315)、[PaneRenderers.kt:343](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:343)、[PaneRenderers.kt:686](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:686)、[IndicatorEngine.kt:25](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/indicator/IndicatorEngine.kt:25)；对照 [上游 IndicatorView.ts:134](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:134)。
+**证据：** [PaneRenderers.kt:315](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:315)、[PaneRenderers.kt:343](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:343)、[PaneRenderers.kt:686](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:686)、[IndicatorEngine.kt:25](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/indicator/IndicatorEngine.kt:25)；对照 [上游 IndicatorView.ts:134](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:134)。
 
 **最小修复：** 复用一条按实例与 figure 描述驱动的渲染流程，统一可见性、类型、attrs 和样式；平台原语可替换，图形类型与领域分支必须保留。
 
@@ -211,7 +211,7 @@
 
 此外 drawOverlays 仍统一使用主 pane 边界及 main 轴，不按 effectivePaneId 选择坐标；createXAxisFigures/createYAxisFigures 目前只有声明，没有生产调用。zIndex 命中排序与实际绘制遍历也未共用顺序。
 
-**证据：** [Segment.kt:7](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/overlay/Segment.kt:7)、[上游 segment.ts:17](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/extension/overlay/segment.ts:17)、[OverlayRenderer.kt:47](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:47)、[OverlayRenderer.kt:86](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:86)、[OverlayRenderer.kt:133](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:133)、[OverlayDefinition.kt:69](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/overlay/OverlayDefinition.kt:69)。
+**证据：** [Segment.kt:7](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/extension/overlay/Segment.kt:7)、[上游 segment.ts:17](../../third_party/klinechart-v10.1.0/src/extension/overlay/segment.ts:17)、[OverlayRenderer.kt:47](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:47)、[OverlayRenderer.kt:86](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:86)、[OverlayRenderer.kt:133](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/OverlayRenderer.kt:133)、[OverlayDefinition.kt:69](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/overlay/OverlayDefinition.kt:69)。
 
 **最小修复：** 将内置图形生成规则放回各模板，统一执行模板的绘制/命中描述，并按实例 pane 建立上下文；保留 OverlayGeometry 作为模板可复用的数学助手。
 
@@ -225,7 +225,7 @@
 
 动态 pane 的触摸事件 paneId 仍通过 main/vol/macd 三段推断；tooltip feature 类型也把 vol 以外的非主 pane 归为 crosshair。主轴 reverse 后，十字线标签还直接用未翻转的 yToValue，与已翻转 candle 映射不同。
 
-**证据：** [LKanvasChart.kt:329](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:329)、[LKanvasChart.kt:375](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:375)、[LKanvasChart.kt:394](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:394)、[ChartState.kt:491](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:491)、[ChartRenderer.kt:329](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/ChartRenderer.kt:329)；对照 [上游 Chart.ts:1261](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/Chart.ts:1261)、[上游 Store.ts:1285](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/Store.ts:1285)。
+**证据：** [LKanvasChart.kt:329](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:329)、[LKanvasChart.kt:375](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:375)、[LKanvasChart.kt:394](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:394)、[ChartState.kt:491](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:491)、[ChartRenderer.kt:329](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/ChartRenderer.kt:329)；对照 [上游 Chart.ts:1261](../../third_party/klinechart-v10.1.0/src/Chart.ts:1261)、[上游 Store.ts:1285](../../third_party/klinechart-v10.1.0/src/Store.ts:1285)。
 
 **最小修复：** 保持 null 清除、按 x 推导数据索引的上游顺序；pane 归属与标签转换使用实际 pane/轴上下文。
 
@@ -239,7 +239,7 @@
 
 setLayoutOptions/getLayoutOptions 只有自定义 paneHeights，缺少上游 Layout 的 barSpaceLimit/pane/yAxis 默认配置模型；固定 pane 外无消费者。getConvertPictureUrl 的平台入口新增了，但 backgroundColor 未使用，bmp 被转成 png，不能因名称存在而视为完整同义。
 
-**证据：** [LKanvasChart.kt:139](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:139)、[LKanvasChart.kt:169](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:169)、[LKanvasChart.kt:889](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:889)、[LKanvasChart.kt:923](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:923)；上游定义见 [Options.ts:88](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/Options.ts:88)。
+**证据：** [LKanvasChart.kt:139](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:139)、[LKanvasChart.kt:169](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:169)、[LKanvasChart.kt:889](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:889)、[LKanvasChart.kt:923](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:923)；上游定义见 [Options.ts:88](../../third_party/klinechart-v10.1.0/src/Options.ts:88)。
 
 **最小修复：** 动画真正驱动同一状态入口并转发 duration；配置保留上游字段及职责。无法直接等价的平台能力应明确登记限制，不以占参数位置的方式宣称完成。
 
@@ -251,7 +251,7 @@ setLayoutOptions/getLayoutOptions 只有自定义 paneHeights，缺少上游 Lay
 
 structure-map 仍写“其余 22 个模板待登记”，Store 映射引用的 Parity4PaginationTest/Parity4SymbolSwitchTest 并不是当前实际测试类；部分 component/common 目标文件仍是计划路径。不能从新增了映射文件推导映射已经完成。
 
-**证据：** [check.py:139](/Users/pauldeman/Documents/ai_workspace/KKLineChart/tools/alignment/check.py:139)、[structure-map.md:39](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/structure-map.md:39)、[structure-map.md:51](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/structure-map.md:51)、[gap-matrix.md:394](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/gap-matrix.md:394)。
+**证据：** [check.py:139](../../tools/alignment/check.py:139)、[structure-map.md:39](structure-map.md:39)、[structure-map.md:51](structure-map.md:51)、[gap-matrix.md:394](gap-matrix.md:394)。
 
 **最小修复：** 回填真实本地符号/测试方法及差异，修正旧状态和不存在引用；将行为执行结果与结构映射分开验收。优先更正 R05 那种“测试通过但预期本身不符合上游”的用例。
 
@@ -261,7 +261,7 @@ structure-map 仍写“其余 22 个模板待登记”，Store 映射引用的 P
 
 **问题：** 已在线核实历史提交 `95a6f2ad681137a4cc3910760851c8f2c988084d`，确实修改 Chart.ts/Event.ts/Store.ts，与文档范围相符。但 f96afa1 只增加 16 行同步文档，当前基线本来已包含该修复；记录没有展示失败状态、反向撤销/重新应用或前后运行结果。
 
-[官方历史补丁](https://github.com/klinecharts/KLineChart/commit/95a6f2ad681137a4cc3910760851c8f2c988084d) 与 [本地演练记录:52](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/upstream-sync.md:52) 能证明来源与有限符号映射；现有抑制回发测试能证明部分当前行为，但不足以单独证明完整移植演练达标。
+[官方历史补丁](https://github.com/klinecharts/KLineChart/commit/95a6f2ad681137a4cc3910760851c8f2c988084d) 与 [本地演练记录:52](../upstream-sync.md:52) 能证明来源与有限符号映射；现有抑制回发测试能证明部分当前行为，但不足以单独证明完整移植演练达标。
 
 **最小修复：** 在临时分支保存一笔真实补丁的 before/after、对应本地有限 diff、失败/通过用例结果和必要平台差异；不要求为了展示而重写已正确的实现。
 
@@ -273,7 +273,7 @@ structure-map 仍写“其余 22 个模板待登记”，Store 映射引用的 P
 
 本地已使用角度区间处理大弧/整圆，优于旧 v10.1.0 的端点矩形命中；但没有新增修复的端点距离容差。半径 100、0°→90°，点位于 -0.5°：距离起点约 0.873 px，在线上游新函数命中为 true，本地 FigureHit 在 2 px 容差下为 false。
 
-**证据：** [官方源码修复](https://github.com/klinecharts/KLineChart/commit/e829f30eff1f4fe23e48e338af17aae5701cc6df)、[Figures.kt:60](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt:60)、[Figures.kt:76](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt:76)。本次直接运行固定 main SHA 的官方 TS 函数验证 true，并用 JVM 临时探针确认本地 false。
+**证据：** [官方源码修复](https://github.com/klinecharts/KLineChart/commit/e829f30eff1f4fe23e48e338af17aae5701cc6df)、[Figures.kt:60](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt:60)、[Figures.kt:76](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/figure/Figures.kt:76)。本次直接运行固定 main SHA 的官方 TS 函数验证 true，并用 JVM 临时探针确认本地 false。
 
 **最小修复：** 在同步台账登记这笔实际新增源码补丁，明确采用/差异/延期决定，增加大弧、整圆和端点容差共同输入。保留固定 v10.1.0 快照用于 oracle，不应悄悄覆盖快照来制造“最新”。
 

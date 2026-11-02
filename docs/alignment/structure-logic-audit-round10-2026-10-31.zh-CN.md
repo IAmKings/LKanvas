@@ -75,7 +75,7 @@ python3 -B tools/alignment/check.py
 | R9-01 邻近默认段边界 | 无 attrs 时，有限窗口 `[0,1]` 和全范围 `[0,2]` 都产生 P0→P1、P1→P2；真正数据末端不越界、NaN 基准保持 | 正确补齐末行默认段，应保留 |
 | R9-02：默认段晚于覆盖段提交 | 原重合用例顺序为 `[default-red,custom-blue]`；flush 后清组，后续默认段能继续产生 | 原重合用例修复；一般行序仍有 R10-01，未完整关闭 |
 
-证据：[完整结果列下一点](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:645)、[覆盖前提交默认批次](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[默认末行段延伸](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:681)、[末尾提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:695)。
+证据：[完整结果列下一点](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:645)、[覆盖前提交默认批次](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[默认末行段延伸](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:681)、[末尾提交](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:695)。
 
 **本轮对旧探针的必要校准：** 一项历史桥线探针使用了 200 行完整结果但只遍历 0…2，旧预期只检查到 P2，遗漏了合法的 P2→P3。重新执行上游相同“完整结果＋可见行”协议后，确认新增末行默认段属于正确修复，本轮已补上预期。此前这个旧预期过窄，不能据它将合法延伸判为回归。
 
@@ -105,7 +105,7 @@ python3 -B tools/alignment/check.py
 
 上游合并循环只比较 `mergeLines` 最后一项，B 已经成为最后项时，新的 A 不会回填较早 A。因此，第九轮“默认段与覆盖段保序”的原样例修复成立，但“提交顺序等于行登记顺序”的一般表述仍不成立。
 
-**证据：** [查找全部样式组并复用](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:585)、[按组首次出现顺序提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:592)、[仅覆盖前主动 flush](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[上游仅比较最后合并项](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:232)、[上游按连续合并结果提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:254)。
+**证据：** [查找全部样式组并复用](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:585)、[按组首次出现顺序提交](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:592)、[仅覆盖前主动 flush](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:656)、[上游仅比较最后合并项](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:232)、[上游按连续合并结果提交](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:254)。
 
 **最小处理方向：** 只复用最近的连续同样式批次；遇到不同样式便结束该批次，之后 A 再出现应是新的 A 批次。默认主循环、末行补段和自定义段继续使用共同顺序；保留覆盖前 flush 和连续同样式一次提交的优化，无需移除批量绘制或重写渲染器。
 
@@ -128,7 +128,7 @@ python3 -B tools/alignment/check.py
 
 本地录制真实 DrawScope/native Canvas 参数和调用顺序，Android JVM 默认返回值用于执行路径，未用 mocked Paint getter 证明色值或像素，也未据此认证 GPU 栅格、触摸或性能。
 
-台账解析 318 行：已声明 237、行为通过 64、已接线 2、不适用 15。[R9 追踪](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/gap-matrix.md:490)与 R8-03 表述纠偏均已落盘。R9-01 原发现支持关闭；R9-02 的“行为通过”支持原覆盖用例，不能外推为 A→B→A 的一般保序已经通过。check.py 只验证格式和引用，本次未修改台账。
+台账解析 318 行：已声明 237、行为通过 64、已接线 2、不适用 15。[R9 追踪](gap-matrix.md:490)与 R8-03 表述纠偏均已落盘。R9-01 原发现支持关闭；R9-02 的“行为通过”支持原覆盖用例，不能外推为 A→B→A 的一般保序已经通过。check.py 只验证格式和引用，本次未修改台账。
 
 ## 6. 当前目标收敛情况
 

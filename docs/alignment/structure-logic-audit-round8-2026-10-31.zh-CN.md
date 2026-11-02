@@ -75,7 +75,7 @@ python3 -B tools/alignment/check.py
 | R7-03：BAR 部分覆盖默认几何 | height-only 的 top=481，width-only 的 left=-1；完整四字段、无 attrs、top/bottom 及非零 paneTop 基准保持 | 本轮覆盖范围内关闭 |
 | R7-04：混合 LINE 自定义终点桥接 | 仅第 0 行覆盖时，自定义路径 1 次，默认数组仅 `[12,110,20,120]`，无 `(500,600)→(12,110)`；默认→覆盖→默认的正式测试也通过 | 桥线原复现关闭；LINE 行段契约仍有 R8-02/03 |
 
-结构证据：[引擎拒绝水位与提交门禁](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:242)、[绑定轴约束聚合](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:921)、[BAR 有效宽度先行](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:754)、[默认 y 不再重复平移](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:761)、[LINE 自定义段断开默认链](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:642)。
+结构证据：[引擎拒绝水位与提交门禁](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:242)、[绑定轴约束聚合](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:921)、[BAR 有效宽度先行](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:754)、[默认 y 不再重复平移](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:761)、[LINE 自定义段断开默认链](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:642)。
 
 “关闭”对应明确发现及本次覆盖范围，不是该领域所有配置、异常路径的穷举证明。
 
@@ -91,7 +91,7 @@ python3 -B tools/alignment/check.py
 
 这是本轮提交门禁引入的回归。将最终拒绝判断移入引擎是正确方向，但身份生成者与水位持有者必须具有一致的生命周期，不能只在单个门面内保证单调。
 
-**证据：** [公开 init/dispose](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:43)、[state 可复用契约](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:568)、[门面私有 epoch](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:473)、[state 持有引擎](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:53)、[引擎持久拒绝水位](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:242)、[新请求被旧水位拒绝](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:264)。
+**证据：** [公开 init/dispose](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:43)、[state 可复用契约](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:568)、[门面私有 epoch](../../lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt:473)、[state 持有引擎](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/state/ChartState.kt:53)、[引擎持久拒绝水位](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:242)、[新请求被旧水位拒绝](../../lkanvas-core/src/main/kotlin/io/lkanvas/core/compute/ChartEngine.kt:264)。
 
 **最小处理方向：** 在现有 state/引擎边界统一提交身份的生命周期，或明确区分不同门面会话的身份空间。保留失败 INIT 的已入队动作拒绝、合法同步首推、旧失败不干扰新 C、ABA 和重试基准；不能仅清空水位而重新放行旧门面的在途动作。
 
@@ -105,7 +105,7 @@ python3 -B tools/alignment/check.py
 
 **逻辑根因：** 本轮将默认段 `(i-1,i)` 的几何归属明确为 row i-1，但实际落段仍执行 `styleOverrideOf(key,i)`。因此几何修复未延伸到同一行的样式消费者；自定义段却使用其自身行样式，两条路径继续不同。
 
-**证据：** [默认段样式取后行](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:608)、[自定义段取本行样式](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:636)、[上游 styles 取 dataIndex](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/component/Indicator.ts:318)、[上游同次调用登记段与 styles](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)。
+**证据：** [默认段样式取后行](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:608)、[自定义段取本行样式](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:636)、[上游 styles 取 dataIndex](../../third_party/klinechart-v10.1.0/src/component/Indicator.ts:318)、[上游同次调用登记段与 styles](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)。
 
 **最小处理方向：** 默认段与自定义段使用同一段归属规则取得几何和 styles，再按结果批量提交；保留已有批量优化，无需恢复逐点低效绘制。样式回调读取的 row/value/candles 也应对应段所属行。
 
@@ -125,7 +125,7 @@ python3 -B tools/alignment/check.py
 
 **控制流根因：** 本地循环只过滤当前 v 的 NaN，然后直接执行自定义 coordinates 分支，没有在该分支保留下一点有效性条件。第 2 行稍后清空连续状态，只能避免默认线跨断，不能撤销第 1 行已经画出的自定义段。
 
-**证据：** [本地仅过滤当前值](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:595)、[非空自定义点列直接绘制](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:631)、[上游当前与下一点共同门禁](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)。当前正式测试 [NaN 组合断言](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt:294)仍要求该自定义路径出现，不能作为与上游一致的证明。
+**证据：** [本地仅过滤当前值](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:595)、[非空自定义点列直接绘制](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:631)、[上游当前与下一点共同门禁](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:194)。当前正式测试 [NaN 组合断言](../../lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt:294)仍要求该自定义路径出现，不能作为与上游一致的证明。
 
 **最小处理方向：** 在实际 LINE 行段入口统一段存在条件、默认/覆盖几何和样式归属，保留 NaN 断开及上一条合法默认段。补充缺失下一点与末端边界，不能仅靠 `prevWasFinite=false` 处理已经提交的路径。
 
@@ -151,7 +151,7 @@ LINE 辅助 TS 验证直接调用固定上游 `eachFigures` 与 `isNumber`；端
 
 正式测试与本次绘制探针使用 Android JVM 默认返回值及录制 DrawScope/native Canvas。所证明的是实际绘制调用、几何参数、分组和裁剪/平移上下文，不是 GPU 栅格、真实 Path 像素或设备触摸。空 coordinates 的上游合并路径还存在需要独立核查的边界，本轮未将其列为验收发现，也不要求复制上游异常。
 
-当前台账解析 313 行：已声明 237、行为通过 59、已接线 2、不适用 15。R7 编号已纳入校验，四行引用存在且能解析，见[第七轮追踪](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/gap-matrix.md:473)。这些证据支持原复现修复，不支持将“行为通过”解释为完整组合验收；本次未修改既有台账。
+当前台账解析 313 行：已声明 237、行为通过 59、已接线 2、不适用 15。R7 编号已纳入校验，四行引用存在且能解析，见[第七轮追踪](gap-matrix.md:473)。这些证据支持原复现修复，不支持将“行为通过”解释为完整组合验收；本次未修改既有台账。
 
 ## 6. 当前目标收敛情况
 

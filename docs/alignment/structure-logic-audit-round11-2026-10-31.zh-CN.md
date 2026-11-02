@@ -90,9 +90,9 @@ python3 -B tools/alignment/check.py
 
 真实上游 View 产生相同的红/蓝/红连续顺序。连续 A→A→A 仍是一个本地批次；原默认红→覆盖蓝顺序继续为 `[default-red,custom-blue]`。默认/覆盖末可见行、真正数据末端/NaN、所属行样式及 state 复用等既有基准均未回归。
 
-证据：[有序批次与最后项复用](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:590)、[顺序提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:600)、[完整结果列下一点](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:653)、[覆盖前 flush](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:664)、[默认末行段](/Users/pauldeman/Documents/ai_workspace/KKLineChart/lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:689)、[上游最后合并项比较](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:233)、[上游按合并结果提交](/Users/pauldeman/Documents/ai_workspace/KKLineChart/third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:254)。
+证据：[有序批次与最后项复用](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:590)、[顺序提交](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:600)、[完整结果列下一点](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:653)、[覆盖前 flush](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:664)、[默认末行段](../../lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt:689)、[上游最后合并项比较](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:233)、[上游按合并结果提交](../../third_party/klinechart-v10.1.0/src/view/IndicatorView.ts:254)。
 
-**判定：R10-01 在本轮覆盖范围内关闭，未发现需要继续修改该规则的证据。** 台账 [R10-01](/Users/pauldeman/Documents/ai_workspace/KKLineChart/docs/alignment/gap-matrix.md:501)的关闭有独立运行结果支持；本次没有改动台账。
+**判定：R10-01 在本轮覆盖范围内关闭，未发现需要继续修改该规则的证据。** 台账 [R10-01](gap-matrix.md:501)的关闭有独立运行结果支持；本次没有改动台账。
 
 ## 4. 组合复核与证据边界
 
