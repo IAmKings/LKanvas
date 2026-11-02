@@ -28,8 +28,8 @@ import kotlin.math.max
  * - showType：`standard` 行式图例（游标换行）/ `rect` 圆角卡片（title 左对齐、value 右对齐）。
  * - features 三组（left/middle/right）图标绘制并记录命中区（手势端分发三 ActionType）。
  *
- * 字号语义：Styles 的 size 为 canvas px 语义；此处直接以 px→sp 文本绘制
- * （Compose 文本测量与密度解耦），颜色/边距/开关全量消费。
+ * Styles 字号在 Android 边界映射为 sp；测量、绘制、行距及缓存回放使用同一字号。
+ * Canvas/ChartText 的已换算 px 字号不在此处二次转换。
  */
 object TooltipRenderer {
 
@@ -40,6 +40,8 @@ object TooltipRenderer {
      * record/drawLayer 在 Compose 1.11 的 DrawScope 上下文存在自引用环，弃用）。
      */
     sealed class DrawOp {
+        // 上游每个 pane 独立 Canvas；共享 Canvas 的缓存回放须保留相同裁剪范围。
+        internal var clipBounds: Rect? = null
         class Text(val text: String, val topLeft: Offset, val sizePx: Float, val color: Color) : DrawOp()
         class RoundRect(val color: Color, val topLeft: Offset, val size: Size, val radius: Float, val strokeWidth: Float) : DrawOp()
         class StrokePath(val path: androidx.compose.ui.graphics.Path, val color: Color, val strokeWidth: Float) : DrawOp()
@@ -141,6 +143,30 @@ object TooltipRenderer {
         paneBottom: Float,
         recorder: MutableList<DrawOp>? = null,
     ) {
+        drawCandleTooltipImpl(state, styles, theme, measurer, baseTextSizePx, crosshair, contentWidth, paneBottom, recorder, true)
+    }
+
+    internal fun DrawScope.recordCandleTooltip(
+        state: ChartState, styles: Styles, theme: ChartTheme, measurer: TextMeasurer,
+        baseTextSizePx: Float, crosshair: Offset?, contentWidth: Float, paneBottom: Float,
+    ): List<DrawOp> {
+        val ops = ArrayList<DrawOp>()
+        drawCandleTooltipImpl(state, styles, theme, measurer, baseTextSizePx, crosshair, contentWidth, paneBottom, ops, false)
+        return ops
+    }
+
+    private fun DrawScope.drawCandleTooltipImpl(
+        state: ChartState,
+        styles: Styles,
+        theme: ChartTheme,
+        measurer: TextMeasurer,
+        baseTextSizePx: Float,
+        crosshair: Offset?,
+        contentWidth: Float,
+        paneBottom: Float,
+        recorder: MutableList<DrawOp>?,
+        drawContent: Boolean,
+    ) {
         val candleT = styles.candle.tooltip
         val indT = styles.indicator.tooltip
         val candles = state.dataSnapshot.candles
@@ -153,7 +179,7 @@ object TooltipRenderer {
         val drawInd = groups.any { it.name.isNotEmpty() || it.legends.any { r -> r.value != "—" } }
         state.tooltipFeatureHits = emptyList()
         if (!drawCandle && !drawInd) return
-        val session = Session(state, measurer, baseTextSizePx, candles, recorder)
+        val session = Session(state, measurer, baseTextSizePx, candles, recorder, drawContent)
 
         val candleRows = if (drawCandle) buildCandleLegends(state, idx, styles, tooltipText) else emptyList()
         if (candleT.showType == "rect") {
@@ -195,23 +221,23 @@ object TooltipRenderer {
         val session = Session(state, measurer, baseTextSizePx, state.dataSnapshot.candles, recorder)
         val titleColor = StylesThemeBridge.parse(indT.title.color)
         val legendColor = StylesThemeBridge.parse(indT.legend.color)
-        var y = paneTop + 2f
+        val flow = Session.Flow(contentWidth, paneTop + 2f)
         if (indT.title.show && name.isNotEmpty()) {
-            y = session.drawRow(
+            session.drawFlowRow(
                 this, LegendRow("", name, titleColor, titleColor),
-                8f, y, contentWidth, indT.title.marginTop.toFloat(), indT.title.marginBottom.toFloat(), indT.title.size.toFloat(),
+                flow, indT.title.marginTop.toFloat(), indT.title.marginBottom.toFloat(), indT.title.size.toFloat(),
             )
         }
         for ((key, v) in legendKeys) {
             val color = legendColors.getOrElse(key.hashCode() % legendColors.size) { theme.linePalette.first() }
-            y = session.drawRow(
+            session.drawFlowRow(
                 this,
                 LegendRow(key, if (v == null || v.isNaN()) "—" else "%.2f".format(v), legendColor, color),
-                8f, y, contentWidth, indT.legend.marginTop.toFloat(), indT.legend.marginBottom.toFloat(), indT.legend.size.toFloat(),
+                flow, indT.legend.marginTop.toFloat(), indT.legend.marginBottom.toFloat(), indT.legend.size.toFloat(),
             )
         }
         // 副图 features（paneId 独立命中区）
-        session.drawFeatureRow(this, indT.features, paneId, Offset(8f, y + 2f), contentWidth, active = false)
+        session.drawFeatureRow(this, indT.features, paneId, Offset(8f, flow.bottom + 2f), contentWidth, active = false)
     }
 
     /** 回放用样式构造（与 Session.style 同一语义）。 */
@@ -228,12 +254,14 @@ object TooltipRenderer {
         val baseSizePx: Float,
         val candles: List<io.lkanvas.core.data.Candle>,
         val recorder: MutableList<DrawOp>? = null,
+        val drawContent: Boolean = true,
     ) {
         // Styles size 语义按 sp 渲染（12 ≈ 上游 DPR3 的 36 物理像素）
         private fun style(sizePx: Float) = TextStyle(fontSize = TextUnit(sizePx, TextUnitType.Sp))
 
-        /** 实际渲染像素（行高计算用；sp×density）。 */
-        private fun DrawScope.renderPx(sizePx: Float) = sizePx * this.density
+        /** 使用实际字体度量，包含系统字体缩放与中英文字形高度。 */
+        private fun lineHeight(sizeSp: Float) =
+            measurer.measure("Hg国", style = style(sizeSp)).size.height.toFloat()
 
         private fun DrawScope.measure(s: String, sizePx: Float): Float {
             if (s.isEmpty()) return 0f
@@ -243,8 +271,27 @@ object TooltipRenderer {
         private fun DrawScope.drawAt(s: String, topLeft: Offset, sizePx: Float, color: Color) {
             if (s.isEmpty()) return
             // 录制模式：录制 + 绘制并行（录制帧本身要呈现；否则「最后一帧无 tooltip」）
-            drawText(measurer, s, topLeft = topLeft, style = style(sizePx).copy(color = color))
+            if (drawContent) drawText(measurer, s, topLeft = topLeft, style = style(sizePx).copy(color = color))
             recorder?.add(DrawOp.Text(s, topLeft, sizePx, color))
+        }
+
+        class Flow(val maxWidth: Float, var y: Float) {
+            var x = 8f
+            var bottom = y
+        }
+
+        fun drawFlowRow(
+            scope: DrawScope, row: LegendRow, flow: Flow,
+            marginTop: Float, marginBottom: Float, size: Float,
+        ) {
+            val full = if (row.title.isEmpty()) row.value else "${row.title} ${row.value}"
+            val width = scope.run { measure(full, size) } + 8f
+            if (flow.x > 8f && flow.x + width > flow.maxWidth) {
+                flow.x = 8f
+                flow.y = flow.bottom
+            }
+            flow.bottom = max(flow.bottom, drawRow(scope, row, flow.x, flow.y, flow.maxWidth, marginTop, marginBottom, size))
+            flow.x += width
         }
 
         /** 行式块：标题行 + candle 行 + 指标组行，返回块底 y。 */
@@ -271,20 +318,22 @@ object TooltipRenderer {
                     )
                 }
             }
+            val flow = Flow(contentWidth, y)
             val legendStyle = styles.candle.tooltip.legend
             for (r in candleRows) {
-                y = drawRow(scope, r, 8f, y, contentWidth, legendStyle.marginTop.toFloat(), legendStyle.marginBottom.toFloat(), legendStyle.size.toFloat())
+                drawFlowRow(scope, r, flow, legendStyle.marginTop.toFloat(), legendStyle.marginBottom.toFloat(), legendStyle.size.toFloat())
             }
             val indTitle = styles.indicator.tooltip.title
             val indLegend = styles.indicator.tooltip.legend
             for (g in groups) {
                 if (g.name.isNotEmpty()) {
-                    y = drawRow(scope, LegendRow("", g.name, Color.Transparent, StylesThemeBridge.parse(indTitle.color)), 8f, y, contentWidth, indTitle.marginTop.toFloat(), indTitle.marginBottom.toFloat(), indTitle.size.toFloat())
+                    drawFlowRow(scope, LegendRow("", g.name, Color.Transparent, StylesThemeBridge.parse(indTitle.color)), flow, indTitle.marginTop.toFloat(), indTitle.marginBottom.toFloat(), indTitle.size.toFloat())
                 }
                 for (r in g.legends) {
-                    y = drawRow(scope, r, 8f, y, contentWidth, indLegend.marginTop.toFloat(), indLegend.marginBottom.toFloat(), indLegend.size.toFloat())
+                    drawFlowRow(scope, r, flow, indLegend.marginTop.toFloat(), indLegend.marginBottom.toFloat(), indLegend.size.toFloat())
                 }
             }
+            y = flow.bottom
             return y
         }
 
@@ -302,9 +351,9 @@ object TooltipRenderer {
             val sizePx = sizePxOverride ?: baseSizePx
             val full = if (r.title.isEmpty()) r.value else "${r.title} ${r.value}"
             val w = scope.run { measure(full, sizePx) }
-            val h = marginTop + scope.run { renderPx(sizePx) } * 1.25f + marginBottom
+            val h = marginTop + lineHeight(sizePx) + marginBottom
             val x = if (x0 + w > maxWidth) 8f else x0
-            val y = if (x == 8f && x0 != 8f) y0 + sizePx * 1.5f else y0
+            val y = if (x == 8f && x0 != 8f) y0 + lineHeight(sizePx) else y0
             var cx = x + 2f
             if (r.title.isNotEmpty()) {
                 scope.run { drawAt(r.title, Offset(cx, y + marginTop), sizePx, r.titleColor) }
@@ -333,7 +382,7 @@ object TooltipRenderer {
             }).filter { it.value.isNotEmpty() }
             if (rows.isEmpty()) return
             val sizePx = legendSizeSp
-            val rowH = scope.run { renderPx(sizePx) } * 1.25f
+            val rowH = lineHeight(sizePx)
             var maxTextW = 0f
             for (r in rows) {
                 val w = max(scope.run { measure(r.title, sizePx) }, scope.run { measure(r.value, sizePx) }) + 8f
@@ -362,13 +411,13 @@ object TooltipRenderer {
 
             val radius = rect.borderRadius.toFloat()
             scope.run {
-                drawRoundRect(
+                if (drawContent) drawRoundRect(
                     StylesThemeBridge.parse(rect.color),
                     topLeft = Offset(rectX, rectY), size = Size(rectW, rectH), cornerRadius = CornerRadius(radius, radius),
                 )
                 recorder?.add(DrawOp.RoundRect(StylesThemeBridge.parse(rect.color), Offset(rectX, rectY), Size(rectW, rectH), radius, 0f))
                 if (borderPx > 0f) {
-                    drawRoundRect(
+                    if (drawContent) drawRoundRect(
                         StylesThemeBridge.parse(rect.borderColor),
                         topLeft = Offset(rectX, rectY), size = Size(rectW, rectH), cornerRadius = CornerRadius(radius, radius),
                         style = Stroke(width = borderPx),
@@ -412,7 +461,7 @@ object TooltipRenderer {
                     x + f.marginLeft.toFloat() + size, y + f.marginTop.toFloat() + size,
                 )
                 scope.run {
-                    drawRoundRect(bg, topLeft = rect.topLeft, size = Size(size, size), cornerRadius = CornerRadius(f.borderRadius.toFloat(), f.borderRadius.toFloat()))
+                    if (drawContent) drawRoundRect(bg, topLeft = rect.topLeft, size = Size(size, size), cornerRadius = CornerRadius(f.borderRadius.toFloat(), f.borderRadius.toFloat()))
                     recorder?.add(DrawOp.RoundRect(bg, rect.topLeft, Size(size, size), f.borderRadius.toFloat(), 0f))
                     val content = f.content
                     when {
@@ -429,7 +478,7 @@ object TooltipRenderer {
                                 val path = Path()
                                 path.moveTo(pts.first().x, pts.first().y)
                                 pts.drop(1).forEach { path.lineTo(it.x, it.y) }
-                                drawPath(path, fg, style = Stroke(width = 1.5f))
+                                if (drawContent) drawPath(path, fg, style = Stroke(width = 1.5f))
                                 recorder?.add(DrawOp.StrokePath(path, fg, 1.5f))
                             }
                         }

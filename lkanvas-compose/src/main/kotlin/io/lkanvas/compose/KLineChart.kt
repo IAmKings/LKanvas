@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -50,10 +51,10 @@ fun KLineChart(
     state.flingScroller = remember { android.widget.OverScroller(context) }
 
 
-    val subPaneH = with(density) { config.subPaneHeight.toPx() }
-    val timeAxisH = with(density) { config.timeAxisHeight.toPx() }
-    // 右轴留白随系统字体缩放（A-41：字体放大后轴标签仍完整显示；1..2 倍钳制）
+    // 字体放大时同时为副图图例与时间标签保留高度。
     val fontScale = density.fontScale.coerceIn(1f, 2f)
+    val subPaneH = with(density) { config.subPaneHeight.toPx() } * fontScale
+    val timeAxisH = with(density) { config.timeAxisHeight.toPx() } * fontScale
     // 0.4.0 多轴：每个自定义轴标签列追加 gutter 宽度（44dp，随字体缩放）
     val extraAxisColW = with(density) {
         androidx.compose.ui.unit.Dp(44f).toPx() * fontScale
@@ -67,22 +68,18 @@ fun KLineChart(
     val layoutModifier = Modifier.onSizeChanged { size ->
         val contentW = size.width - gutterW
         // 0.5.x 动态副图：容器高扣除自定义 pane 数 × 默认副图高
-        val mainH = (size.height - 2 * subPaneH - timeAxisH - state.extraPanes.value.size * subPaneH).coerceAtLeast(0f)
-        state.onLayout(contentW, ChartState.PaneHeights(mainH, subPaneH, subPaneH, timeAxisH))
-    }
-
-    // 无障碍摘要依赖的状态（读取以触发语义更新）
-    val a11yRevision = state.viewRevision + state.overlayRevision +
-        (state.accessibilitySelectedIndex ?: -1)
-    val a11yText = remember(a11yRevision, state.dataSnapshot.candles.size) {
-        state.accessibilityText { ts -> ChartText.timeLabel(ts, 60_000L, state.effectiveTimeZone()) }
+        val timeH = timeAxisH.coerceAtMost(size.height * 0.15f)
+        val subCount = 2 + state.extraPanes.value.size
+        val paneH = subPaneH.coerceAtMost((size.height - timeH) / (subCount + 2))
+        val mainH = (size.height - subCount * paneH - timeH).coerceAtLeast(0f)
+        state.onLayout(contentW, ChartState.PaneHeights(mainH, paneH, paneH, timeH))
     }
 
     // 图例数据（插槽非空或模式变化时随 viewRevision 重组）
     val useCustomLegend = legendSlot != null && state.legendMode == ChartState.LegendMode.VISIBLE
     val legendData = if (useCustomLegend) {
-        val rev = state.viewRevision + state.overlayRevision + (state.accessibilitySelectedIndex ?: -1)
-        remember(rev) { state.legendData() }
+        val rev = state.viewRevision + state.overlayRevision
+        remember(rev, state.accessibilitySelectedIndex) { state.legendData() }
     } else {
         null
     }
@@ -91,10 +88,16 @@ fun KLineChart(
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                // 将图表重绘限制在自己的层，避免重录整个宿主界面。
+                .graphicsLayer()
                 .then(layoutModifier)
                 .chartGestures(state)
                 .semantics {
-                    contentDescription = a11yText
+                    // 在语义阶段订阅摘要，视口平移不必重组整个图表节点。
+                    @Suppress("UNUSED_VARIABLE") val a11yRevision = state.viewRevision + state.overlayRevision
+                    contentDescription = state.accessibilityText { ts ->
+                        ChartText.timeLabel(ts, 60_000L, state.effectiveTimeZone())
+                    }
                     customActions = listOf(
                         CustomAccessibilityAction(state.locale.actionPrevCandle) { state.selectPreviousCandle() },
                         CustomAccessibilityAction(state.locale.actionNextCandle) { state.selectNextCandle() },

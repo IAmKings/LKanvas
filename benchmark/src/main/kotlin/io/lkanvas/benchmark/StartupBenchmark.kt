@@ -20,7 +20,7 @@ class StartupBenchmark {
     val benchmarkRule = MacrobenchmarkRule()
 
     @Test
-    fun coldStartup() = benchmarkRule.measureRepeated(
+    fun coldStartup() = inPortrait { benchmarkRule.measureRepeated(
         packageName = PACKAGE,
         metrics = listOf(StartupTimingMetric()),
         compilationMode = CompilationMode.None(),
@@ -31,7 +31,26 @@ class StartupBenchmark {
         startActivityAndWait()
         // 图表首帧后稍等稳定（完整图表 = 主图 + 三内置指标首帧）
         device.waitForIdle()
-    }
+    } }
+
+    @org.junit.Ignore("K60U MIUI14 warm StartupTimingMetric has missing metrics; explicit equivalent probe: WarmReadinessTest")
+    @Test
+    fun warmStartup() = inPortrait { benchmarkRule.measureRepeated(
+        packageName = PACKAGE,
+        metrics = listOf(StartupTimingMetric()),
+        compilationMode = CompilationMode.None(),
+        iterations = 5,
+        startupMode = StartupMode.WARM,
+        setupBlock = { pressHome() },
+    ) {
+        // Recreate the Activity in the warm process; a launcher resume only measures the first iteration.
+        startActivityAndWait(android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+            addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            setClassName(PACKAGE, "io.lkanvas.sample.MainActivity")
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        })
+        device.waitForIdle()
+    } }
 
     companion object {
         const val PACKAGE = "io.lkanvas.sample"

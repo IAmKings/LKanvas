@@ -64,7 +64,10 @@ class ChartState(
 
     /** R7-01/R8-01：INIT 最终建会话失败——抬升拒绝水位（取 max，单调）。 */
     fun markInitRejected(epoch: Long) {
-        rejectedEpochWatermark.updateAndGet { prev -> maxOf(prev, epoch) }
+        while (true) {
+            val prev = rejectedEpochWatermark.get()
+            if (epoch <= prev || rejectedEpochWatermark.compareAndSet(prev, epoch)) return
+        }
     }
 
     /** R7-01/R8-01：该代次（含更早）是否已被失败 INIT 拒绝（执行时门禁）。 */
@@ -303,8 +306,8 @@ class ChartState(
         restoreGate.beginRestore()
         try {
             overlays.restoreFrom(archive.overlays)
-            archive.indicatorParams.forEach { (name, params) ->
-                getIndicators(IndicatorFilter(name = name)).forEach { it.updateParams(params) }
+            for ((name, params) in archive.indicatorParams) {
+                for (indicator in getIndicators(IndicatorFilter(name = name))) indicator.updateParams(params)
             }
             val anchor = archive.viewportAnchor
             if (anchor != null && dataSnapshot.candles.isNotEmpty()) {
@@ -349,15 +352,30 @@ class ChartState(
         overlayRevision++
     }
 
+    private var mainRangeSession = Long.MIN_VALUE
+    private var mainRangeRevision = Long.MIN_VALUE
+    private var mainRangeFrom = -1
+    private var mainRangeTo = -1
+    private var mainRange: Pair<Double, Double>? = null
+
     /** 主 pane 当前可见范围（与绘制共用同一来源，A-12 一致性）。 */
     fun mainPaneRange(): Pair<Double, Double>? {
-        val candles = dataSnapshot.candles
+        val snapshot = dataSnapshot
+        val candles = snapshot.candles
         if (candles.isEmpty()) return null
         val vp = viewport
         val from = kotlin.math.floor(vp.scrollIndex).toInt().coerceIn(candles.indices)
         val to = kotlin.math.ceil(vp.scrollIndex + vp.visibleCount).toInt().coerceIn(candles.indices)
         if (to < from) return null
-        return io.lkanvas.core.axis.LinearYAxis.rangeOfCandles(candles.subList(from, to + 1))
+        // Overlay points share a viewport: scan once, without retaining a previous data snapshot.
+        if (mainRangeSession != snapshot.sessionId || mainRangeRevision != snapshot.revision || mainRangeFrom != from || mainRangeTo != to) {
+            mainRange = io.lkanvas.core.axis.LinearYAxis.rangeOfCandles(candles.subList(from, to + 1))
+            mainRangeSession = snapshot.sessionId
+            mainRangeRevision = snapshot.revision
+            mainRangeFrom = from
+            mainRangeTo = to
+        }
+        return mainRange
     }
 
     /**
@@ -565,9 +583,6 @@ class ChartState(
 
     fun paneValueToY(paneId: String, value: Double): Double? {
         val (top, bottom) = paneBounds(paneId) ?: return null
-        val candles = dataSnapshot.candles
-        if (candles.isEmpty()) return null
-        val (vFrom, vTo) = visibleIndexRange() ?: return null
         val loHi: Pair<Double, Double>? = when (paneId) {
             "main" -> return mainPaneYOf(value)?.let { it - top }
             // N03（第五轮复审 2026-10-31）：vol 分支统一走 paneVisibleRange
@@ -1071,13 +1086,15 @@ class ChartState(
                 0, 0,
             )
             var lastX = 0
-            flingJob = scope.launch {
+            // 外部 UI scope 也可能没有帧时钟；沿用父 Job，以显示帧驱动平台曲线。
+            flingJob = scope.launch(androidx.compose.ui.platform.AndroidUiDispatcher.Main) {
                 while (!scroller.isFinished) {
-                    scroller.computeScrollOffset()
-                    val x = scroller.currX
-                    panBy((x - lastX).toFloat())
-                    lastX = x
-                    kotlinx.coroutines.delay(16L)
+                    androidx.compose.runtime.withFrameNanos {
+                        scroller.computeScrollOffset()
+                        val x = scroller.currX
+                        panBy((x - lastX).toFloat())
+                        lastX = x
+                    }
                 }
             }
         } else {
@@ -1213,14 +1230,14 @@ class ChartState(
 
     fun onLayout(widthPx: Float, panes: PaneHeights) {
         contentWidthPx = widthPx
-        containerHeightPx = panes.main + panes.vol + panes.macd + panes.timeAxis +
-            extraPanes.value.size * defaultSubPanePx
-        timeAxisHeightPx = panes.timeAxis
         if (defaultSubPanePx == 0f) {
             defaultSubPanePx = panes.vol
             volPaneOverride = panes.vol
             macdPaneOverride = panes.macd
         }
+        containerHeightPx = panes.main + panes.vol + panes.macd + panes.timeAxis +
+            extraPanes.value.size * defaultSubPanePx
+        timeAxisHeightPx = panes.timeAxis
         relayout()
     }
 
@@ -1255,7 +1272,7 @@ class ChartState(
         // R07：vol/macd 不在 pane 集合时高度为 0（渲染端跳过、分隔条命中退化无效）
         var extraH = 0f
         for (pane in extraPanes.value) extraH += (extraPaneHeightOverride[pane] ?: defaultSubPanePx)
-        val usable = (containerHeightPx - timeAxisHeightPx - extraH).coerceAtLeast(minSubPanePx * 2)
+        val usable = (containerHeightPx - timeAxisHeightPx - extraH - extraPanes.value.size).coerceAtLeast(minSubPanePx * 2)
         // 主 pane 保底 35% 可用高（A-41：横屏/大字体下关键绘图区不被挤没）
         val mainMin = (usable * 0.35f).coerceAtLeast(minMainPanePx)
         val maxSub = ((usable - mainMin) / 2f).coerceAtLeast(minSubPanePx)
@@ -1275,6 +1292,15 @@ class ChartState(
             val bottom = top + (extraPaneHeightOverride[pane] ?: defaultSubPanePx)
             cursor = bottom
             pane to (top to bottom)
+        }
+        // 短屏无法容纳最小高度时同比压缩实际布局，时间轴仍留在容器内。
+        val available = (containerHeightPx - timeAxisHeightPx).coerceAtLeast(0f)
+        if (available > 0f && cursor > available + 0.01f) {
+            val scale = available / cursor
+            paneHeightsPx = PaneHeights(main * scale, vol * scale, macd * scale, timeAxisHeightPx)
+            extraPaneLayout = extraPaneLayout.map { (pane, bounds) ->
+                pane to (bounds.first * scale to bounds.second * scale)
+            }
         }
         viewport.layout(contentWidthPx.toDouble(), dataSnapshot.candles.size)
         viewRevision++

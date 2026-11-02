@@ -35,7 +35,7 @@ object LkanvasUtils {
     @Suppress("UNCHECKED_CAST")
     fun merge(base: MutableMap<String, Any?>, patch: Map<String, Any?>): MutableMap<String, Any?> {
         val out = base.toMutableMap()
-        patch.forEach { (k, v) -> out[k] = v }
+        for ((k, v) in patch) out[k] = v
         return out
     }
 

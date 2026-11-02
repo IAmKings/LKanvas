@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720"><rect width="1200" height="720" fill="#f5f6f8"/><style>text{font-family:Arial,sans-serif;fill:#152238}</style><text x="40" y="48" font-size="24" font-weight="600">LKanvas / Geometry review</text><text x="40" y="90" font-size="16">A / Original · Mirror · 180°</text><g transform="translate(40 112) scale(.42)"><g transform="" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g></g><g transform="translate(156 112) scale(.42)"><g transform="translate(256 0) scale(-1 1)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g></g><g transform="translate(272 112) scale(.42)"><g transform="translate(256 256) rotate(180)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g></g><rect x="40" y="260" width="340" height="240" rx="12" fill="#0B1018"/><g transform="translate(98 268) scale(.875)" fill="#ffffff"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g><text x="40" y="540" font-size="15">Actual 16 / 24 / 32 / 64 px</text><g transform="translate(40 560) scale(0.0625)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g><g transform="translate(86 560) scale(0.09375)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g><g transform="translate(140 560) scale(0.125)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g><g transform="translate(202 560) scale(0.25)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M36 40H72V216H36Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M96 116L172 40H220L132 128L220 216H172L96 140Z" />
+</g><text x="430" y="90" font-size="16">B / Original · Mirror · 180°</text><g transform="translate(430 112) scale(.42)"><g transform="" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g></g><g transform="translate(546 112) scale(.42)"><g transform="translate(256 0) scale(-1 1)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g></g><g transform="translate(662 112) scale(.42)"><g transform="translate(256 256) rotate(180)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g></g><rect x="430" y="260" width="340" height="240" rx="12" fill="#0B1018"/><g transform="translate(488 268) scale(.875)" fill="#ffffff"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g><text x="430" y="540" font-size="15">Actual 16 / 24 / 32 / 64 px</text><g transform="translate(430 560) scale(0.0625)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g><g transform="translate(476 560) scale(0.09375)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g><g transform="translate(530 560) scale(0.125)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g><g transform="translate(592 560) scale(0.25)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M40 40H76V180H216V214H40Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M104 40H216V152H180V74H104Z" />
+</g><text x="820" y="90" font-size="16">C / Original · Mirror · 180°</text><g transform="translate(820 112) scale(.42)"><g transform="" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g></g><g transform="translate(936 112) scale(.42)"><g transform="translate(256 0) scale(-1 1)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g></g><g transform="translate(1052 112) scale(.42)"><g transform="translate(256 256) rotate(180)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g></g><rect x="820" y="260" width="340" height="240" rx="12" fill="#0B1018"/><g transform="translate(878 268) scale(.875)" fill="#ffffff"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g><text x="820" y="540" font-size="15">Actual 16 / 24 / 32 / 64 px</text><g transform="translate(820 560) scale(0.0625)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g><g transform="translate(866 560) scale(0.09375)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g><g transform="translate(920 560) scale(0.125)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g><g transform="translate(982 560) scale(0.25)" fill="#111111"><ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M44 44H144V80H80V176H176V120H212V212H44Z" />
+  <ns0:path xmlns:ns0="http://www.w3.org/2000/svg" d="M176 44H212V80H176Z" />
+</g><text x="40" y="682" font-size="14">Concept review only · no trademark clearance · no app icon replacement yet</text></svg>

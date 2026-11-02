@@ -44,6 +44,18 @@ fun Viewport.visibleRange(dataCount: Int): VisibleRange {
  */
 object PaneRenderers {
 
+    /** 已合并的连续线段：保留批次几何，按上游 lineTo 顺序提交同一条路径。 */
+    internal class IndicatorLinePath(
+        internal val segments: FloatArray,
+        internal val segmentSize: Int,
+    ) : android.graphics.Path() {
+        init {
+            incReserve(segmentSize / 4 + 1)
+            moveTo(segments[0], segments[1])
+            for (offset in 2 until segmentSize step 4) lineTo(segments[offset], segments[offset + 1])
+        }
+    }
+
     /** 主 pane：网格 + candle + MA 线 + 末价线（按 [YAxisSpec] 轴规格映射）。 */
     fun DrawScope.drawMainPane(
         state: ChartState,
@@ -124,7 +136,7 @@ object PaneRenderers {
             if (theme.lastPriceShow) {
                 drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
             }
-            drawHighLowMarkers(state, theme, text, visible, range.first, y, contentRight)
+            drawHighLowMarkers(state, theme, text, visible, range.first, y, contentRight, bottom)
             if (state.mainChartType == MainChartType.AREA) {
                 drawAreaFill(state, theme, visible, range.first, y, bottom)
             }
@@ -186,28 +198,30 @@ object PaneRenderers {
             }
             // 轴标签（独立 gutter 列；inside/LEFT 轴画 pane 内右缘右对齐）
             val axisColor = theme.linePalette[(ai * 3) % theme.linePalette.size]
-            var lastTop = Float.NEGATIVE_INFINITY
             fun labelX(v: String): Float = if (colX < 0f) contentRight - text.measureWidth(v) - 6f else colX
+            val clipTop = if (colX < 0f) maxOf(top, legendHeight) else top
             if (customTicks != null) {
-                for (t in customTicks.ticks) {
-                    val ty = LinearYAxis.valueToY(t.real, rlo, rhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
-                    if (ty < lastTop + 2f || ty < legendHeight) continue
-                    drawText(text, t.text, Offset(labelX(t.text), ty), axisColor)
-                    lastTop = ty
+                val ticks = customTicks.ticks
+                val centers = ticks.map { LinearYAxis.valueToY(it.real, rlo, rhi, top.toDouble(), bottom.toDouble()).toFloat() }
+                for ((index, ty) in axisLabelPositions(centers, text.textHeight, clipTop, bottom)) {
+                    val label = ticks[index].text
+                    drawText(text, label, Offset(labelX(label), ty), axisColor)
                 }
             } else {
                 val (ylo, yhi) = if (reversed) ahi to alo else alo to ahi
                 val ticks = LinearYAxis.ticks(ylo, yhi, 5)
-                for (t in ticks) {
-                    val ty = LinearYAxis.valueToY(t, ylo, yhi, top.toDouble(), bottom.toDouble()).toFloat() - text.textHeight / 2f
-                    if (ty < lastTop + 2f || ty < legendHeight) continue
-                    val s0 = text.price(t)
-                    drawText(text, s0, Offset(labelX(s0), ty), axisColor)
-                    lastTop = ty
+                val centers = ticks.map { LinearYAxis.valueToY(it, ylo, yhi, top.toDouble(), bottom.toDouble()).toFloat() }
+                for ((index, ty) in axisLabelPositions(centers, text.textHeight, clipTop, bottom)) {
+                    val label = text.price(ticks[index])
+                    drawText(text, label, Offset(labelX(label), ty), axisColor)
                 }
             }
         }
-        drawAxisTicks(text, theme, axisTicks, yReal, contentRight, clipTop = legendHeight)
+        val tickY: (Double) -> Double = { real ->
+            val yy = yReal(real)
+            if (state.mainAxisReverse) top + bottom - yy else yy
+        }
+        drawAxisTicks(text, theme, axisTicks, tickY, contentRight, clipTop = top, clipBottom = bottom)
         if (crosshair != null && theme.crosshairShow) {
             drawCrosshair(theme, crosshair, contentLeft, contentRight, top, bottom)
         }
@@ -221,14 +235,11 @@ object PaneRenderers {
         yReal: (Double) -> Double,
         axisRight: Float,
         clipTop: Float,
+        clipBottom: Float,
     ) {
-        var lastTop = Float.NEGATIVE_INFINITY
-        for (t in ticks.ticks) {
-            val top = yReal(t.real).toFloat() - text.textHeight / 2f
-            if (top < lastTop + 2f) continue
-            if (top < clipTop) continue
-            drawText(text, t.text, Offset(axisRight + 6f, top), theme.axisText)
-            lastTop = top
+        val centers = ticks.ticks.map { yReal(it.real).toFloat() }
+        for ((index, top) in axisLabelPositions(centers, text.textHeight, clipTop, clipBottom)) {
+            drawText(text, ticks.ticks[index].text, Offset(axisRight + 6f, top), theme.axisText)
         }
     }
 
@@ -310,7 +321,7 @@ object PaneRenderers {
                 paletteIdx += res.result.keys.size
             }
         }
-        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight)
+        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight, top, bottom)
     }
 
     /**
@@ -367,7 +378,7 @@ object PaneRenderers {
                 paletteIdx += res.result.keys.size
             }
         }
-        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight)
+        drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight, top, bottom)
     }
 
     // ---------- 内部 ----------
@@ -527,6 +538,7 @@ object PaneRenderers {
         firstIndex: Int,
         y: (Double) -> Double,
         contentRight: Float,
+        bottom: Float,
     ) {
         if (!theme.priceMarkShow || visible.size < 2) return
         var highIdx = 0
@@ -535,14 +547,20 @@ object PaneRenderers {
             if (visible[i].high > visible[highIdx].high) highIdx = i
             if (visible[i].low < visible[lowIdx].low) lowIdx = i
         }
+        val exclusions = text.markerExclusions
         val vp = state.viewport
         val hx = vp.candleCenterX((firstIndex + highIdx).toDouble()).toFloat()
         val hy = y(visible[highIdx].high).toFloat()
-        drawText(text, " ${text.price(visible[highIdx].high)}", Offset(hx + 6f, (hy - text.textHeight).coerceAtLeast(0f)), theme.highMarkerColor)
-
         val lx = vp.candleCenterX((firstIndex + lowIdx).toDouble()).toFloat()
         val ly = y(visible[lowIdx].low).toFloat()
-        drawText(text, "${text.price(visible[lowIdx].low)} ", Offset((lx - 6f - text.tagWidth).coerceAtLeast(0f), ly + 2f), theme.lowMarkerColor)
+        val high = text.price(visible[highIdx].high)
+        val low = text.price(visible[lowIdx].low)
+        val highBounds = priceMarkerBounds(hx, if (hy < ly) hy - text.textHeight - 7f else hy + 7f,
+            text.measureWidth(high), text.textHeight, contentRight, bottom, exclusions)
+        val lowBounds = priceMarkerBounds(lx, if (hy < ly) ly + 7f else ly - text.textHeight - 7f,
+            text.measureWidth(low), text.textHeight, contentRight, bottom, exclusions + highBounds)
+        drawText(text, high, highBounds.topLeft, theme.highMarkerColor)
+        drawText(text, low, lowBounds.topLeft, theme.lowMarkerColor)
     }
 
 
@@ -565,14 +583,11 @@ object PaneRenderers {
         attrsOf: ((key: String, row: Int, value: Double) -> Map<*, *>?)? = null,
         paneTop: Float = 0f,
     ) {
-        // T-34 第二轮：drawLines(FloatArray) 批量提交替代逐点 Path（B-02 分段定位
-        // 指标线占 13ms/帧：65 列 × ~240 点的 Path 构建+drawPath 为 UI 线程大头）。
-        // 连续段（NaN 断开）各一次 drawLines；线段重复端点语义与 lineTo 一致。
+        // 连续同样式段按上游 mergeLines 合并，再一次 stroke；NaN/样式/坐标断点分批。
+        // 保留 FloatArray 收集几何，避免逐段 drawLines 的端帽重叠和重复栅格化。
         val lineKeys = keys ?: result.result.keys.filterNot { it in skipKeys }
         val eff = if (dashed) dashedEffect() else null
-        // 预计算恒定项：candleCenterX = barSpacing*(i - scrollIndex + 0.5)
-        val barSpacing = vp.barSpacing.toFloat()
-        val x0 = ((0 - vp.scrollIndex + 0.5) * vp.barSpacing).toFloat()
+        // 与 candle/命中共用 Double 坐标，最后一步转 Float，避免大索引相消丢精度。
         for ((idx, key) in lineKeys.withIndex()) {
             val column = result.result[key]
             val baseColor = palette[(idx + paletteOffset) % palette.size]
@@ -588,9 +603,11 @@ object PaneRenderers {
             // [0,1,2]；修复前 Map 按值等价（data class equals）键控——全局查找
             // 复用最早 A 组且新 A 组被合并回原键位（首现序提交 [0,2,1] 甚至丢段）
             val groups = ArrayList<Seg>()
-            fun segFor(color: Color, width: Float): Seg {
+            fun segFor(color: Color, width: Float, x: Float, y: Float): Seg {
                 val last = groups.lastOrNull()
-                if (last != null && last.color == color && last.width == width) return last
+                if (last != null && last.color == color && last.width == width &&
+                    last.pos >= 4 && last.arr[last.pos - 2] == x && last.arr[last.pos - 1] == y
+                ) return last
                 return Seg(color, width).also { groups += it }
             }
             // R9-02（第九轮复审 2026-10-31）：**提交顺序 = 行登记顺序**——上游按行
@@ -605,10 +622,13 @@ object PaneRenderers {
                                 this.strokeWidth = seg.width
                                 this.color = seg.color.toArgb()
                                 this.style = android.graphics.Paint.Style.STROKE
-                                this.strokeCap = android.graphics.Paint.Cap.ROUND
+                                // 上游非 smooth 线默认 butt/miter；Canvas 默认 miterLimit=10。
+                                this.strokeCap = android.graphics.Paint.Cap.BUTT
+                                this.strokeJoin = android.graphics.Paint.Join.MITER
+                                this.strokeMiter = 10f
                                 eff?.let { this.pathEffect = android.graphics.DashPathEffect(floatArrayOf(6f, 4f), 0f) }
                             }
-                            canvas.nativeCanvas.drawLines(seg.arr, 0, seg.pos, p2)
+                            canvas.nativeCanvas.drawPath(IndicatorLinePath(seg.arr, seg.pos), p2)
                         }
                     }
                 }
@@ -623,7 +643,7 @@ object PaneRenderers {
                     prevWasFinite = false
                     continue
                 }
-                val x = x0 + barSpacing * i
+                val x = vp.candleCenterX(i.toDouble()).toFloat()
                 val yy = y(v).toFloat()
                 // R7-04（第七轮复审 2026-10-31）+ R8-02（第八轮复审 2026-10-31）：
                 // **行段归属统一**——默认段 (i-1,i) 属于 row i-1（上游
@@ -634,9 +654,9 @@ object PaneRenderers {
                 if (prevWasFinite) {
                     val seg = if (styleOverrideOf != null) {
                         val (c0, w0) = styleOverrideOf(key, i - 1)
-                        segFor(c0 ?: baseColor, w0 ?: lineSizePx)
+                        segFor(c0 ?: baseColor, w0 ?: lineSizePx, lastX, lastY)
                     } else {
-                        segFor(baseColor, lineSizePx)
+                        segFor(baseColor, lineSizePx, lastX, lastY)
                     }
                     if (seg.pos + 4 > seg.arr.size) seg.arr = seg.arr.copyOf(seg.arr.size * 2)
                     seg.arr[seg.pos++] = lastX; seg.arr[seg.pos++] = lastY
@@ -687,19 +707,19 @@ object PaneRenderers {
             // "下一行也在可见列表"要求）；prev=false（末行被自定义替换）或数据
             // 末端/NaN 不登记。lastX/lastY 保持末个可见点（lastValueMark 语义）
             if (prevWasFinite && range.last + 1 < column.size && !column[range.last + 1].isNaN()) {
-                val xNext = x0 + barSpacing * (range.last + 1)
+                val xNext = vp.candleCenterX((range.last + 1).toDouble()).toFloat()
                 val yNext = y(column[range.last + 1]).toFloat()
                 val seg = if (styleOverrideOf != null) {
                     val (c0, w0) = styleOverrideOf(key, range.last)
-                    segFor(c0 ?: baseColor, w0 ?: lineSizePx)
+                    segFor(c0 ?: baseColor, w0 ?: lineSizePx, lastX, lastY)
                 } else {
-                    segFor(baseColor, lineSizePx)
+                    segFor(baseColor, lineSizePx, lastX, lastY)
                 }
                 if (seg.pos + 4 > seg.arr.size) seg.arr = seg.arr.copyOf(seg.arr.size * 2)
                 seg.arr[seg.pos++] = lastX; seg.arr[seg.pos++] = lastY
                 seg.arr[seg.pos++] = xNext; seg.arr[seg.pos++] = yNext
             }
-            // T-34：native drawLines 按样式组批量提交（无回调时恰为单组=原快速路径）
+            // 按登记顺序提交连续路径批次（保持行级回调与 A→B→A 顺序）。
             flushGroups()
             // Styles indicator.lastValueMark.show：线末端值点
             if (lastValueMark && !lastX.isNaN()) {
@@ -728,8 +748,8 @@ object PaneRenderers {
         paneTop: Float = 0f,
     ) {
         val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
-        val override = styleOverrideFor(inst)
-        val attrsGeo = attrsOverrideFor(inst)
+        val override = styleOverrideFor(inst, plots)
+        val attrsGeo = attrsOverrideFor(inst, plots)
         val lineKeys = ArrayList<String>()
         val barEntries = ArrayList<Pair<String, Double?>>() // key → baseValue
         for ((key, plot) in plots) {
@@ -741,11 +761,15 @@ object PaneRenderers {
         }
         // 顺序：先线后柱（与内置 MACD DIF/DEA→柱 口径一致）
         if (lineKeys.isNotEmpty()) {
-            val lineAttrs = rawAttrsFor(inst)
-            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = override?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } }, attrsOf = lineAttrs?.let { la -> { k: String, r: Int, v: Double -> la(k, r, v, candles) } }, paneTop = paneTop)
+            // 只为这些 LINE 图形绑定实际存在的回调，BAR 的样式不绕入空的逐点包装。
+            val lineOverride = if (lineKeys.any { plots[it]?.styles != null }) override else null
+            val lineAttrs = if (lineKeys.any { plots[it]?.attrs != null }) rawAttrsFor(inst, plots) else null
+            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = lineOverride?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } }, attrsOf = lineAttrs?.let { la -> { k: String, r: Int, v: Double -> la(k, r, v, candles) } }, paneTop = paneTop)
         }
         if (barEntries.isNotEmpty()) {
-            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, override, attrsGeo, candles, paneTop)
+            val barOverride = if (barEntries.any { plots[it.first]?.styles != null }) override else null
+            val barAttrs = if (barEntries.any { plots[it.first]?.attrs != null }) attrsGeo else null
+            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, barOverride, barAttrs, candles, paneTop)
         }
     }
 
@@ -850,12 +874,23 @@ object PaneRenderers {
     }
 
     /** Q05：styles 上下文含 value+candles（上游 figure.styles data 语义）。 */
-    fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)? {
-        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+    fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)? =
+        styleOverrideFor(inst, inst.definition.plotsFor(inst.params).associateBy { it.key })
+
+    private fun styleOverrideFor(
+        inst: io.lkanvas.core.indicator.IndicatorInstance,
+        plots: Map<String, io.lkanvas.core.indicator.PlotDef>,
+    ): ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)? {
         if (plots.values.all { it.styles == null }) return null
+        val parsedColors = HashMap<String, Color>()
         return { key, row, colValue, candles ->
             val map: Map<*, *> = evaluateStyles(plots[key]?.styles, row, inst.params, colValue, candles) ?: emptyMap<Any?, Any>()
-            val color = map["color"]?.toString()?.let { io.lkanvas.compose.theme.StylesThemeBridge.parse(it) }
+            // 仍逐行执行 styles；只复用相同字符串的纯颜色解析，缓存有界。
+            val color = map["color"]?.toString()?.let { value ->
+                parsedColors[value] ?: io.lkanvas.compose.theme.StylesThemeBridge.parse(value).also {
+                    if (parsedColors.size < 64) parsedColors[value] = it
+                }
+            }
             val width = map["lineWidth"]?.let { (it as? Number)?.toFloat() ?: it.toString().toFloatOrNull() }
             color to width
         }
@@ -867,8 +902,13 @@ object PaneRenderers {
      * BAR 消费键：top/bottom（pane 相对 y）——缺省由管线按值/基线自算。
      */
     /** Q05：attrs 几何求值（含 value+candles 上下文；数值 map）。 */
-    fun attrsOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Map<String, Double>)? {
-        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+    fun attrsOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Map<String, Double>)? =
+        attrsOverrideFor(inst, inst.definition.plotsFor(inst.params).associateBy { it.key })
+
+    private fun attrsOverrideFor(
+        inst: io.lkanvas.core.indicator.IndicatorInstance,
+        plots: Map<String, io.lkanvas.core.indicator.PlotDef>,
+    ): ((String, Int, Double, List<Candle>) -> Map<String, Double>)? {
         if (plots.values.all { it.attrs == null }) return null
         return { key, row, colValue, candles ->
             // N04（第五轮复审 2026-10-31）：attrs 求值传入**真实** value+candles
@@ -886,8 +926,10 @@ object PaneRenderers {
      * M03：attrs **原样**求值（LINE coordinates 点列非 Number，数值过滤器会
      * 丢弃——rawAttrsFor 保留完整 map 供 drawLinePlots 提取 coordinates）。
      */
-    private fun rawAttrsFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Map<*, *>?)? {
-        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+    private fun rawAttrsFor(
+        inst: io.lkanvas.core.indicator.IndicatorInstance,
+        plots: Map<String, io.lkanvas.core.indicator.PlotDef>,
+    ): ((String, Int, Double, List<Candle>) -> Map<*, *>?)? {
         if (plots.values.all { it.attrs == null }) return null
         return { key, row, colValue, candles ->
             evaluateStyles(plots[key]?.attrs, row, inst.params, colValue, candles)
@@ -941,19 +983,12 @@ object PaneRenderers {
         ticks: List<Double>,
         y: (Double) -> Double,
         axisRight: Float,
-        clipTop: Float = 0f,
+        clipTop: Float,
+        clipBottom: Float,
     ) {
-        var lastTop = Float.NEGATIVE_INFINITY
-        for (t in ticks) {
-            val top = y(t).toFloat() - text.textHeight / 2f
-            if (top < lastTop + 2f) continue // 相邻刻度垂直重叠时跳过
-            if (top < clipTop) continue // 避让顶部图例区
-            drawText(text,
-                t,
-                Offset(axisRight + 6f, top),
-                theme.axisText,
-            )
-            lastTop = top
+        val centers = ticks.map { y(it).toFloat() }
+        for ((index, top) in axisLabelPositions(centers, text.textHeight, clipTop, clipBottom)) {
+            drawText(text, ticks[index], Offset(axisRight + 6f, top), theme.axisText)
         }
     }
 }

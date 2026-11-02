@@ -6,6 +6,11 @@
 //   （gradlew 软链到根工程 wrapper；仓库指向根工程 build/maven-repo）
 rootProject.name = "lkanvas-consumer-example"
 pluginManagement {
+    // 官方 R8 覆盖入口；AGP 内置 8.13.19 无法处理 Kotlin 2.4 元数据。
+    buildscript {
+        repositories { maven("https://storage.googleapis.com/r8-releases/raw") }
+        dependencies { classpath("com.android.tools:r8:9.1.29") }
+    }
     repositories {
         maven("https://maven.aliyun.com/repository/google")
         maven("https://maven.aliyun.com/repository/central")

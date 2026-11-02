@@ -24,6 +24,12 @@ captures/
 # Node（tools/oracle 本地依赖）
 node_modules/
 
+# Python 缓存（曾误提交，2026-11-03 清理）
+__pycache__/
+
+# 验收原始测量证据（trace/hprof/mapping/截图等，~GB 级）：仅本地保留，不入库
+docs/evidence/
+
 # 日志与临时文件
 *.log
 .DS_Store

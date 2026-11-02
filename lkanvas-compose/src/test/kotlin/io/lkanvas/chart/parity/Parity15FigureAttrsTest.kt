@@ -384,7 +384,7 @@ class Parity15FigureAttrsTest {
         }
         val narrow = draw(1)
         assertEquals(1, narrow.ops.count { it == "path" }, "末可见行覆盖段保留（R9-01 复现收口）")
-        assertEquals(1, narrow.ops.count { it == "drawLines" }, "默认段 P0→P1 一次提交")
+        assertEquals(1, narrow.ops.count { it == "indicatorLineBatch" }, "默认段 P0→P1 一次提交")
         assertEquals(listOf(4f, 100f, 12f, 101f), batchPoints(narrow), "默认段 [P0,P1]")
         // 对照：遍历范围扩大到 [0,2] → 相同两项 figure
         val wide = draw(2)
@@ -454,8 +454,8 @@ class Parity15FigureAttrsTest {
         }
         val fake = drawLines(def)
         // 提交顺序：默认批次（drawLines）先于覆盖段（path）
-        val seq = fake.ops.filter { it == "drawLines" || it == "path" }
-        assertEquals(listOf("drawLines", "path"), seq, "默认批次先提交、覆盖段后提交（R9-02 复现收口）")
+        val seq = fake.ops.filter { it == "indicatorLineBatch" || it == "path" }
+        assertEquals(listOf("indicatorLineBatch", "path"), seq, "默认批次先提交、覆盖段后提交（R9-02 复现收口）")
         // 默认批次 = row 0 样式与几何 (P0,P1)
         assertEquals(listOf(4f, 100f, 12f, 101f), batchPoints(fake), "默认批次对应 row 0 红色样式与几何")
     }
@@ -531,4 +531,53 @@ class Parity15FigureAttrsTest {
             "三段合并单批次",
         )
     }
+    @Test
+    fun `大索引指标横坐标与共享视口Double结果一致`() {
+        val cs = candles(50_100)
+        val def = lineTemplatePerRow { null }
+        val result = IndicatorEngine.recompute(def, emptyList(), cs)
+        val instance = io.lkanvas.core.indicator.IndicatorInstance("precision", def, emptyList(), "main", "main", null)
+        val viewport = Viewport(barSpacing = 7.3).apply {
+            layout(400.0, cs.size)
+            restoreAnchor(Viewport.Anchor(50_000.123456, 7.3), cs.size)
+        }
+        val fake = TestDrawScope(Size(600f, 600f))
+        with(fake) {
+            drawInstanceFigures(instance, result, viewport, VisibleRange(50_000, 50_003), { it }, ChartTheme(), 0, false, cs)
+        }
+        val points = batchPoints(fake)
+        assertEquals(16, points.size, "四个可见行段包括窗口末端的下一点")
+        for (segment in 0..3) {
+            assertEquals(viewport.candleCenterX((50_000 + segment).toDouble()).toFloat(), points[segment * 4], "段起点先以Double计算")
+            assertEquals(viewport.candleCenterX((50_001 + segment).toDouble()).toFloat(), points[segment * 4 + 2], "段终点与蜡烛中心同源")
+        }
+    }
+
+    @Test
+    fun `单次图形准备供分发样式和几何共同消费`() {
+        var preparations = 0
+        val definition = object : IndicatorDefinition {
+            override val name = "PREPARED"
+            override val shortName = "P"
+            override val calcParams = emptyList<Double>()
+            override val precision = 2
+            override val plots = emptyList<PlotDef>()
+            override fun plotsFor(params: List<Double>): List<PlotDef> {
+                preparations++
+                return listOf(PlotDef("v", "V", PlotType.LINE))
+            }
+            override fun initScratch(params: List<Double>): Any? = null
+            override fun stepScratch(prev: Any?, c: List<Candle>, p: List<Double>, i: Int): Any? = null
+            override fun rowFromScratch(s: Any?, c: List<Candle>, p: List<Double>, i: Int) = mapOf("v" to c[i].close)
+        }
+        val cs = candles(4)
+        val result = IndicatorEngine.recompute(definition, emptyList(), cs)
+        val instance = io.lkanvas.core.indicator.IndicatorInstance("prepared", definition, emptyList(), "main", "main", null)
+        val fake = TestDrawScope(Size(600f, 600f))
+        preparations = 0
+        with(fake) { drawInstanceFigures(instance, result, Viewport(), VisibleRange(0, 3), { it }, ChartTheme(), 0, false, cs) }
+        assertEquals(1, preparations, "与上游 preparedFigures 一样，一份定义供本次绘制全部阶段使用")
+        assertEquals(12, batchPoints(fake).size, "三个行段仍按原坐标提交")
+    }
+
 }

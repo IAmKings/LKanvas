@@ -1,0 +1,28 @@
+
+=== lkanvas-symbol-color.svg  (210 bytes)
+viewBox 0 0 256 256 · aspect 1.0 (square)
+colours 1: #79a8ff · gradients 0 · anchors 13
+margins L36.0 R36.0 T40.0 B40.0 · bbox fill 0.494
+✔ no issues found
+production-readiness score: 100/100 (heuristic)
+
+=== lkanvas-logo-horizontal.svg  (1398 bytes)
+viewBox 0 0 1040 256 · aspect 4.062 (horizontal)
+colours 2: #255bc8 #152238 · gradients 0 · anchors 97
+margins L36.0 R22.6 T40.0 B40.0 · bbox fill 0.649
+✔ no issues found
+production-readiness score: 100/100 (heuristic)
+
+=== lkanvas-logo-horizontal-white.svg  (1398 bytes)
+viewBox 0 0 1040 256 · aspect 4.062 (horizontal)
+colours 1: #ffffff · gradients 0 · anchors 97
+margins L38.0 R22.6 T40.0 B40.0 · bbox fill 0.647
+✔ no issues found
+production-readiness score: 100/100 (heuristic)
+
+=== lkanvas-logo-stacked.svg  (1433 bytes)
+viewBox -2 0 748 450 · aspect 1.662 (wide)
+colours 2: #255bc8 #152238 · gradients 0 · anchors 97
+margins L2.0 R8.6 T40.0 B19.2 · bbox fill 0.856
+✔ no issues found
+production-readiness score: 100/100 (heuristic)

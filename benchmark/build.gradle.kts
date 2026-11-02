@@ -4,8 +4,8 @@ plugins {
 }
 
 // 性能线 P1（PRD 7.2/7.3，0.4.x 独立线）：Macrobenchmark 模块。
-// 目标变体 = app-sample 的 benchmark buildType（R8 压缩 + 非 debuggable），
-// 保证帧耗时数据不被调试开销污染（PRD 7.2 计量纪律）。
+// 目标变体 = app-sample 的 benchmark buildType（非压缩 + 非 debuggable），
+// R8 release 另行安装计量；两种变体分别留档（PRD 7.2 计量纪律）。
 android {
     namespace = "io.lkanvas.benchmark"
     compileSdk = libs.versions.android.compileSdk.get().toInt()

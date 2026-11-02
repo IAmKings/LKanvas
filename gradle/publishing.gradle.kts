@@ -19,7 +19,7 @@ configure<org.gradle.api.publish.PublishingExtension> {
             create<MavenPublication>("lkanvas") {
                 groupId = "io.lkanvas"
                 artifactId = "lkanvas-compose"
-                version = "0.15.0"
+                version = "0.15.1-rc5"
                 afterEvaluate {
                     from(components["release"])
                 }
@@ -29,7 +29,7 @@ configure<org.gradle.api.publish.PublishingExtension> {
             create<MavenPublication>("lkanvas") {
                 groupId = "io.lkanvas"
                 artifactId = "lkanvas-core"
-                version = "0.15.0"
+                version = "0.15.1-rc5"
                 from(components["java"])
                 pomConfig(this)
             }
@@ -76,8 +76,8 @@ fun pomConfig(publication: MavenPublication) {
             }
         }
         scm {
-            connection.set("scm:git:git://github.com/lkanvas/lkanvas.git")
-            url.set("https://github.com/lkanvas/lkanvas")
+            connection.set("scm:git:git://github.com/IAmKings/LKanvas.git")
+            url.set("https://github.com/IAmKings/LKanvas")
         }
     }
 }

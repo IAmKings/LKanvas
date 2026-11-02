@@ -1,0 +1,44 @@
+{
+  "brand": "LKanvas",
+  "tagline": "Precision, in view.",
+  "brief": "Android / Jetpack Compose 原生金融图表库。为开发者提供清楚、可靠、可验证的图表体验。",
+  "adjectives": [
+    "精准",
+    "克制",
+    "可靠",
+    "清楚"
+  ],
+  "criteria": "16px 可辨、单色可用、Android 图标安全区内完整，和图表的涨跌色分开。",
+  "industry": "software",
+  "mockups": [
+    "readme",
+    "app-icon",
+    "website",
+    "terminal",
+    "sticker",
+    "social"
+  ],
+  "brand_color": "#79A8FF",
+  "greyscale": false,
+  "designer": "LKanvas",
+  "round": 2,
+  "concepts": [
+    {
+      "name": "刻度 K / Calibrated K",
+      "symbol": "lkanvas-symbol-color.svg",
+      "lockup": "lkanvas-logo-horizontal.svg",
+      "idea": "独立竖直基准与 45° 折臂组成清晰的 K。",
+      "rationale": [
+        "纯路径几何，保留采样间隔般的空白。",
+        "品牌蓝与行情涨跌色分离。",
+        "专为 sample、SDK 文档和启动图标适配。"
+      ]
+    }
+  ],
+  "recommendation": "A 方向已由用户选定。数字场景优先使用冷蓝符号与深色字标，深色背景使用反白组合。",
+  "next_steps": [
+    "Logo 已接入 sample 与 Android 自适应图标",
+    "sample UI 已按 DESIGN.md 实现",
+    "真机验证范围见改版验收文档"
+  ]
+}

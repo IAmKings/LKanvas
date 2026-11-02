@@ -52,7 +52,7 @@ class LKanvasChartTest {
     fun `init与dispose生命周期`() {
         val chart = newChart()
         assertTrue(chart === LKanvasChart.init(chart.state), "同 state 重复 init 返回既有实例")
-        assertTrue(LKanvasChart.version().isNotEmpty())
+        assertEquals(io.lkanvas.core.LKanvas.VERSION, LKanvasChart.version())
         LKanvasChart.dispose(chart)
     }
 

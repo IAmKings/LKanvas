@@ -1,5 +1,7 @@
 # LKanvas
 
+> 0.15.0 保持冻结；当前修复候选为 0.15.1-rc5（APK `8c5895b3…`），发布仍为 **HOLD**。同包双机字体与 API23 模拟器冒烟复验通过；PJZ110 实时/压力帧各一次短测通过，K60U 对应项仍失败。JVM417、K60U原生21及本地制品链通过，最终双机矩阵、heap/B06/真人TalkBack尚未完成。见[第七轮执行报告 §7–8](docs/alignment/release-readiness-round7-execution-2026-11-02.zh-CN.md)。
+
 KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 [KLineChart](https://github.com/klinecharts/KLineChart)（v10.1.0）的领域能力——指标、覆盖物、坐标轴、
 数据接入模型——移植为纯 Kotlin 计算核心 + Compose 原生绘制的图表库。
@@ -12,7 +14,16 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 |---|---|
 | `lkanvas-core` | 纯 Kotlin/JVM 库：数据模型与校验、串行数据变更、会话/版本门禁、27 种内置指标（全量与增量）、三种纵轴+自定义轴、视口坐标、覆盖物领域状态、DataSource 契约 |
 | `lkanvas-compose` | Android Compose 库：`KLineChart` 组件（六种主图类型、三 pane、明暗主题）、Canvas 绘制、手势状态机、segment 画线 |
-| `app-sample` | 示例应用：本地确定性行情、实时末根更新、分页、画线、图型/轴切换 |
+| `app-sample` | 行情试用工作台：深浅主题、真实模拟周期、27 指标、画线、图型/轴切换、诊断与 PNG 导出 |
+
+## Sample 试用工作台
+
+默认展示本地模拟指数与 MA / VOL / MACD，可直接切换 `1m / 5m / 15m / 1h / 1d`。底部「指标 / 画线 / 图表 / 更多」集中展示库能力；右上角提供主题切换与诊断。横屏采用紧凑布局，设置面板独立滚动。
+
+- [设计规范](DESIGN.md) · [Logo 与使用说明](docs/design/brand/final/USAGE.md) · [改版验收与操作路径](docs/design/sample-redesign-2026-11-01.md)
+- [深色首页](docs/evidence/sample-redesign-20261101/home-dark.png) · [浅色首页](docs/evidence/sample-redesign-20261101/home-light.png) · [横屏](docs/evidence/sample-redesign-20261101/font-1.0-landscape.png)
+
+行情是加速模拟数据，不联网；PNG 与诊断日志导出到应用缓存，界面显示结果和路径。原有 `stress_mode` 等性能测试参数保留，UI 改版不替代库的性能与发布验收。
 
 ## 当前进度（0.5.0：多轴完整版 + 动态 pane 完整版）
 

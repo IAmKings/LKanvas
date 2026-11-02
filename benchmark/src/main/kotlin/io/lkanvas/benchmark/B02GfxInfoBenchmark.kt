@@ -10,19 +10,18 @@ import org.junit.runner.RunWith
 /**
  * B-02 扩展负载——等价计量口径（PRD 7.3「旧系统使用冻结的等价方法，不混算」）。
  *
- * 背景：FrameTimingMetric 需要 perfetto RenderThread doFrame 切片，在冻结设备
- * （MIUI 14）对非 debuggable 构建不可采集（minify 与否均复现，对照实验见
- * docs/performance-baseline.md §4）。本测试按等价口径采集：
+ * 背景：历史默认 FrameTiming 捕获配置缺 RenderThread 匹配；本轮显式配置已可采
+ *（见 FrameTimingBenchmark）。本测试独立保留 HWUI 口径，不与 CPU/overrun 混算：
  *
  * - 构建：`:app-sample` 的 benchmark buildType（**非压缩**，isMinifyEnabled=false，
- *   非 debuggable；R8 压缩口径的 gfxinfo 在该设备同样不可见——0 帧对照实验）。
+ *   非 debuggable；R8 release 另行安装后可复采，不与本变体混算）。
  * - 计量：`dumpsys gfxinfo`（HWUI 帧统计）：Total frames / Janky / P50~P99。
  * - 负载：50k candle + 10 MA 实例 + 100 segment（intent extras，种子固定）。
  * - 交互：10 次向过去方向全宽滑动 + 10 次返回（B-02 持续交互）。
  *
- * **口径警告**：非压缩构建的帧耗时优于 R8 构建（启动/渲染均不含 R8 收益），
+ * **口径警告**：非压缩与 R8 构建应分别采样，不预设哪种构建更快，
  * 该数据只用于「负载压力量级判定」，不得与 FrameTimingMetric 数据或压缩构建
- * 数据直接比较；R8 口径的帧数据待设备兼容后由 B02StressBenchmark 采集。
+ * 数据直接比较；R8 release 的 HWUI 已可复采，FrameTiming 显式捕获配置已独立实测。
  *
  * 结果经 JUnit XML system-out 与 logcat（B02_GFXINFO 标签）双通道留档。
  */
@@ -37,7 +36,7 @@ class B02GfxInfoBenchmark {
     }
 
     @Test
-    fun stressScroll() {
+    fun stressScroll() = inPortrait {
         val pkg = "io.lkanvas.sample"
         // 冷启动 + stress 负载注入（注入耗时：50k reset + 10 指标全量 + 100 覆盖物）
         device.executeShellCommand("am force-stop $pkg")
@@ -48,6 +47,26 @@ class B02GfxInfoBenchmark {
         )
         Thread.sleep(22_000)
         device.executeShellCommand("dumpsys gfxinfo $pkg reset")
+
+        val captureTrace = InstrumentationRegistry.getArguments().getString("frameTrace") == "true"
+        val traceStart = android.os.SystemClock.elapsedRealtime()
+        if (captureTrace) {
+            val config = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir("validation"), "frames.pbtxt")
+            config.writeText("""
+                buffers { size_kb: 65536 fill_policy: RING_BUFFER }
+                duration_ms: 17000
+                data_sources { config { name: "linux.ftrace" ftrace_config {
+                    ftrace_events: "sched/sched_switch" ftrace_events: "sched/sched_waking"
+                    atrace_categories: "gfx" atrace_categories: "view" atrace_categories: "input"
+                    atrace_apps: "io.lkanvas.sample"
+                } } }
+                data_sources { config { name: "linux.process_stats" process_stats_config {
+                    scan_all_processes_on_start: true proc_stats_poll_ms: 500
+                } } }
+                data_sources { config { name: "android.surfaceflinger.frametimeline" } }
+            """.trimIndent())
+            device.startFrameTrace(config, "/data/misc/perfetto-traces/lkanvas-b02.perfetto-trace")
+        }
 
         // B-02 持续交互：先向过去方向（查看更早数据）滑 10 次，再拉回 10 次
         val w = device.displayWidth
@@ -60,9 +79,19 @@ class B02GfxInfoBenchmark {
             device.swipe((w * 0.8).toInt(), midY, (w * 0.2).toInt(), midY, 25)
         }
         Thread.sleep(1_000)
+        if (captureTrace) Thread.sleep((traceStart + 18_000 - android.os.SystemClock.elapsedRealtime()).coerceAtLeast(0))
 
-        val raw = device.executeShellCommand("dumpsys gfxinfo $pkg")
+        val raw = device.executeShellCommand("dumpsys gfxinfo $pkg framestats")
+        val output = java.io.File(
+            InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir("validation"),
+            "b02-${System.currentTimeMillis()}.txt",
+        )
+        output.writeText(raw)
         val metrics = parseGfxInfo(raw)
+        check(listOf("totalFrames", "janky", "p50", "p90", "p95", "p99").all { metrics[it]?.toDoubleOrNull() != null }) {
+            "gfxinfo 计量不完整；原始输出：${output.absolutePath}"
+        }
+        android.util.Log.i("B02_GFXINFO", "MEASUREMENT_ONLY; deadline/input gates unverified; raw=${output.absolutePath}")
 
         // 计量可用性护栏（PRD：不能以缺计量掩盖；不可得即失败）
         check((metrics["totalFrames"]?.toIntOrNull() ?: 0) > 0) {
@@ -94,16 +123,9 @@ class B02GfxInfoBenchmark {
             when {
                 t.startsWith("Total frames rendered:") -> out["totalFrames"] = t.substringAfter(":").trim()
                 t.startsWith("Janky frames:") -> out["janky"] = t.substringAfter(":").trim().substringBefore("(").trim()
-                t.endsWith("th percentile:") -> {
-                    val pct = t.substringBefore("th percentile").trim().removeSuffix("50").ifEmpty { "50" }
-                    val key = when {
-                        t.startsWith("50th") -> "p50"
-                        t.startsWith("90th") -> "p90"
-                        t.startsWith("95th") -> "p95"
-                        t.startsWith("99th") -> "p99"
-                        else -> t.substringBefore("th").trim() + "pct"
-                    }
-                    out[key] = t.substringAfter(":").trim().substringBefore("ms").trim()
+                t.startsWith("Janky frames (legacy):") -> out["legacyJanky"] = t.substringAfter(":").trim().substringBefore("(").trim()
+                else -> Regex("^(50|90|95|99)th percentile:\\s*(\\d+(?:\\.\\d+)?)ms$").matchEntire(t)?.let { match ->
+                    out["p${match.groupValues[1]}"] = match.groupValues[2]
                 }
             }
         }

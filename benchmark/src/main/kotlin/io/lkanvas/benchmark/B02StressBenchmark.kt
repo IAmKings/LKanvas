@@ -16,14 +16,12 @@ import org.junit.runner.RunWith
  * 100 条 segment 覆盖物（intent extras 注入），持续横向滚动交互 +
  * [FrameTimingMetric]（frameDurationCpuMs 分位数与 frameOverrunMs 超帧比例）。
  *
- * **设备受限登记（docs/performance-baseline.md §4）**：FrameTimingMetric 依赖
- * perfetto RenderThread `doFrame` 切片，在冻结设备（MIUI 14 / 23078PND5G）上
- * 对非 debuggable 构建不可采集（minify 与否均复现，对照实验已留档）——按
- * PRD 7.3「旧系统使用冻结的等价方法，不混算」，等价实现见
- * [B02GfxInfoBenchmark]（非压缩 benchmark 变体 + gfxinfo 口径）。
- * 本测试在兼容设备/系统恢复启用（去掉 [Ignore] 即可）。
+ * 历史默认捕获配置曾缺少 RenderThread 匹配，保留旧入口及失败记录。
+ * 当前设备已通过 [FrameTimingBenchmark] 的显式捕获配置取得 CPU/overrun 指标；
+ * 不再将旧失败解释为该设备对所有非 debuggable 构建均不可采。
+
  */
-@Ignore("MIUI14 冻结设备对非 debuggable 构建无 renderthread slices；等价口径见 B02GfxInfoBenchmark")
+@Ignore("历史默认捕获入口；当前显式配置及真实指标见 FrameTimingBenchmark")
 @RunWith(AndroidJUnit4::class)
 class B02StressBenchmark {
 

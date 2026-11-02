@@ -157,3 +157,16 @@
 - ~~惯性滚动为基础指数衰减实现~~：**已接平台 OverScroller native spline 曲线**（RecyclerView/ScrollView 同款，KLineChart 注入、null 回退旧衰减保 JVM 测试可用；真机惯性滚动行为验证通过）。
 - ~~pane 增删/排序为固定三 pane 布局~~：**0.5.x 动态 pane 完整版收口**（绑定 paneId 自动建删/渲染/拖动/排序/存档）；0.6.0 起主 pane 不再按 series 过滤、vol/macd pane 接受任意绑定实例（上游缺省语义）。
 - PVT volume 缺失按上游显式取 1、ROC 零回看取 0、AVP 缺失按 0：上游明确代码行为，逐位对齐优先（登记备查）。
+
+### 2026-11-01 0.15.1-rc1 设备验收更正
+
+当前使用 R8 9.1.29 处理 Kotlin 2.4 元数据，原“Should never be called 仅为构建噪音”的描述不适用于本次问题。API 23 的 AtomicLong 更新改为 CAS；ChartText 保留 0.15.0 公开构造签名。0.15.0 冻结制品不覆盖，候选本地 Maven/独立 consumer 已验证。当前发布仍 HOLD，源码、设备与计量边界见[第三轮最终验收报告](alignment/pre-release-final-acceptance-round3-2026-11-01.zh-CN.md)。
+
+
+### 2026-11-02 0.15.1-rc3 第五轮收尾
+
+0.15.0 继续冻结，候选统一为 rc3。示例两处 API 24 Iterable.forEach 改为保持顺序的 for 循环，minSdk 仍为 23；本轮新增 OnePlus PJZ110 / Android 17 实机覆盖，K60U 另补同一 R8 包的 30 建销/100 切品种与真实 heap，均通过。Android 6 没有真机认证，当前仍因帧 CPU、轻载输入和大字体横屏排版未达标而 HOLD。新机 benchmark 需要临时允许测试 APK 后台运行，结束后已恢复；没有修改生产示例后台策略或 debuggable/profileable 标志。以[第五轮报告](alignment/targeted-fix-retest-round5-2026-11-02.zh-CN.md)的范围和证据为准，以上历史阶段说明不扩大为当前最终放行。
+
+### 2026-11-02 0.15.1-rc4 第六轮
+
+0.15.0 继续冻结。副图图例裁剪恢复上游各 pane 独立 Canvas 的边界语义；DrawOp 仅新增内部裁剪元数据，公开构造与 sealed 子类保持。K60U 原生字体/缓存与 PNG/示例共 12 项通过，最终 R8 的字体/方向与交互复验通过；PJZ110 原机 rc4 尚未实机复验。K60U 帧、轻载输入、容量和严格 warm 未通过，发布仍 **HOLD**。本轮没有扩大 Android 6、双机 heap、B06 或真人 TalkBack 的认证范围。以[第六轮报告](alignment/targeted-fix-retest-round6-2026-11-02.zh-CN.md)为准。

@@ -35,7 +35,7 @@ class LKanvasChart private constructor(
 ) {
 
     companion object {
-        const val VERSION = "0.15.0"
+        const val VERSION = "0.15.1-rc5"
 
         /** 上游 `init(ds, options?)`：Android 无 DOM，直接构造（同一 state 重复 init 返回既有实例）。 */
         private val liveCharts = java.util.concurrent.ConcurrentHashMap<ChartState, LKanvasChart>()
@@ -787,7 +787,7 @@ class LKanvasChart private constructor(
             val inst = state.overlays.get(id) ?: return null
             inst.paneIdOverride = paneId
             value.groupId?.let { inst.groupId = it }
-            value.extendData.forEach { (k, v) -> inst.extensionData[k] = v }
+            for ((k, v) in value.extendData) inst.extensionData[k] = v
             inst.locked = value.lock
             inst.visible = value.visible
             inst.zIndex = value.zLevel
@@ -807,7 +807,7 @@ class LKanvasChart private constructor(
         val inst = state.overlays.get(id) ?: return null
         inst.paneIdOverride = paneId
         value.groupId?.let { inst.groupId = it }
-        value.extendData.forEach { (k, v) -> inst.extensionData[k] = v }
+        for ((k, v) in value.extendData) inst.extensionData[k] = v
         inst.locked = value.lock
         inst.visible = value.visible
         inst.zIndex = value.zLevel

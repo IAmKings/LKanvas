@@ -216,7 +216,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                 val prev = pinchDist
                                 if (prev != null && prev > 1f) {
                                     state.zoomAt(d / prev, (ps[0].x + ps[1].x) / 2f)
-                                    event.changes.forEach { it.consume() }
+                                    for (change in event.changes) change.consume()
                                 }
                                 pinchDist = d
                             }
@@ -225,14 +225,14 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                         GMode.CROSSHAIR -> {
                             val c = event.changes.firstOrNull() ?: continue
                             state.moveCrosshair(c.position.x, c.position.y)
-                            event.changes.forEach { it.consume() }
+                            for (change in event.changes) change.consume()
                         }
 
                         GMode.PAN -> {
                             val c = event.changes.firstOrNull() ?: continue
                             velocity.addPosition(c.uptimeMillis, c.position)
                             state.panBy(c.position.x - c.previousPosition.x)
-                            event.changes.forEach { it.consume() }
+                            for (change in event.changes) change.consume()
                         }
 
                         GMode.IDLE -> {
@@ -265,7 +265,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                 }
                             }
                             OverlayEventDispatch.onTouchMove(state, dragInstanceId, c.position.x, c.position.y)
-                            event.changes.forEach { it.consume() }
+                            for (change in event.changes) change.consume()
                         }
 
                         GMode.WHOLE_DRAG -> {
@@ -283,7 +283,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                 state.notifyOverlayChanged()
                             }
                             OverlayEventDispatch.onTouchMove(state, dragInstanceId, c.position.x, c.position.y)
-                            event.changes.forEach { it.consume() }
+                            for (change in event.changes) change.consume()
                         }
 
                         GMode.CREATE -> {
@@ -305,7 +305,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                     }
                                 }
                             }
-                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            for (change in event.changes) if (change.positionChanged()) change.consume()
                         }
 
                         GMode.PANE_ADJUST -> {
@@ -315,13 +315,13 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                             } else if (extraPaneId != null) {
                                 state.adjustExtraPane(extraPaneId!!, paneStartValue, c.position.y - paneStartY)
                             }
-                            event.changes.forEach { it.consume() }
+                            for (change in event.changes) change.consume()
                         }
 
                         GMode.AXIS_ZOOM -> {
                             val c = event.changes.firstOrNull() ?: continue
                             state.axisZoomBy(c.position.y - axisStartY)
-                            event.changes.forEach { it.consume() }
+                            for (change in event.changes) change.consume()
                         }
                     }
                 }

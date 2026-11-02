@@ -12,8 +12,9 @@ android {
         applicationId = "io.lkanvas.sample"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 5
+        versionName = "0.15.1-rc5"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -24,7 +25,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
         }
-        // Macrobenchmark 目标变体（P1 性能线）：R8 压缩 + 非 debuggable + debug 签名
+        // Macrobenchmark 目标变体（P1 性能线）：非压缩 + 非 debuggable；R8 release 单独复采
         create("benchmark") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
@@ -55,6 +56,9 @@ kotlin {
 }
 
 dependencies {
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.uiautomator)
     implementation(project(":lkanvas-compose"))
 
     implementation(libs.androidx.core.ktx)

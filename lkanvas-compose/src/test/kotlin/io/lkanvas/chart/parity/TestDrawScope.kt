@@ -170,6 +170,15 @@ class TestDrawScope(override val size: Size) : DrawScope {
         val lineArrays = mutableListOf<FloatArray>()
         private val stack = ArrayDeque<Triple<Float, Float, Int>>()
 
+        override fun drawPath(path: android.graphics.Path, paint: android.graphics.Paint) {
+            if (path is io.lkanvas.compose.draw.PaneRenderers.IndicatorLinePath) {
+                lineArrays += path.segments.copyOf(path.segmentSize)
+                s.ops += "indicatorLineBatch"
+            } else {
+                s.ops += "nativePath"
+            }
+        }
+
         override fun drawLines(pts: FloatArray, paint: android.graphics.Paint) {
             lineArrays += pts.copyOf()
             s.ops += "drawLines"
