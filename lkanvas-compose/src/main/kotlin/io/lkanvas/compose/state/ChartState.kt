@@ -235,7 +235,7 @@ class ChartState(
         if (candles.isEmpty()) return null
         val crosshair = crosshairPosition
         val idx = if (crosshair != null) {
-            viewport.logicalIndexAt(crosshair.x.toDouble()).toInt().coerceIn(candles.indices)
+            viewport.logicalIndexAt(crosshair.x.toDouble()).roundToInt().coerceIn(candles.indices)
         } else {
             accessibilitySelectedIndex ?: (candles.size - 1)
         }
@@ -370,6 +370,21 @@ class ChartState(
         // Overlay points share a viewport: scan once, without retaining a previous data snapshot.
         if (mainRangeSession != snapshot.sessionId || mainRangeRevision != snapshot.revision || mainRangeFrom != from || mainRangeTo != to) {
             mainRange = io.lkanvas.core.axis.LinearYAxis.rangeOfCandles(candles.subList(from, to + 1))
+            mainRange?.let { initial ->
+                var lo = initial.first
+                var hi = initial.second
+                for (inst in mainPaneIndicatorResults()) {
+                    if (extraYAxisMeta[inst.yAxisId]?.paneId == "main") continue
+                    for (plot in inst.definition.plotsFor(inst.params)) {
+                        val values = inst.state?.result?.get(plot.key) ?: continue
+                        for (i in from..to) {
+                            val value = values.getOrNull(i) ?: continue
+                            if (value.isFinite()) { lo = minOf(lo, value); hi = maxOf(hi, value) }
+                        }
+                    }
+                }
+                mainRange = lo to hi
+            }
             mainRangeSession = snapshot.sessionId
             mainRangeRevision = snapshot.revision
             mainRangeFrom = from
@@ -383,6 +398,37 @@ class ChartState(
      * 绘制 y 映射、十字线、覆盖物与门面 convert 共用）。
      */
     var mainAxisReverse: Boolean = false
+
+    internal var axisGaps: Map<String, io.lkanvas.chart.AxisGap> = emptyMap()
+    // 由本帧图例度量回填，坐标转换与绘制使用同一份 pane 几何。
+    internal var legendHeightsPx: Map<String, Float> = emptyMap()
+
+    fun axisDisplayRange(paneId: String, range: Pair<Double, Double>, axisId: String = "main"): Pair<Double, Double> {
+        val bounds = paneBounds(paneId) ?: return range
+        val height = (bounds.second - bounds.first).toDouble()
+        if (height <= 0.0) return range
+        val spec = when {
+            axisId != "main" -> effectiveExtraAxisSpec(axisId)
+            paneId == "main" -> effectiveMainAxisSpec()
+            else -> io.lkanvas.core.axis.YAxisSpec.Normal
+        }
+        val (lo, hi) = io.lkanvas.core.axis.YAxisMath.realRange(spec, range.first, range.second)
+        val gap = axisGaps[if (axisId == "main" && paneId != "main") paneId else axisId] ?: io.lkanvas.chart.AxisGap()
+        fun rate(value: Double): Double = when {
+            !value.isFinite() || value < 0.0 -> 0.0
+            value >= 1.0 -> value / height
+            else -> value
+        }
+        var top = rate(gap.top)
+        var bottom = rate(gap.bottom)
+        val fraction = ((legendHeightsPx[paneId] ?: 0f) / height).coerceIn(0.0, (1.0 - 1.0 / height).coerceAtLeast(0.0))
+        val reverse = if (axisId == "main") paneId == "main" && mainAxisReverse else extraYAxisMeta[axisId]?.reverse == true
+        if (reverse) bottom = maxOf(bottom, fraction * (1 + top) / (1 - fraction))
+        else top = maxOf(top, fraction * (1 + bottom) / (1 - fraction))
+        val from = io.lkanvas.core.axis.YAxisMath.realToValue(spec, lo - (hi - lo) * bottom)
+        val to = io.lkanvas.core.axis.YAxisMath.realToValue(spec, hi + (hi - lo) * top)
+        return if (from.isFinite() && to.isFinite() && from != to) minOf(from, to) to maxOf(from, to) else range
+    }
 
     /** SLA-011：滚动开关（手势与程序化 panBy 共同遵守；上游 Store.scroll 检查）。 */
     var scrollEnabled: Boolean = true
@@ -401,7 +447,7 @@ class ChartState(
      * effectiveMainAxisSpec，log/percentage/custom 一致；reverse 逆映射）。
      */
     fun mainPaneValueAt(y: Float): Double? {
-        val (lo, hi) = mainPaneRange() ?: return null
+        val (lo, hi) = axisDisplayRange("main", mainPaneRange() ?: return null)
         val spec = effectiveMainAxisSpec()
         val bottom = paneHeightsPx.main.toDouble()
         val yy = if (mainAxisReverse) bottom - y else y
@@ -410,7 +456,7 @@ class ChartState(
 
     /** 数值 → y 像素（SLA-012 统一轴模型：与绘制同用 YAxisMath；reverse 翻转）。 */
     fun mainPaneYOf(value: Double): Double? {
-        val (lo, hi) = mainPaneRange() ?: return null
+        val (lo, hi) = axisDisplayRange("main", mainPaneRange() ?: return null)
         val spec = effectiveMainAxisSpec()
         val bottom = paneHeightsPx.main.toDouble()
         val y = io.lkanvas.core.axis.YAxisMath.valueToY(spec, value, lo, hi, 0.0, bottom)
@@ -426,7 +472,7 @@ class ChartState(
         if (axisId == "main") return mainPaneYOf(value)
         val meta = extraYAxisMeta[axisId] ?: return mainPaneYOf(value)
         val (vFrom, vTo) = visibleIndexRange() ?: return null
-        val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
+        val (alo, ahi) = axisDisplayRange(meta.paneId, extraAxisRange(axisId, vFrom, vTo) ?: return null, axisId)
         val spec = effectiveExtraAxisSpec(axisId)
         // Q02（第四轮复审 2026-10-30）：投影几何 = 轴所属 pane 的 bounds，但返回
         // **pane 相对 y**（与 paneValueToY 同约定；修复前返回绝对 y，门面又当
@@ -462,7 +508,7 @@ class ChartState(
     ): ((Double) -> Double)? {
         if (yAxisId == "main") return null
         val meta = extraYAxisMeta[yAxisId]?.takeIf { it.paneId == paneId } ?: return null
-        val (alo, ahi) = extraAxisRange(yAxisId, from, to) ?: return null
+        val (alo, ahi) = axisDisplayRange(paneId, extraAxisRange(yAxisId, from, to) ?: return null, yAxisId)
         val spec = effectiveExtraAxisSpec(yAxisId)
         val t = paneTop.toDouble()
         val b = paneBottom.toDouble()
@@ -477,7 +523,7 @@ class ChartState(
         if (axisId == "main") return mainPaneValueAt(y)
         val meta = extraYAxisMeta[axisId] ?: return mainPaneValueAt(y)
         val (vFrom, vTo) = visibleIndexRange() ?: return null
-        val (alo, ahi) = extraAxisRange(axisId, vFrom, vTo) ?: return null
+        val (alo, ahi) = axisDisplayRange(meta.paneId, extraAxisRange(axisId, vFrom, vTo) ?: return null, axisId)
         val spec = effectiveExtraAxisSpec(axisId)
         // Q02：输入为 pane 相对 y（与 axisValueToY 输出互逆）
         val (aTop, aBottom) = paneBounds(meta.paneId) ?: (0f to paneHeightsPx.main)
@@ -593,7 +639,7 @@ class ChartState(
                 paneVisibleRange(paneId) ?: return null
             }
         }
-        val (lo, hi) = loHi ?: return null
+        val (lo, hi) = axisDisplayRange(paneId, loHi ?: return null)
         return io.lkanvas.core.axis.LinearYAxis.valueToY(value, lo, hi, top.toDouble(), bottom.toDouble()) - top
     }
 
@@ -607,11 +653,11 @@ class ChartState(
         return when (paneId) {
             "main" -> mainPaneValueAt(yRelative)
             "vol" -> {
-                val (l, h2) = paneVisibleRange(paneId) ?: return null
+                val (l, h2) = axisDisplayRange(paneId, paneVisibleRange(paneId) ?: return null)
                 io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), l, h2, top.toDouble(), bottom.toDouble())
             }
             else -> {
-                val (l, h2) = paneVisibleRange(paneId) ?: return null
+                val (l, h2) = axisDisplayRange(paneId, paneVisibleRange(paneId) ?: return null)
                 io.lkanvas.core.axis.LinearYAxis.yToValue(absY.toDouble(), l, h2, top.toDouble(), bottom.toDouble())
             }
         }
@@ -1002,13 +1048,16 @@ class ChartState(
 
     private var lastBarSpacing = 0.0
 
-    /** 平移（px；手势层调用）。 */
+    /** 内容位移（px）：正数向右，查看更早数据；视口索引的方向与内容相反。 */
     fun panBy(deltaX: Float) {
         if (!scrollEnabled) return // SLA-011：开关在共用执行入口检查
-        viewport.scrollBy(deltaX.toDouble(), dataSnapshot.candles.size)
+        val before = viewport.scrollIndex
+        viewport.scrollBy(-deltaX.toDouble(), dataSnapshot.candles.size)
+        val distance = (before - viewport.scrollIndex) * viewport.barSpacing
+        if (distance == 0.0) return
         viewRevision++
         emitRangeChange()
-        onScrolled?.invoke(deltaX.toDouble())
+        onScrolled?.invoke(distance)
     }
 
     /** 以触点为锚缩放。 */
@@ -1036,7 +1085,7 @@ class ChartState(
         val candles = dataSnapshot.candles
         if (candles.isEmpty()) return
         val vp = viewport
-        val idx = vp.logicalIndexAt(x.toDouble()).toInt().coerceIn(candles.indices)
+        val idx = vp.logicalIndexAt(x.toDouble()).roundToInt().coerceIn(candles.indices)
         // T05：y 钳制到实际 pane 集合（含 extras，不截回主图）；pane 归属保留
         crosshairPaneId = paneIdAt(y)
         crosshairPosition = androidx.compose.ui.geometry.Offset(
@@ -1055,6 +1104,7 @@ class ChartState(
 
     fun hideCrosshair() {
         crosshairPosition = null
+        crosshairPaneId = null
     }
 
     /** 点击：解析命中 candle 并回调。 */
@@ -1154,7 +1204,12 @@ class ChartState(
         when (change.op) {
             // Reset（init/切会话）：回到最新（上游 init 定位语义；layout 的
             // wasAtLatest 启发式对"旧 scrollIndex + 新数据量"不成立，不能依赖）
-            io.lkanvas.core.store.DataOp.RESET -> viewport.onReset(dataSnapshot.candles.size)
+            io.lkanvas.core.store.DataOp.RESET -> {
+                viewport.onReset(dataSnapshot.candles.size)
+                hideCrosshair()
+                endGesture()
+                legendHeightsPx = emptyMap()
+            }
             io.lkanvas.core.store.DataOp.PREPEND_HISTORY -> viewport.onPrepended(change.prependedCount)
             else -> if (change.appendedCount > 0) {
                 viewport.onAppended(change.appendedCount, prevCount, followLatest)
@@ -1163,6 +1218,7 @@ class ChartState(
     }
 
     private fun advanceIndicators(snap: DataSnapshot, change: AppliedChange?) {
+        mainRangeRevision = Long.MIN_VALUE
         val kind = when (change?.op) {
             null, io.lkanvas.core.store.DataOp.RESET -> ChangeKind.Reset
             io.lkanvas.core.store.DataOp.REPLACE_LATEST -> ChangeKind.ReplaceLatest
@@ -1221,6 +1277,7 @@ class ChartState(
     private var containerHeightPx = 0f
     private var timeAxisHeightPx = 0f
     private var defaultSubPanePx = 0f
+    private var defaultMacdPanePx = 0f
     private var volPaneOverride = 0f
     private var macdPaneOverride = 0f
 
@@ -1230,11 +1287,14 @@ class ChartState(
 
     fun onLayout(widthPx: Float, panes: PaneHeights) {
         contentWidthPx = widthPx
-        if (defaultSubPanePx == 0f) {
-            defaultSubPanePx = panes.vol
+        if (defaultSubPanePx == 0f || volPaneOverride == defaultSubPanePx) {
             volPaneOverride = panes.vol
+        }
+        if (defaultMacdPanePx == 0f || macdPaneOverride == defaultMacdPanePx) {
             macdPaneOverride = panes.macd
         }
+        defaultSubPanePx = panes.vol
+        defaultMacdPanePx = panes.macd
         containerHeightPx = panes.main + panes.vol + panes.macd + panes.timeAxis +
             extraPanes.value.size * defaultSubPanePx
         timeAxisHeightPx = panes.timeAxis

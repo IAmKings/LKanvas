@@ -1,5 +1,7 @@
 # 差距矩阵（TS ↔ Kotlin 对齐现状）v2
 
+> 0.16.0 补充：[手势与画面必修验证](0.16.0-interaction-visual-alignment.md)与[非必修模块差异](0.16.0-other-module-audit.md)。本表的接口覆盖校验不等价于完整输入轨迹或画面验收；未修差异不得因 check.py 通过而计为已对齐。
+
 > A3 产物（v2 修复版：一符号一行 / 行 ID / 单字母分类 / 验收方式列 / 批次 2a·2b·2c / 纠正方法名 / 补 convertToPixel·convertFromPixel / Styles 字段级 / 统计改由脚本生成）。
 > 分类：**A** 直接对齐｜**B** 适配｜**C** 平台不适用｜**D** 有意差异｜**E** 缺失。验收：**test** 单测｜**diff** 上游自动对照｜**compile** 编译即证｜**parity** 上游文档示例迁移测试｜**manual** 人工｜**—** 不适用。
 > **完整性由 `tools/alignment/check.py` 强制校验**（Chart.ts 全部方法必须有行、格式违规即失败）；统计数字由该脚本输出，本文不手写。

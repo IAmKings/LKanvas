@@ -1,6 +1,6 @@
 # LKanvas
 
-> 0.15.0 保持冻结；当前修复候选为 0.15.1-rc5（APK `8c5895b3…`），发布仍为 **HOLD**。同包双机字体与 API23 模拟器冒烟复验通过；PJZ110 实时/压力帧各一次短测通过，K60U 对应项仍失败。JVM417、K60U原生21及本地制品链通过，最终双机矩阵、heap/B06/真人TalkBack尚未完成。见[第七轮执行报告 §7–8](docs/alignment/release-readiness-round7-execution-2026-11-02.zh-CN.md)。
+> 当前本地修复版本为 **0.16.0**：短按/长按十字线保持、右拖历史、轴留白与图例可读性见[验证记录](docs/alignment/0.16.0-interaction-visual-alignment.md)；sample 周期已改为[同一基础行情的 OHLCV 聚合](docs/alignment/0.16.0-period-switch-fix.md)。[其他模块排查](docs/alignment/0.16.0-other-module-audit.md)另列未修差异。0.15.0 保持冻结；远程发布仍为 **HOLD**，本轮不替代[既有双机性能、heap/B06/真人 TalkBack 验收](docs/alignment/release-readiness-round7-execution-2026-11-02.zh-CN.md)。
 
 KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 [KLineChart](https://github.com/klinecharts/KLineChart)（v10.1.0）的领域能力——指标、覆盖物、坐标轴、

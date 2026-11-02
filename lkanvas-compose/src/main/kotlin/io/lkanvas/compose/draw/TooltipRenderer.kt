@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.TextUnitType
 import io.lkanvas.chart.styles.CandleTooltipRectStyle
 import io.lkanvas.chart.styles.Styles
 import io.lkanvas.chart.styles.TooltipFeatureStyle
+import kotlin.math.roundToInt
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
 import io.lkanvas.compose.theme.StylesThemeBridge
@@ -171,7 +172,7 @@ object TooltipRenderer {
         val indT = styles.indicator.tooltip
         val candles = state.dataSnapshot.candles
         val idx = crosshair
-            ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) }
+            ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) }
             ?: (candles.size - 1)
         val tooltipText = ChartText(measurer, theme.axisText, baseTextSizePx, format = state.formatConfig)
         val groups = buildMainIndicatorGroups(state, idx, styles, theme, tooltipText)
@@ -214,13 +215,15 @@ object TooltipRenderer {
         legendKeys: List<Pair<String, Double?>>,
         legendColors: List<Color>,
         recorder: MutableList<DrawOp>? = null,
+        drawContent: Boolean = true,
     ) {
         val indT = styles.indicator.tooltip
         if (!indT.title.show && !indT.legend.show) return
         if (indT.features.isEmpty() && legendKeys.isEmpty()) return
-        val session = Session(state, measurer, baseTextSizePx, state.dataSnapshot.candles, recorder)
+        val session = Session(state, measurer, baseTextSizePx, state.dataSnapshot.candles, recorder, drawContent)
         val titleColor = StylesThemeBridge.parse(indT.title.color)
         val legendColor = StylesThemeBridge.parse(indT.legend.color)
+        val instance = state.getIndicators(ChartState.IndicatorFilter(paneId = paneId)).firstOrNull { it.definition.name == name }
         val flow = Session.Flow(contentWidth, paneTop + 2f)
         if (indT.title.show && name.isNotEmpty()) {
             session.drawFlowRow(
@@ -230,9 +233,15 @@ object TooltipRenderer {
         }
         for ((key, v) in legendKeys) {
             val color = legendColors.getOrElse(key.hashCode() % legendColors.size) { theme.linePalette.first() }
+            val value = when {
+                v == null || !v.isFinite() -> "—"
+                instance?.definition?.shouldFormatBigNumber == true ->
+                    state.formatConfig.formatBigNumber?.invoke(v) ?: io.lkanvas.core.common.utils.Format.formatBigNumber(v)
+                else -> io.lkanvas.core.common.utils.Format.formatPrecision(v, instance?.precisionOverride ?: instance?.definition?.precision ?: 2)
+            }
             session.drawFlowRow(
                 this,
-                LegendRow(key, if (v == null || v.isNaN()) "—" else "%.2f".format(v), legendColor, color),
+                LegendRow(key, value, legendColor, color),
                 flow, indT.legend.marginTop.toFloat(), indT.legend.marginBottom.toFloat(), indT.legend.size.toFloat(),
             )
         }
