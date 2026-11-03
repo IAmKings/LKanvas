@@ -39,8 +39,13 @@ class OverlayInstance(
     /** 上游 groupId：分组 id（批量操作/filter 用）。 */
     var groupId: String? = null
 
-    /** 上游 currentStep：当前交互步（创建中 = points.size）。 */
-    val currentStep: Int get() = points.size
+    /** 已确认的控制点数，不包含创建中的预览末点。 */
+    val currentStep: Int get() = points.size - if (hasDrawingPreview) 1 else 0
+
+    internal var hasDrawingPreview = false
+
+    /** null 继承图表磁吸模式；实例设置互不影响。 */
+    var mode: MagnetMode? = null
 
     /** 上游 fixedZLevel：层级是否固定（true=不随选中浮起）。 */
     var fixedZLevel: Boolean = false
@@ -90,6 +95,7 @@ class OverlayManager {
 
     /** 创建中实例的目标点数（beginCreate 时记录；continuous 模板为 0）。 */
     private var creatingPointCount: Int = 0
+    private var creatingTemplate: OverlayDefinition? = null
 
     /** 创建中实例是否为连续采样模板。 */
     private var creatingContinuous = false
@@ -125,6 +131,7 @@ class OverlayManager {
         val id = "ov-${++idSerial}"
         val inst = OverlayInstance(id, template.name, mutableListOf())
         inst.phase = OverlayPhase.CREATING
+        creatingTemplate = template
         creatingPointCount = template.pointCount
         creatingContinuous = template.continuous
         creatingMaxPoints = template.maxPoints
@@ -154,15 +161,28 @@ class OverlayManager {
             emit(OverlayEvent.CreatePointAdded(id, inst.points.size - 1))
             return false
         }
-        inst.points += point
+        if (inst.hasDrawingPreview) inst.points[inst.points.lastIndex] = point
+        else inst.points += point
+        inst.hasDrawingPreview = false
         emit(OverlayEvent.CreatePointAdded(id, inst.points.size - 1))
         if (inst.points.size >= creatingPointCount) {
             inst.phase = OverlayPhase.COMPLETED
             creatingPointCount = 0
+            creatingTemplate = null
             emit(OverlayEvent.Created(id, inst.templateName))
             return true
         }
         return false
+    }
+
+    /** 创建中的末点参与模板预览，但不推进已落点数量。 */
+    fun moveCreatePoint(id: String, point: OverlayPoint) {
+        val inst = creating(id) ?: return
+        if (creatingContinuous) return
+        if (inst.hasDrawingPreview) inst.points[inst.points.lastIndex] = point
+        else inst.points += point
+        inst.hasDrawingPreview = true
+        creatingTemplate?.performEventMoveForDrawing?.invoke(id, point)
     }
 
     /** 连续模板显式完成创建（Created 恰好一次）；至少需要 2 个采样点。 */
@@ -173,6 +193,7 @@ class OverlayManager {
         inst.phase = OverlayPhase.COMPLETED
         creatingPointCount = 0
         creatingContinuous = false
+        creatingTemplate = null
         emit(OverlayEvent.Created(id, inst.templateName))
         return true
     }
@@ -184,6 +205,7 @@ class OverlayManager {
         if (selectedId == id) selectedId = null
         creatingPointCount = 0
         creatingContinuous = false
+        creatingTemplate = null
         emit(OverlayEvent.CreateCancelled(id))
     }
 

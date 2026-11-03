@@ -173,7 +173,9 @@ object ChartArchive {
         put("locked", locked)
         put("visible", visible)
         put("zIndex", zIndex)
-        put("paneId", paneId)
+        put("paneId", effectivePaneId)
+        mode?.let { put("mode", it.name) }
+        put("modeSensitivity", modeSensitivity)
         put("extensionData", buildJsonObject { extensionData.forEach { (k, v) -> put(k, v) } })
     }
 
@@ -195,6 +197,11 @@ object ChartArchive {
         )
         get("extensionData")?.jsonObject?.forEach { (k, v) ->
             inst.extensionData[k] = v.jsonPrimitive.content
+        }
+        get("mode")?.jsonPrimitive?.content?.let { inst.mode = io.lkanvas.core.overlay.MagnetMode.valueOf(it) }
+        get("modeSensitivity")?.jsonPrimitive?.double?.let {
+            require(it.isFinite() && it >= 0) { "modeSensitivity 必须是有限非负数" }
+            inst.modeSensitivity = it
         }
         inst.phase = OverlayPhase.COMPLETED
         return inst

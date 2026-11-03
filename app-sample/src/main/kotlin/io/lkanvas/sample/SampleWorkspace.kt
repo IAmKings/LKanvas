@@ -295,7 +295,7 @@ fun SampleWorkspace(
                                     FilledTonalButton(onClick = {
                                         val out = File(context.cacheDir, "lkanvas-export.png")
                                         val result = runCatching {
-                                            out.outputStream().use { ChartSnapshotExporter.exportPng(state, measurer, it, theme = facade.resolveTheme(), widthPx = 1080, heightPx = 1600) }
+                                            out.outputStream().use { ChartSnapshotExporter.exportPng(state, measurer, it, theme = facade.resolveTheme(), styles = facade.getStyles(), widthPx = 1080, heightPx = 1600) }
                                         }
                                         sheet = null
                                         result.onSuccess { report("PNG 已导出到应用缓存：${out.absolutePath}") }

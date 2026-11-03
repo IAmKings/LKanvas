@@ -84,11 +84,11 @@ object OverlayRenderer {
         // (0,0,width,paneHeight)、pixelPoints y 减 pane top（修复前 bounds 底是
         // 绝对坐标、verticalStraightLine 从整图顶画穿主图）
         val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneHeight)
-        val px = inst.points.mapNotNull { state.overlayPointToPx(it, paneId) }
+        val template = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName] ?: return
+        val px = inst.points.mapNotNull { state.overlayPointToPx(it, paneId, continuous = template.continuous) }
         val dash = if (creating) floatArrayOf(8f, 6f) else null
         val lineWidth = stylesLineWidth(inst) ?: 2f
 
-        val template = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName] ?: return
         val figures = template.createPointFigures(
             inst.points, bounds.width, bounds.height,
             pixelPoints = px.map { listOf(it.x.toDouble(), it.y.toDouble() - paneTop) },
@@ -293,9 +293,9 @@ object OverlayRenderer {
         val bounds = OverlayGeometry.Bounds(0.0, 0.0, contentRight.toDouble(), paneHeight)
         // Q04：pane 外查询点不参与该实例命中（修复前副图水平线在主图区仍可命中）
         if (y < paneTop || y > paneTop + paneHeight.toFloat()) return false
-        val px = inst.points.mapNotNull { state.overlayPointToPx(it, paneId) }
-        if (px.isEmpty()) return false
         val template = io.lkanvas.core.extension.overlay.OverlayTemplates[inst.templateName] ?: return false
+        val px = inst.points.mapNotNull { state.overlayPointToPx(it, paneId, continuous = template.continuous) }
+        if (px.isEmpty()) return false
         if (!template.checkEventOn) return false
         val figures = template.createPointFigures(
             inst.points, bounds.width, bounds.height,

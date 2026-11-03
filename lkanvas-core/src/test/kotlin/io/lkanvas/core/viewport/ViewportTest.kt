@@ -51,9 +51,9 @@ class ViewportTest {
         val data = candles(100) // ts 0..99
         assertEquals(37, Viewport.indexOfTimestamp(37L, data))
         assertEquals(54, Viewport.indexOfTimestamp(54L, data))
-        // 超出范围的时间戳：返回不大于目标的最近索引
+        // 超出已加载范围的时间戳：取最近端点
         assertEquals(99, Viewport.indexOfTimestamp(150L, data))
-        assertEquals(null, Viewport.indexOfTimestamp(-10L, data))
+        assertEquals(0, Viewport.indexOfTimestamp(-10L, data))
     }
 
     // ---------- A-13：前插锚点保持 ----------

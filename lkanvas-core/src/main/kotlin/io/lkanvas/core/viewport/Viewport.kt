@@ -1,6 +1,7 @@
 package io.lkanvas.core.viewport
 
 import io.lkanvas.core.data.Candle
+import kotlin.math.roundToLong
 
 /**
  * 视口状态：横向坐标契约（PRD R-05）。
@@ -207,24 +208,42 @@ class Viewport(
         /** 左侧超滚（橡皮筋阻尼由手势层实现，这里只限定状态范围）。 */
         const val DEFAULT_OVERSCROLL_SLOTS = 0.0
 
-        /** 时间戳 → 数据索引（candles 按时间严格递增）；不存在返回 null。 */
+        /** 最近时间索引；等距取较早一根，范围外取端点，空数据返回 null。 */
         fun indexOfTimestamp(timestamp: Long, candles: List<Candle>): Int? {
+            if (candles.isEmpty()) return null
             var lo = 0
             var hi = candles.size - 1
-            var best: Int? = null
             while (lo <= hi) {
                 val mid = (lo + hi) ushr 1
                 val ts = candles[mid].timestamp
                 when {
                     ts == timestamp -> return mid
                     ts < timestamp -> {
-                        best = mid
                         lo = mid + 1
                     }
                     else -> hi = mid - 1
                 }
             }
-            return best
+            if (hi < 0) return 0
+            if (lo >= candles.size) return candles.lastIndex
+            return if (timestamp.toDouble() - candles[hi].timestamp <= candles[lo].timestamp.toDouble() - timestamp) hi else lo
+        }
+
+        /** 连续画笔保留槽内精度，范围外按首尾间隔外推。 */
+        fun floatIndexToTimestamp(index: Double, candles: List<Candle>): Long? {
+            if (candles.isEmpty() || !index.isFinite()) return null
+            if (candles.size == 1) return candles[0].timestamp
+            val left = kotlin.math.floor(index).toInt().coerceIn(0, candles.lastIndex - 1)
+            val start = candles[left].timestamp
+            return start + ((candles[left + 1].timestamp - start).toDouble() * (index - left)).roundToLong()
+        }
+
+        /** 连续时间锚点的逆映射，补历史或缩放后仍保留原来的槽内位置。 */
+        fun timestampToFloatIndex(timestamp: Long, candles: List<Candle>): Double? {
+            val nearest = indexOfTimestamp(timestamp, candles) ?: return null
+            if (candles.size == 1) return 0.0
+            val left = (if (timestamp < candles[nearest].timestamp) nearest - 1 else nearest).coerceIn(0, candles.lastIndex - 1)
+            return left + (timestamp - candles[left].timestamp).toDouble() / (candles[left + 1].timestamp - candles[left].timestamp)
         }
     }
 }

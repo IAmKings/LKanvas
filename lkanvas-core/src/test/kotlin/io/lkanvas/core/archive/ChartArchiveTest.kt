@@ -152,6 +152,24 @@ class ChartArchiveTest {
         assertEquals(null, result.archive.marketKey)
         assertEquals(null, result.archive.viewportAnchor)
     }
+    @kotlin.test.Test
+    fun instanceMagnetConfigurationSurvivesArchiveAndOldArchivesStillLoad() {
+        val inst = io.lkanvas.core.overlay.OverlayInstance("mode", "segment", mutableListOf(io.lkanvas.core.overlay.OverlayPoint(0, 1.0)))
+        inst.mode = io.lkanvas.core.overlay.MagnetMode.STRONG
+        inst.modeSensitivity = 100.0
+        inst.paneIdOverride = "vol"
+        val raw = ChartArchive.export(null, listOf(inst), emptyMap(), null)
+        val restored = (ChartArchive.restore(raw) as ChartArchive.RestoreResult.Ok).archive.overlays.single()
+        kotlin.test.assertEquals(inst.mode, restored.mode)
+        kotlin.test.assertEquals(100.0, restored.modeSensitivity)
+        kotlin.test.assertEquals("vol", restored.effectivePaneId)
+        val old = raw.replace(",\"mode\":\"STRONG\"", "").replace(",\"modeSensitivity\":100.0", "")
+        val fallback = (ChartArchive.restore(old) as ChartArchive.RestoreResult.Ok).archive.overlays.single()
+        kotlin.test.assertNull(fallback.mode)
+        kotlin.test.assertEquals(8.0, fallback.modeSensitivity)
+        kotlin.test.assertTrue(ChartArchive.restore(raw.replace("100.0", "-1.0")) is ChartArchive.RestoreResult.Failed)
+    }
+
 }
 
 

@@ -27,6 +27,8 @@ data class OverlayCreate(
     val modeSensitivity: Double = 8.0,
     /** 上游 styles：实例级样式覆盖。 */
     val styles: Any? = null,
+    /** null 继承图表模式；显式模式仅作用于当前实例。 */
+    val mode: OverlayMode? = null,
 )
 
 /** 上游 `OverlayOverride`：按 filter 定位后的字段级覆盖。 */
@@ -40,6 +42,8 @@ data class OverlayOverride(
     val fixedZLevel: Boolean? = null,
     val modeSensitivity: Double? = null,
     val styles: Any? = null,
+    /** null 继承图表模式；显式模式仅作用于当前实例。 */
+    val mode: OverlayMode? = null,
 )
 
 /** 上游 `OverlayFilter`。 */
@@ -67,7 +71,7 @@ data class OverlayInfo(
     val visible: Boolean,
     val zLevel: Int,
     val extendData: Map<String, String>,
-    /** 上游 currentStep：当前交互步（创建中 = points.size）。 */
+    /** 已确认的控制点数，不包含创建中的预览末点。 */
     val currentStep: Int = points.size,
     /** 上游 fixedZLevel：层级是否固定（true=不随选中浮起）。 */
     val fixedZLevel: Boolean = false,
@@ -75,4 +79,6 @@ data class OverlayInfo(
     val modeSensitivity: Double = 8.0,
     /** 上游 styles：实例级样式覆盖（宿主自定义结构）。 */
     val styles: Any? = null,
+    /** 生效磁吸模式（实例配置优先，否则继承图表模式）。 */
+    val mode: OverlayMode? = null,
 )

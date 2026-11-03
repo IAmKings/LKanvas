@@ -19,54 +19,76 @@ class FinalAcceptanceUiTest {
     @Test fun periodButtonsChangeThePricePlotWithTheFeedPaused() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
-        val output = File(instrumentation.targetContext.getExternalFilesDir("validation"), "periods").apply { mkdirs() }
-        device.executeShellCommand("am force-stop io.lkanvas.sample")
-        device.executeShellCommand("am start -W -n io.lkanvas.sample/.MainActivity --ez stress_mode false")
-        val chart = device.findObject(UiSelector().descriptionContains("，高 "))
-        assertTrue(chart.waitForExists(15000))
-        device.findObject(UiSelector().text("更多")).click()
-        val push = device.findObject(UiSelector().text("模拟行情推送"))
-        assertTrue(push.waitForExists(5000))
-        push.click()
-        device.findObject(UiSelector().description("关闭面板")).click()
-        assertTrue(device.findObject(UiSelector().text("模拟已暂停")).waitForExists(5000))
-        fun pricePlotHash(): Int {
-            val b = chart.bounds
-            val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("screenshot unavailable")
-            try {
-                // 只取主图内部，排除周期按钮、图例、轴标签与时间标签。
-                val w = (b.width() * 0.7).toInt()
-                val h = (b.height() * 0.3).toInt()
-                val pixels = IntArray(w * h)
-                bitmap.getPixels(pixels, 0, w, b.left + b.width() / 20, b.top + b.height() / 5, w, h)
-                return pixels.contentHashCode()
-            } finally { bitmap.recycle() }
-        }
-        Thread.sleep(300)
-        var before = pricePlotHash()
-        val rows = mutableListOf("1m initial=$before")
-        for (label in listOf("5m", "15m", "1h", "1d", "1m")) {
-            device.findObject(UiSelector().text(label)).click()
-            var after = before
-            var stable = false
-            for (attempt in 0 until 150) {
-                Thread.sleep(100)
-                if (chart.exists()) after = pricePlotHash()
-                if (after != before && chart.exists()) {
-                    Thread.sleep(300)
-                    if (pricePlotHash() == after) { stable = true; break }
+        val originalScale = device.executeShellCommand("settings get system font_scale").trim()
+        val originalRotation = device.executeShellCommand("settings get system user_rotation").trim()
+        val originalAuto = device.executeShellCommand("settings get system accelerometer_rotation").trim()
+        try {
+            // 暂停状态文字只在非紧凑竖屏显示，测试不依赖设备当前的物理方向。
+            device.executeShellCommand("settings put system accelerometer_rotation 0")
+            device.executeShellCommand("wm user-rotation lock 0")
+            device.executeShellCommand("settings put system font_scale 1.0")
+            val output = File(instrumentation.targetContext.getExternalFilesDir("validation"), "periods").apply { mkdirs() }
+            device.executeShellCommand("am force-stop io.lkanvas.sample")
+            device.executeShellCommand("am start -W -n io.lkanvas.sample/.MainActivity --ez stress_mode false")
+            val chart = device.findObject(UiSelector().descriptionContains("，高 "))
+            assertTrue(chart.waitForExists(15000))
+            val running = device.findObject(UiSelector().text("模拟推送 · 5 次/秒"))
+            repeat(20) {
+                if (!running.exists()) {
+                    device.executeShellCommand("wm user-rotation lock 0")
+                    running.waitForExists(500)
                 }
             }
-            assertNotEquals("$label must change the price plot while live updates are paused", before, after)
-            assertTrue("$label must reach a stable rendered price plot", stable)
-            device.takeScreenshot(File(output, "$label.png"))
-            rows += "$label plotHash=$after"
-            before = after
+            assertTrue("portrait summary must be laid out before toggling the feed", running.exists())
+            device.findObject(UiSelector().text("更多")).click()
+            val push = device.findObject(UiSelector().text("模拟行情推送"))
+            assertTrue(push.waitForExists(5000))
+            push.click()
+            device.findObject(UiSelector().description("关闭面板")).click()
+            assertTrue(device.findObject(UiSelector().text("模拟已暂停")).waitForExists(5000))
+            fun pricePlotHash(): Int {
+                val b = chart.bounds
+                val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("screenshot unavailable")
+                try {
+                    // 只取主图内部，排除周期按钮、图例、轴标签与时间标签。
+                    val w = (b.width() * 0.7).toInt()
+                    val h = (b.height() * 0.3).toInt()
+                    val pixels = IntArray(w * h)
+                    bitmap.getPixels(pixels, 0, w, b.left + b.width() / 20, b.top + b.height() / 5, w, h)
+                    return pixels.contentHashCode()
+                } finally { bitmap.recycle() }
+            }
+            Thread.sleep(300)
+            var before = pricePlotHash()
+            val rows = mutableListOf("1m initial=$before")
+            for (label in listOf("5m", "15m", "1h", "1d", "1m")) {
+                device.findObject(UiSelector().text(label)).click()
+                var after = before
+                var stable = false
+                for (attempt in 0 until 150) {
+                    Thread.sleep(100)
+                    if (chart.exists()) after = pricePlotHash()
+                    if (after != before && chart.exists()) {
+                        Thread.sleep(300)
+                        if (pricePlotHash() == after) { stable = true; break }
+                    }
+                }
+                assertNotEquals("$label must change the price plot while live updates are paused", before, after)
+                assertTrue("$label must reach a stable rendered price plot", stable)
+                device.takeScreenshot(File(output, "$label.png"))
+                rows += "$label plotHash=$after"
+                before = after
+            }
+            File(output, "plot-hashes.txt").writeText(rows.joinToString("\n"))
+            device.findObject(UiSelector().text("更多")).click()
+            device.findObject(UiSelector().text("模拟行情推送")).click()
+            device.findObject(UiSelector().description("关闭面板")).click()
+        } finally {
+            device.unfreezeRotation()
+            device.executeShellCommand("settings put system font_scale $originalScale")
+            device.executeShellCommand("settings put system user_rotation $originalRotation")
+            device.executeShellCommand("settings put system accelerometer_rotation $originalAuto")
         }
-        File(output, "plot-hashes.txt").writeText(rows.joinToString("\n"))
-        device.findObject(UiSelector().text("更多")).click()
-        device.findObject(UiSelector().text("模拟行情推送")).click()
-        device.findObject(UiSelector().description("关闭面板")).click()
     }
 
     @Test fun pinchAccessibilityAndConfigurationMatrix() {

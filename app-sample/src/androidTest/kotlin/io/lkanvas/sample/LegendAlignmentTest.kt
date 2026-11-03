@@ -65,8 +65,7 @@ class LegendAlignmentTest {
                             with(TooltipRenderer) {
                                 if (pane == "main") drawCandleTooltip(state, styles, theme, measurer, 33f, null, width - gutter, bottom, ops)
                                 else {
-                                    val result = (if (pane == "vol") state.volResult else state.macdResult)!!.result
-                                    drawPaneIndicatorTooltip(state, styles, theme, measurer, 33f, null, width - gutter, top, pane, pane.uppercase(), result.keys.map { it to it.let { key -> result[key].getOrNull(599) } }, List(result.keys.size) { theme.axisText }, ops)
+                                    drawIndicatorTooltip(state, styles, theme, measurer, 33f, null, width - gutter, top, pane, ops)
                                 }
                             }
                         }
@@ -88,7 +87,7 @@ class LegendAlignmentTest {
                     val uncached = render(ChartRenderer.TooltipKeyHolder())
                     assertTrue("same-index crosshair activation must refresh tooltip cache", cached.asAndroidBitmap().sameAs(uncached.asAndroidBitmap()))
                     val yBefore = listOf("main", "vol", "macd").map { state.paneValueToY(it, 150.0) }
-                    ChartSnapshotExporter.export(state, measurer, widthPx = 1080, heightPx = 1600)
+                    ChartSnapshotExporter.export(state, measurer, styles = styles, widthPx = 1080, heightPx = 1600)
                     assertEquals("export must preserve screen coordinate geometry", yBefore, listOf("main", "vol", "macd").map { state.paneValueToY(it, 150.0) })
                 }
             }

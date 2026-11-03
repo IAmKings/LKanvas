@@ -249,7 +249,7 @@ class LKanvasChartTest {
         drain()
         assertTrue(chart.getBarSpace().bar > 8.0, "放大后 barSpacing 增大")
         assertTrue(chart.scrollToTimestamp(150L), "时间定位命中")
-        assertFalse(chart.scrollToTimestamp(-999L), "越界时间定位失败")
+        assertTrue(chart.scrollToTimestamp(-999L), "早于已加载数据时定位最近端点")
         chart.scrollToRealTime(); drain()
         LKanvasChart.dispose(chart)
     }
