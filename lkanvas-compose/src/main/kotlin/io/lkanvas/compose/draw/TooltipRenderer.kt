@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -43,6 +44,7 @@ object TooltipRenderer {
     sealed class DrawOp {
         // 上游每个 pane 独立 Canvas；共享 Canvas 的缓存回放须保留相同裁剪范围。
         internal var clipBounds: Rect? = null
+        internal var reserveLegendSpace: Boolean = true
         class Text(val text: String, val topLeft: Offset, val sizePx: Float, val color: Color) : DrawOp()
         class RoundRect(val color: Color, val topLeft: Offset, val size: Size, val radius: Float, val strokeWidth: Float) : DrawOp()
         class StrokePath(val path: androidx.compose.ui.graphics.Path, val color: Color, val strokeWidth: Float) : DrawOp()
@@ -62,7 +64,7 @@ object TooltipRenderer {
     data class LegendRow(val title: String, val value: String, val titleColor: Color, val valueColor: Color)
 
     /** 指标图例组（标题行 + 数值行）。 */
-    data class IndicatorGroup(val name: String, val legends: List<LegendRow>)
+    data class IndicatorGroup(val name: String, val legends: List<LegendRow>, val titleColor: Color = Color.Unspecified)
 
     /** 上游 _getCandleTooltipLegends：O/H/L/C/V/change（change 按 priceMark.last 着色）。 */
     fun buildCandleLegends(state: ChartState, idx: Int, styles: Styles, text: NumericText): List<LegendRow> {
@@ -90,39 +92,51 @@ object TooltipRenderer {
         )
     }
 
-    /** 主 pane 指标组：name(shortName(参数)) + 每 key 行值（palette 取色）。 */
-    fun buildMainIndicatorGroups(
-        state: ChartState,
-        idx: Int,
-        styles: Styles,
-        theme: ChartTheme,
-        text: NumericText,
+    /** 所有 pane 共用图形元数据、实例精度与逐行样式。 */
+    fun buildIndicatorGroups(
+        state: ChartState, paneId: String, idx: Int, styles: Styles, theme: ChartTheme,
     ): List<IndicatorGroup> {
-        val groups = ArrayList<IndicatorGroup>()
-        for (inst in state.mainPaneIndicatorResults()) {
-            val res = inst.state ?: continue
-            val titleStyle = styles.indicator.tooltip.title
-            val name = if (titleStyle.show && titleStyle.showName) inst.displayName() else ""
-            val params = if (titleStyle.show && titleStyle.showParams && inst.params.isNotEmpty()) {
-                "(${inst.params.joinToString(",") { trimNum(it) }})"
-            } else ""
-            val legendColor = StylesThemeBridge.parse(styles.indicator.tooltip.legend.color)
-            // SLA-013/IND：createTooltipDataSource 消费——非空时以模板自定义数据源
-            // 替代 figures 默认行（上游 IndicatorTooltipView.createTooltipDataSource 语义）
-            val customSource = inst.definition.createTooltipDataSource?.invoke(state.dataSnapshot.candles, idx)
-            val rows = if (customSource != null) {
-                customSource.entries.mapIndexed { k, entry ->
-                    LegendRow(entry.key, entry.value, legendColor, theme.linePalette[k % theme.linePalette.size])
+        val tooltip = styles.indicator.tooltip
+        return state.getIndicators(ChartState.IndicatorFilter(paneId = paneId))
+            .filter { it.visible && it.state != null }.map { inst ->
+                val name = if (tooltip.title.show && tooltip.title.showName) inst.displayName() else ""
+                val params = if (tooltip.title.show && tooltip.title.showParams && inst.params.isNotEmpty())
+                    "(${inst.params.joinToString(",") { trimNum(it) }})" else ""
+                val candles = state.dataSnapshot.candles
+                val plots = PaneRenderers.figurePlots(inst)
+                val colors = PaneRenderers.figureColors(plots, theme, PaneRenderers.figurePaletteOffset(state, inst))
+                val override = PaneRenderers.styleOverrideFor(inst)
+                val custom = if (tooltip.legend.show) inst.definition.createTooltipDataSource?.invoke(candles, idx) else null
+                val rows = when {
+                    !tooltip.legend.show -> emptyList()
+                    custom != null -> custom.map { (key, value) ->
+                        val color = StylesThemeBridge.parse(tooltip.legend.color)
+                        LegendRow(key, value, color, color)
+                    }
+                    else -> plots.map { plot ->
+                        val value = inst.state!!.result.columns[plot.key]?.getOrNull(idx) ?: Double.NaN
+                        val color = override?.invoke(plot.key, idx, value, candles)?.first ?: colors.getValue(plot.key)
+                        val formatted = indicatorValue(state, inst, value, tooltip.legend.defaultValue)
+                        LegendRow(plot.title, formatted, color, color)
+                    }
                 }
-            } else {
-                res.result.keys.mapIndexed { k, key ->
-                    val v = res.result[key].getOrNull(idx) ?: Double.NaN
-                    LegendRow(key, text.price(v), legendColor, theme.linePalette[k % theme.linePalette.size])
-                }
+                IndicatorGroup(name + params, rows, StylesThemeBridge.parse(tooltip.title.color))
             }
-            groups += IndicatorGroup(name + params, rows)
-        }
-        return groups
+    }
+
+    /** 保留已有公开入口；主副图消费者共用同一构造路径。 */
+    @Suppress("UNUSED_PARAMETER")
+    fun buildMainIndicatorGroups(state: ChartState, idx: Int, styles: Styles, theme: ChartTheme, text: NumericText): List<IndicatorGroup> =
+        buildIndicatorGroups(state, "main", idx, styles, theme)
+
+    private fun indicatorValue(state: ChartState, inst: io.lkanvas.core.indicator.IndicatorInstance?, value: Double?, default: String): String {
+        if (value == null || !value.isFinite()) return default.ifEmpty { "—" }
+        val precision = io.lkanvas.core.common.utils.Format.formatPrecision(value, inst?.precisionOverride ?: inst?.definition?.precision ?: 2)
+        val formatted = if (inst?.definition?.shouldFormatBigNumber == true) {
+            state.formatConfig.formatBigNumber?.invoke(precision.toDouble()) ?: io.lkanvas.core.common.utils.Format.formatBigNumber(precision.toDouble())
+        } else precision
+        val grouped = if (formatted.toDoubleOrNull() != null) io.lkanvas.core.common.utils.Format.formatThousands(formatted, state.formatConfig.thousandsSign ?: "") else formatted
+        return state.formatConfig.decimalFoldThreshold?.let { io.lkanvas.core.common.utils.Format.formatFoldDecimal(grouped, it) } ?: grouped
     }
 
     private fun trimNum(v: Double): String =
@@ -130,7 +144,7 @@ object TooltipRenderer {
 
     /**
      * 主 pane tooltip 入口（candle + indicator 组合；对齐上游 CandleTooltipView.drawImp）。
-     * indicator tooltip 恒行式（Kotlin 树 indicator.tooltip 无 showType，上游 standard 语义）。
+     * candle/indicator 的 showRule 独立生效；showType 组合决定行式块与卡片。
      * @param baseTextSizePx tooltip 基准字号（=图例字号 px）
      */
     fun DrawScope.drawCandleTooltip(
@@ -144,7 +158,12 @@ object TooltipRenderer {
         paneBottom: Float,
         recorder: MutableList<DrawOp>? = null,
     ) {
-        drawCandleTooltipImpl(state, styles, theme, measurer, baseTextSizePx, crosshair, contentWidth, paneBottom, recorder, true)
+        val firstOp = recorder?.size ?: 0
+        val bounds = Rect(0f, 0f, contentWidth, paneBottom)
+        clipRect(bounds.left, bounds.top, bounds.right, bounds.bottom) {
+            drawCandleTooltipImpl(state, styles, theme, measurer, baseTextSizePx, crosshair, contentWidth, paneBottom, recorder, true)
+        }
+        recorder?.let { for (i in firstOp until it.size) it[i].clipBounds = bounds }
     }
 
     internal fun DrawScope.recordCandleTooltip(
@@ -153,6 +172,7 @@ object TooltipRenderer {
     ): List<DrawOp> {
         val ops = ArrayList<DrawOp>()
         drawCandleTooltipImpl(state, styles, theme, measurer, baseTextSizePx, crosshair, contentWidth, paneBottom, ops, false)
+        ops.forEach { it.clipBounds = Rect(0f, 0f, contentWidth, paneBottom) }
         return ops
     }
 
@@ -175,26 +195,71 @@ object TooltipRenderer {
             ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) }
             ?: (candles.size - 1)
         val tooltipText = ChartText(measurer, theme.axisText, baseTextSizePx, format = state.formatConfig)
-        val groups = buildMainIndicatorGroups(state, idx, styles, theme, tooltipText)
+        val groups = if (shouldDraw(indT.showRule, crosshair != null)) buildMainIndicatorGroups(state, idx, styles, theme, tooltipText) else emptyList()
         val drawCandle = shouldDraw(candleT.showRule, crosshair != null)
-        val drawInd = groups.any { it.name.isNotEmpty() || it.legends.any { r -> r.value != "—" } }
+        val drawInd = shouldDraw(indT.showRule, crosshair != null)
         state.tooltipFeatureHits = emptyList()
         if (!drawCandle && !drawInd) return
-        val session = Session(state, measurer, baseTextSizePx, candles, recorder, drawContent)
-
-        val candleRows = if (drawCandle) buildCandleLegends(state, idx, styles, tooltipText) else emptyList()
-        if (candleT.showType == "rect") {
-            // rect 卡片：candle 行 + 指标组合并单卡（上游 both-rect 语义）
-            session.drawRectCard(
-                this, candleRows, if (drawInd) groups else emptyList(),
-                crosshair, contentWidth, paneBottom, 0f, candleT.rect,
-                candleT.legend.size.toFloat(),
+        val session = Session(state, measurer, baseTextSizePx, candles, recorder, drawContent, Rect(0f, 0f, contentWidth, paneBottom))
+        val candleRows = if (drawCandle && candleT.legend.show) buildCandleLegends(state, idx, styles, tooltipText) else emptyList()
+        val visibleGroups = if (drawInd) groups else emptyList()
+        val candleRect = candleT.showType == "rect"
+        val indicatorRect = indT.showType == "rect"
+        var top = candleT.offsetTop.toFloat()
+        val left = candleT.offsetLeft.toFloat()
+        val right = (contentWidth - candleT.offsetRight.toFloat()).coerceAtLeast(left)
+        if (!candleRect || !indicatorRect) {
+            top = session.drawStandardBlock(
+                this, crosshair, idx, styles, right,
+                if (candleRect) emptyList() else candleRows,
+                if (indicatorRect) emptyList() else visibleGroups,
+                top, left,
             )
-        } else {
-            val top = session.drawStandardBlock(this, crosshair, idx, styles, contentWidth, candleRows, if (drawInd) groups else emptyList())
-            // features 图标（left/middle/right 顺序），命中区记录到 state
-            session.drawFeatureRow(this, indT.features, "main", Offset(8f, top), contentWidth, active = false)
+            if (drawInd && !indicatorRect) top = session.drawFeatureRow(this, indT.features, "main", Offset(left, top), right, active = false)
         }
+        if (candleRect || indicatorRect) {
+            session.drawRectCard(
+                this, if (candleRect) candleRows else emptyList(), if (indicatorRect) visibleGroups else emptyList(),
+                crosshair, contentWidth, paneBottom - candleT.offsetBottom.toFloat(), top,
+                candleT.rect, styles,
+            )
+        }
+    }
+
+    /** 按 pane 遍历全部实例，动态副图与内置副图不再使用专用 keys/色板。 */
+    fun DrawScope.drawIndicatorTooltip(
+        state: ChartState, styles: Styles, theme: ChartTheme, measurer: TextMeasurer,
+        baseTextSizePx: Float, crosshair: Offset?, contentWidth: Float, paneTop: Float, paneId: String,
+        recorder: MutableList<DrawOp>? = null, drawContent: Boolean = true,
+    ) {
+        val candles = state.dataSnapshot.candles
+        if (candles.isEmpty()) return
+        val idx = crosshair?.let { state.viewport.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) } ?: candles.lastIndex
+        drawIndicatorGroups(state, styles, measurer, baseTextSizePx, crosshair, contentWidth, paneTop, paneId,
+            buildIndicatorGroups(state, paneId, idx, styles, theme), recorder, drawContent)
+    }
+
+    private fun DrawScope.drawIndicatorGroups(
+        state: ChartState, styles: Styles, measurer: TextMeasurer, baseTextSizePx: Float,
+        crosshair: Offset?, contentWidth: Float, paneTop: Float, paneId: String, groups: List<IndicatorGroup>,
+        recorder: MutableList<DrawOp>?, drawContent: Boolean,
+    ) {
+        val t = styles.indicator.tooltip
+        if (!shouldDraw(t.showRule, crosshair != null)) return
+        val paneHeight = state.paneBounds(paneId)?.takeIf { paneId in state.paneList() }?.let { it.second - it.first }
+        val bottom = minOf(size.height, paneHeight?.let { paneTop + it } ?: size.height)
+        val session = Session(state, measurer, baseTextSizePx, state.dataSnapshot.candles, recorder, drawContent, Rect(0f, paneTop, contentWidth, bottom))
+        val left = t.offsetLeft.toFloat()
+        val flow = Session.Flow((contentWidth - t.offsetRight.toFloat()).coerceAtLeast(left), paneTop + t.offsetTop.toFloat(), left)
+        for (group in groups) {
+            if (t.title.show && group.name.isNotEmpty()) session.drawFlowRow(this, LegendRow("", group.name, group.titleColor, group.titleColor), flow,
+                t.title.marginTop.toFloat(), t.title.marginBottom.toFloat(), t.title.size.toFloat())
+            if (t.legend.show) for (row in group.legends) session.drawFlowRow(this, row, flow,
+                t.legend.marginTop.toFloat(), t.legend.marginBottom.toFloat(), t.legend.size.toFloat())
+            flow.x = left
+            flow.y = flow.bottom
+        }
+        session.drawFeatureRow(this, t.features, paneId, Offset(left, flow.bottom), flow.maxWidth, active = false)
     }
 
     /**
@@ -217,36 +282,15 @@ object TooltipRenderer {
         recorder: MutableList<DrawOp>? = null,
         drawContent: Boolean = true,
     ) {
-        val indT = styles.indicator.tooltip
-        if (!indT.title.show && !indT.legend.show) return
-        if (indT.features.isEmpty() && legendKeys.isEmpty()) return
-        val session = Session(state, measurer, baseTextSizePx, state.dataSnapshot.candles, recorder, drawContent)
-        val titleColor = StylesThemeBridge.parse(indT.title.color)
-        val legendColor = StylesThemeBridge.parse(indT.legend.color)
-        val instance = state.getIndicators(ChartState.IndicatorFilter(paneId = paneId)).firstOrNull { it.definition.name == name }
-        val flow = Session.Flow(contentWidth, paneTop + 2f)
-        if (indT.title.show && name.isNotEmpty()) {
-            session.drawFlowRow(
-                this, LegendRow("", name, titleColor, titleColor),
-                flow, indT.title.marginTop.toFloat(), indT.title.marginBottom.toFloat(), indT.title.size.toFloat(),
-            )
+        val t = styles.indicator.tooltip
+        val inst = state.getIndicators(ChartState.IndicatorFilter(paneId = paneId)).firstOrNull { it.definition.name == name }
+        val rows = legendKeys.mapIndexed { i, (key, value) ->
+            val color = legendColors.getOrElse(i) { theme.linePalette.first() }
+            val formatted = indicatorValue(state, inst, value, t.legend.defaultValue)
+            LegendRow(key, formatted, StylesThemeBridge.parse(t.legend.color), color)
         }
-        for ((key, v) in legendKeys) {
-            val color = legendColors.getOrElse(key.hashCode() % legendColors.size) { theme.linePalette.first() }
-            val value = when {
-                v == null || !v.isFinite() -> "—"
-                instance?.definition?.shouldFormatBigNumber == true ->
-                    state.formatConfig.formatBigNumber?.invoke(v) ?: io.lkanvas.core.common.utils.Format.formatBigNumber(v)
-                else -> io.lkanvas.core.common.utils.Format.formatPrecision(v, instance?.precisionOverride ?: instance?.definition?.precision ?: 2)
-            }
-            session.drawFlowRow(
-                this,
-                LegendRow(key, value, legendColor, color),
-                flow, indT.legend.marginTop.toFloat(), indT.legend.marginBottom.toFloat(), indT.legend.size.toFloat(),
-            )
-        }
-        // 副图 features（paneId 独立命中区）
-        session.drawFeatureRow(this, indT.features, paneId, Offset(8f, flow.bottom + 2f), contentWidth, active = false)
+        drawIndicatorGroups(state, styles, measurer, baseTextSizePx, crosshair, contentWidth, paneTop, paneId,
+            listOf(IndicatorGroup(name, rows, StylesThemeBridge.parse(t.title.color))), recorder, drawContent)
     }
 
     /** 回放用样式构造（与 Session.style 同一语义）。 */
@@ -264,6 +308,7 @@ object TooltipRenderer {
         val candles: List<io.lkanvas.core.data.Candle>,
         val recorder: MutableList<DrawOp>? = null,
         val drawContent: Boolean = true,
+        val bounds: Rect,
     ) {
         // Styles size 语义按 sp 渲染（12 ≈ 上游 DPR3 的 36 物理像素）
         private fun style(sizePx: Float) = TextStyle(fontSize = TextUnit(sizePx, TextUnitType.Sp))
@@ -279,13 +324,17 @@ object TooltipRenderer {
 
         private fun DrawScope.drawAt(s: String, topLeft: Offset, sizePx: Float, color: Color) {
             if (s.isEmpty()) return
+            val glyph = measurer.measure(s, style = style(sizePx)).size
+            // 后续整行放不下时停止；pane 比一行还矮时由 pane 裁剪保留可见文字。
+            if (topLeft.x < bounds.left || topLeft.y < bounds.top || topLeft.y >= bounds.bottom || topLeft.x + glyph.width > bounds.right ||
+                (glyph.height <= bounds.height && topLeft.y + glyph.height > bounds.bottom)) return
             // 录制模式：录制 + 绘制并行（录制帧本身要呈现；否则「最后一帧无 tooltip」）
             if (drawContent) drawText(measurer, s, topLeft = topLeft, style = style(sizePx).copy(color = color))
             recorder?.add(DrawOp.Text(s, topLeft, sizePx, color))
         }
 
-        class Flow(val maxWidth: Float, var y: Float) {
-            var x = 8f
+        class Flow(val maxWidth: Float, var y: Float, val left: Float = 8f) {
+            var x = left
             var bottom = y
         }
 
@@ -295,8 +344,8 @@ object TooltipRenderer {
         ) {
             val full = if (row.title.isEmpty()) row.value else "${row.title} ${row.value}"
             val width = scope.run { measure(full, size) } + 8f
-            if (flow.x > 8f && flow.x + width > flow.maxWidth) {
-                flow.x = 8f
+            if (flow.x > flow.left && flow.x + width > flow.maxWidth) {
+                flow.x = flow.left
                 flow.y = flow.bottom
             }
             flow.bottom = max(flow.bottom, drawRow(scope, row, flow.x, flow.y, flow.maxWidth, marginTop, marginBottom, size))
@@ -312,22 +361,24 @@ object TooltipRenderer {
             contentWidth: Float,
             candleRows: List<LegendRow>,
             groups: List<IndicatorGroup>,
+            top: Float = 4f,
+            left: Float = 8f,
         ): Float {
-            var y = 4f
+            var y = top
             val titleStyle = styles.candle.tooltip.title
-            if (crosshair != null && titleStyle.show) {
+            if (candleRows.isNotEmpty() && crosshair != null && titleStyle.show) {
                 val c = candles.getOrNull(idx)
                 if (c != null) {
                     val ts = ChartText.timeLabel(c.timestamp, 60_000L, state.effectiveTimeZone())
                     y = drawRow(
                         scope,
                         LegendRow("", ts, Color.Transparent, StylesThemeBridge.parse(titleStyle.color)),
-                        8f, y, contentWidth,
+                        left, y, contentWidth,
                         titleStyle.marginTop.toFloat(), titleStyle.marginBottom.toFloat(), titleStyle.size.toFloat(),
                     )
                 }
             }
-            val flow = Flow(contentWidth, y)
+            val flow = Flow(contentWidth, y, left)
             val legendStyle = styles.candle.tooltip.legend
             for (r in candleRows) {
                 drawFlowRow(scope, r, flow, legendStyle.marginTop.toFloat(), legendStyle.marginBottom.toFloat(), legendStyle.size.toFloat())
@@ -361,8 +412,8 @@ object TooltipRenderer {
             val full = if (r.title.isEmpty()) r.value else "${r.title} ${r.value}"
             val w = scope.run { measure(full, sizePx) }
             val h = marginTop + lineHeight(sizePx) + marginBottom
-            val x = if (x0 + w > maxWidth) 8f else x0
-            val y = if (x == 8f && x0 != 8f) y0 + lineHeight(sizePx) else y0
+            val x = x0
+            val y = y0
             var cx = x + 2f
             if (r.title.isNotEmpty()) {
                 scope.run { drawAt(r.title, Offset(cx, y + marginTop), sizePx, r.titleColor) }
@@ -382,24 +433,23 @@ object TooltipRenderer {
             paneBottom: Float,
             topOverride: Float,
             rect: CandleTooltipRectStyle,
-            legendSizeSp: Float,
+            styles: Styles,
         ) {
-            // 合并行：candle 行 + 指标组（name 行 + legends 行），空值行跳过
-            val indTitleColor = StylesThemeBridge.parse(Styles().indicator.tooltip.title.color)
-            val rows = (candleRows + groups.flatMap { g ->
-                (if (g.name.isNotEmpty()) listOf(LegendRow("", g.name, indTitleColor, indTitleColor)) else emptyList()) + g.legends
-            }).filter { it.value.isNotEmpty() }
+            val firstOp = recorder?.size ?: 0
+            // 上游 rect 只显示 legends；各组保留自己的字号和边距。
+            val rows = candleRows.map { it to styles.candle.tooltip.legend } +
+                groups.flatMap { it.legends }.map { it to styles.indicator.tooltip.legend }
             if (rows.isEmpty()) return
-            val sizePx = legendSizeSp
-            val rowH = lineHeight(sizePx)
             var maxTextW = 0f
-            for (r in rows) {
-                val w = max(scope.run { measure(r.title, sizePx) }, scope.run { measure(r.value, sizePx) }) + 8f
-                maxTextW = max(maxTextW, w)
+            for ((row, style) in rows) {
+                val size = style.size.toFloat()
+                val width = scope.run { measure(row.title, size) + measure(row.value, size) } +
+                    style.marginLeft.toFloat() + style.marginRight.toFloat() + 16f
+                maxTextW = max(maxTextW, width)
             }
             val borderPx = rect.borderWidth.toFloat()
             val rectW = maxTextW + borderPx * 2 + rect.paddingLeft.toFloat() + rect.paddingRight.toFloat()
-            val rectH = rowH * rows.size + rect.paddingTop.toFloat() + rect.paddingBottom.toFloat() + borderPx * 2
+            val rectH = rows.sumOf { (_, style) -> lineHeight(style.size.toFloat()).toDouble() + style.marginTop + style.marginBottom }.toFloat() + rect.paddingTop.toFloat() + rect.paddingBottom.toFloat() + borderPx * 2
             if (rectW <= 0f || rectH <= 0f) return
 
             val centerX = contentWidth / 2f
@@ -409,12 +459,10 @@ object TooltipRenderer {
             if (rect.position == "pointer" && crosshair != null) {
                 rectX = if (isLeft) crosshair.x - rect.offsetRight.toFloat() - rectW
                 else crosshair.x + rect.offsetLeft.toFloat()
-                rectY = (crosshair.y - rectH / 2f).coerceIn(
-                    rect.offsetTop.toFloat(),
-                    (paneBottom - rect.offsetBottom.toFloat() - rectH).coerceAtLeast(rect.offsetTop.toFloat()),
-                )
+                val minY = topOverride + rect.offsetTop.toFloat()
+                rectY = (crosshair.y - rectH / 2f).coerceIn(minY, (paneBottom - rect.offsetBottom.toFloat() - rectH).coerceAtLeast(minY))
             } else {
-                rectX = if (isLeft) rect.offsetLeft.toFloat() else contentWidth - rect.offsetRight.toFloat() - rectW
+                rectX = if (isLeft) styles.candle.tooltip.offsetLeft.toFloat() + rect.offsetLeft.toFloat() else contentWidth - styles.candle.tooltip.offsetRight.toFloat() - rect.offsetRight.toFloat() - rectW
                 rectY = topOverride + rect.offsetTop.toFloat()
             }
 
@@ -437,14 +485,17 @@ object TooltipRenderer {
             var ty = rectY + borderPx + rect.paddingTop.toFloat()
             val textLeft = rectX + borderPx + rect.paddingLeft.toFloat()
             val valueRight = rectX + rectW - borderPx - rect.paddingRight.toFloat()
-            for (r in rows) {
+            for ((row, style) in rows) {
+                val size = style.size.toFloat()
+                ty += style.marginTop.toFloat()
                 scope.run {
-                    drawAt(r.title, Offset(textLeft, ty), sizePx, r.titleColor)
-                    val vw = measure(r.value, sizePx)
-                    drawAt(r.value, Offset(valueRight - vw, ty), sizePx, r.valueColor)
+                    drawAt(row.title, Offset(textLeft + style.marginLeft.toFloat(), ty), size, row.titleColor)
+                    val vw = measure(row.value, size)
+                    drawAt(row.value, Offset(valueRight - style.marginRight.toFloat() - vw, ty), size, row.valueColor)
                 }
-                ty += rowH
+                ty += lineHeight(size) + style.marginBottom.toFloat()
             }
+            recorder?.let { for (i in firstOp until it.size) it[i].reserveLegendSpace = false }
         }
 
         /** features 三组图标绘制（path 画比例折线、icon_font 画字符）并记录命中区。 */

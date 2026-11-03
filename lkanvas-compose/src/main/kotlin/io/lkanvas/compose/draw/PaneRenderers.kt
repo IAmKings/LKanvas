@@ -131,7 +131,7 @@ object PaneRenderers {
                     //（BAR 分发——main 上创建 MACD 柱列不再画折线）
                     drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow, candles = candles, paneTop = top)
                 }
-                paletteIdx += res.result.keys.size
+                paletteIdx += figurePlots(inst).size
             }
             if (theme.lastPriceShow) {
                 drawLastPriceLine(candles, y, theme, contentLeft, contentRight, text, legendHeight)
@@ -193,7 +193,7 @@ object PaneRenderers {
                         // T06：主图额外轴入口同管线
                         drawInstanceFigures(inst, res, state.viewport, range, ay, theme, axPalette, lastValueMark = theme.lastValueMarkShow, candles = candles)
                     }
-                    axPalette += res.result.keys.size
+                    axPalette += figurePlots(inst).size
                 }
             }
             // 轴标签（独立 gutter 列；inside/LEFT 轴画 pane 内右缘右对齐）
@@ -318,7 +318,7 @@ object PaneRenderers {
                 } else {
                     drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = false, candles = candles, paneTop = top)
                 }
-                paletteIdx += res.result.keys.size
+                paletteIdx += figurePlots(inst).size
             }
         }
         drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight, top, bottom)
@@ -375,7 +375,7 @@ object PaneRenderers {
                     // attrs/styles 逐行求值；27 显示模板不再依赖专用 renderer
                     drawInstanceFigures(inst, res, state.viewport, range, y, theme, paletteIdx, lastValueMark = theme.lastValueMarkShow, candles = candles, paneTop = top)
                 }
-                paletteIdx += res.result.keys.size
+                paletteIdx += figurePlots(inst).size
             }
         }
         drawYAxisLabels(text, theme, LinearYAxis.ticks(lo, hi, 3), defaultY, contentRight, top, bottom)
@@ -555,15 +555,33 @@ object PaneRenderers {
         val ly = y(visible[lowIdx].low).toFloat()
         val high = text.price(visible[highIdx].high)
         val low = text.price(visible[lowIdx].low)
-        val highBounds = priceMarkerBounds(hx, if (hy < ly) hy - text.textHeight - 7f else hy + 7f,
-            text.measureWidth(high), text.textHeight, contentRight, bottom, exclusions)
-        val lowBounds = priceMarkerBounds(lx, if (hy < ly) ly + 7f else ly - text.textHeight - 7f,
-            text.measureWidth(low), text.textHeight, contentRight, bottom, exclusions + highBounds)
-        drawText(text, high, highBounds.topLeft, theme.highMarkerColor)
-        drawText(text, low, lowBounds.topLeft, theme.lowMarkerColor)
+        // 数字标注用自身布局，避免 CJK 基准行高虚占密集图例下的可用空位。
+        val highSize = text.layout(high).size
+        val lowSize = text.layout(low).size
+        val highBounds = priceMarkerBounds(hx, if (hy < ly) hy - highSize.height - 7f else hy + 7f,
+            highSize.width.toFloat(), highSize.height.toFloat(), contentRight, bottom, exclusions)
+        val lowBounds = priceMarkerBounds(lx, if (hy < ly) ly + 7f else ly - lowSize.height - 7f,
+            lowSize.width.toFloat(), lowSize.height.toFloat(), contentRight, bottom, exclusions + listOfNotNull(highBounds))
+        highBounds?.let { drawText(text, high, it.topLeft, theme.highMarkerColor) }
+        lowBounds?.let { drawText(text, low, it.topLeft, theme.lowMarkerColor) }
     }
 
 
+
+    /** 图例与绘图共用定义顺序，结果 Map 不承诺顺序。 */
+    fun figurePlots(inst: io.lkanvas.core.indicator.IndicatorInstance): List<io.lkanvas.core.indicator.PlotDef> =
+        inst.definition.plotsFor(inst.params)
+
+    fun figurePaletteOffset(state: ChartState, inst: io.lkanvas.core.indicator.IndicatorInstance): Int {
+        val peers = state.getIndicators(ChartState.IndicatorFilter(paneId = inst.paneId))
+            .filter { it.visible && it.state != null && (inst.paneId != "main" || it.yAxisId == inst.yAxisId) }
+        val base = if (inst.paneId == "main" && inst.yAxisId != "main")
+            state.extraYAxisMeta.entries.filter { it.value.paneId == "main" }.indexOfFirst { it.key == inst.yAxisId }.coerceAtLeast(0) * 3 else 0
+        return base + peers.takeWhile { it.id != inst.id }.sumOf { figurePlots(it).size }
+    }
+
+    fun figureColors(plots: List<io.lkanvas.core.indicator.PlotDef>, theme: ChartTheme, offset: Int): Map<String, Color> =
+        plots.mapIndexed { i, plot -> plot.key to theme.linePalette[(offset + i) % theme.linePalette.size] }.toMap()
 
     /** 指标线绘制（跳过 NaN；palette 按 key 序取色）。 */
     private fun DrawScope.drawLinePlots(
@@ -582,6 +600,7 @@ object PaneRenderers {
         /** M03：attrs 原样求值（coordinates 点列覆盖）；null=无 attrs 走批量快路径。 */
         attrsOf: ((key: String, row: Int, value: Double) -> Map<*, *>?)? = null,
         paneTop: Float = 0f,
+        figureColors: Map<String, Color> = emptyMap(),
     ) {
         // 连续同样式段按上游 mergeLines 合并，再一次 stroke；NaN/样式/坐标断点分批。
         // 保留 FloatArray 收集几何，避免逐段 drawLines 的端帽重叠和重复栅格化。
@@ -590,7 +609,7 @@ object PaneRenderers {
         // 与 candle/命中共用 Double 坐标，最后一步转 Float，避免大索引相消丢精度。
         for ((idx, key) in lineKeys.withIndex()) {
             val column = result.result[key]
-            val baseColor = palette[(idx + paletteOffset) % palette.size]
+            val baseColor = figureColors[key] ?: palette[(idx + paletteOffset) % palette.size]
             // SLA-013/IND：PlotDef.styles 行级回调**逐行求值**（(row, params) ->
             // {"color":...,"lineWidth":...}；无回调时整列走单组快速路径）
             data class Seg(val color: Color, val width: Float) {
@@ -747,7 +766,9 @@ object PaneRenderers {
         candles: List<Candle> = emptyList(),
         paneTop: Float = 0f,
     ) {
-        val plots = inst.definition.plotsFor(inst.params).associateBy { it.key }
+        val figures = figurePlots(inst)
+        val plots = figures.associateBy { it.key }
+        val colors = figureColors(figures, theme, paletteOffset)
         val override = styleOverrideFor(inst, plots)
         val attrsGeo = attrsOverrideFor(inst, plots)
         val lineKeys = ArrayList<String>()
@@ -764,12 +785,12 @@ object PaneRenderers {
             // 只为这些 LINE 图形绑定实际存在的回调，BAR 的样式不绕入空的逐点包装。
             val lineOverride = if (lineKeys.any { plots[it]?.styles != null }) override else null
             val lineAttrs = if (lineKeys.any { plots[it]?.attrs != null }) rawAttrsFor(inst, plots) else null
-            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = lineOverride?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } }, attrsOf = lineAttrs?.let { la -> { k: String, r: Int, v: Double -> la(k, r, v, candles) } }, paneTop = paneTop)
+            drawLinePlots(res, vp, range, y, theme.linePalette, keys = lineKeys, paletteOffset = paletteOffset, lineSizePx = theme.indicatorLineSizePx, dashed = theme.indicatorLineDashed, lastValueMark = lastValueMark, styleOverrideOf = lineOverride?.let { o -> { k: String, r: Int -> o(k, r, res.result[k]?.getOrNull(r) ?: Double.NaN, candles) } }, attrsOf = lineAttrs?.let { la -> { k: String, r: Int, v: Double -> la(k, r, v, candles) } }, paneTop = paneTop, figureColors = colors)
         }
         if (barEntries.isNotEmpty()) {
             val barOverride = if (barEntries.any { plots[it.first]?.styles != null }) override else null
             val barAttrs = if (barEntries.any { plots[it.first]?.attrs != null }) attrsGeo else null
-            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, barOverride, barAttrs, candles, paneTop)
+            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, barOverride, barAttrs, candles, paneTop, colors)
         }
     }
 
@@ -789,6 +810,7 @@ object PaneRenderers {
         attrsGeo: ((String, Int, Double, List<Candle>) -> Map<String, Double>)?,
         candles: List<Candle> = emptyList(),
         paneTop: Float = 0f,
+        figureColors: Map<String, Color> = emptyMap(),
     ) {
         val gap = (vp.barSpacing * 0.25).coerceAtMost(vp.barSpacing - 1.0).coerceAtLeast(0.0).toFloat()
         val bodyWidth = (vp.barSpacing - gap).coerceAtLeast(1.0).toFloat()
@@ -836,7 +858,7 @@ object PaneRenderers {
                     }
                 }
                 val (c0, _) = override?.invoke(key, i, v, candles) ?: (null to null)
-                val color = c0 ?: palette[(bi + paletteOffset) % palette.size]
+                val color = c0 ?: figureColors[key] ?: palette[(bi + paletteOffset) % palette.size]
                 drawRect(
                     color,
                     topLeft = Offset(ax, top),

@@ -109,4 +109,33 @@ class OverlayManagerTest {
         assertEquals(OverlayPhase.COMPLETED, manager.get(b)!!.phase, "b 不受 a 的编辑影响")
         manager.endDrag(a, 0)
     }
+    @kotlin.test.Test
+    fun drawingPreviewDoesNotCommitAPointAndTheHookSeesTheUpdatedGeometry() {
+        val manager = OverlayManager()
+        var calls = 0
+        val template = object : OverlayDefinition {
+            override val name = "preview_core_test"
+            override val pointCount = 2
+            override val performEventMoveForDrawing: ((String, OverlayPoint) -> Unit) = { id, point ->
+                calls++
+                val inst = manager.get(id)!!
+                kotlin.test.assertEquals(point, inst.points.last())
+                inst.points[inst.points.lastIndex] = point.copy(value = 42.0)
+            }
+        }
+        val id = manager.beginCreate(template)!!
+        manager.moveCreatePoint(id, OverlayPoint(0, 1.0))
+        kotlin.test.assertEquals(0, manager.get(id)!!.currentStep)
+        manager.addCreatePoint(id, manager.get(id)!!.points.last())
+        kotlin.test.assertEquals(1, manager.get(id)!!.currentStep)
+        manager.moveCreatePoint(id, OverlayPoint(60000, 2.0))
+        manager.moveCreatePoint(id, OverlayPoint(61000, 3.0))
+        kotlin.test.assertEquals(1, manager.get(id)!!.currentStep)
+        kotlin.test.assertEquals(2, manager.get(id)!!.points.size)
+        kotlin.test.assertTrue(manager.addCreatePoint(id, manager.get(id)!!.points.last()))
+        kotlin.test.assertEquals(42.0, manager.get(id)!!.points.last().value)
+        kotlin.test.assertEquals(3, calls)
+        kotlin.test.assertEquals(OverlayPhase.COMPLETED, manager.get(id)!!.phase)
+    }
+
 }

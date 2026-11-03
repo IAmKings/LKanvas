@@ -51,6 +51,7 @@ object ChartSnapshotExporter {
         widthPx: Int,
         heightPx: Int,
         includeCrosshair: Boolean = false,
+        styles: io.lkanvas.chart.styles.Styles? = null,
     ): Result {
         if (widthPx <= 0 || heightPx <= 0) {
             throw IllegalArgumentException("导出尺寸必须为正：${widthPx}x$heightPx")
@@ -70,7 +71,7 @@ object ChartSnapshotExporter {
         val panes = state.paneHeightsPx
         val layoutW = if (state.contentWidthPx > 0f) state.contentWidthPx + gutterPx else widthPx.toFloat()
         val layoutH = if (state.contentWidthPx > 0f) {
-            panes.main + panes.vol + panes.macd + panes.timeAxis
+            (state.extraPaneLayout.lastOrNull()?.second?.second ?: (panes.main + panes.vol + panes.macd)) + panes.timeAxis
         } else {
             heightPx.toFloat()
         }
@@ -97,6 +98,7 @@ object ChartSnapshotExporter {
                             legendTextSizePx = legendPx,
                             axisTextSizePx = axisPx,
                             includeCrosshair = includeCrosshair,
+                            styles = styles,
                         ),
                         textMeasurer = textMeasurer,
                     )
@@ -120,7 +122,8 @@ object ChartSnapshotExporter {
         widthPx: Int,
         heightPx: Int,
         includeCrosshair: Boolean = false,
-    ): Boolean = when (val r = export(state, textMeasurer, theme, config, widthPx, heightPx, includeCrosshair)) {
+        styles: io.lkanvas.chart.styles.Styles? = null,
+    ): Boolean = when (val r = export(state, textMeasurer, theme, config, widthPx, heightPx, includeCrosshair, styles)) {
         is Result.TooLarge -> false
         is Result.Ok -> runCatching {
             r.bitmap.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, output)

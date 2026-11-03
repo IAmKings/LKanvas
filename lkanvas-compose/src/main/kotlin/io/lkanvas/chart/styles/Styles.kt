@@ -230,6 +230,10 @@ data class CandleTooltipStyle(
     val rect: CandleTooltipRectStyle = CandleTooltipRectStyle(),
     val title: TooltipTitleStyle = TooltipTitleStyle(),
     val legend: TooltipLegendStyle = TooltipLegendStyle(),
+    val offsetLeft: Double = 4.0,
+    val offsetTop: Double = 6.0,
+    val offsetRight: Double = 4.0,
+    val offsetBottom: Double = 6.0,
 )
 
 /** 上游 CandleTooltipRectStyle。 */
@@ -343,6 +347,12 @@ data class IndicatorTooltipStyle(
     val legend: TooltipLegendStyle = TooltipLegendStyle(),
     /** 上游 indicator.tooltip.features：tooltip 功能图标（默认空=不渲染；三事件命中源）。 */
     val features: List<TooltipFeatureStyle> = emptyList(),
+    val offsetLeft: Double = 4.0,
+    val offsetTop: Double = 6.0,
+    val offsetRight: Double = 4.0,
+    val offsetBottom: Double = 6.0,
+    val showRule: String = "always",
+    val showType: String = "standard",
 )
 
 /** 上游 IndicatorStyle。 */

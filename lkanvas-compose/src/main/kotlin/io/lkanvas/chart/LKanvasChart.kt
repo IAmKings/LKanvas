@@ -742,11 +742,7 @@ class LKanvasChart private constructor(
     var overlayMode: OverlayMode = OverlayMode.WEAK_MAGNET
         set(value) {
             field = value
-            state.overlays.magnetMode = when (value) {
-                OverlayMode.NORMAL -> io.lkanvas.core.overlay.MagnetMode.NORMAL
-                OverlayMode.WEAK_MAGNET -> io.lkanvas.core.overlay.MagnetMode.WEAK
-                OverlayMode.STRONG_MAGNET -> io.lkanvas.core.overlay.MagnetMode.STRONG
-            }
+            state.overlays.magnetMode = magnetModeOf(value)
         }
 
     private fun overlayToInfo(id: String): OverlayInfo? {
@@ -765,7 +761,20 @@ class LKanvasChart private constructor(
             fixedZLevel = inst.fixedZLevel,
             modeSensitivity = inst.modeSensitivity,
             styles = inst.styles,
+            mode = overlayModeOf(inst.mode ?: state.overlays.magnetMode),
         )
+    }
+
+    private fun magnetModeOf(mode: OverlayMode): io.lkanvas.core.overlay.MagnetMode = when (mode) {
+        OverlayMode.NORMAL -> io.lkanvas.core.overlay.MagnetMode.NORMAL
+        OverlayMode.WEAK_MAGNET -> io.lkanvas.core.overlay.MagnetMode.WEAK
+        OverlayMode.STRONG_MAGNET -> io.lkanvas.core.overlay.MagnetMode.STRONG
+    }
+
+    private fun overlayModeOf(mode: io.lkanvas.core.overlay.MagnetMode): OverlayMode = when (mode) {
+        io.lkanvas.core.overlay.MagnetMode.NORMAL -> OverlayMode.NORMAL
+        io.lkanvas.core.overlay.MagnetMode.WEAK -> OverlayMode.WEAK_MAGNET
+        io.lkanvas.core.overlay.MagnetMode.STRONG -> OverlayMode.STRONG_MAGNET
     }
 
     /**
@@ -775,6 +784,7 @@ class LKanvasChart private constructor(
      * - 数组 → 批量，逐一返回（失败位为 null）。
      */
     fun createOverlay(value: OverlayCreate, paneId: String = "main"): String? {
+        if (!value.modeSensitivity.isFinite() || value.modeSensitivity < 0) return null
         // 模板解析：core 内置 16 表优先，回退宿主注册表（registerOverlay 注册的自定义模板）
         val template = io.lkanvas.core.extension.overlay.OverlayTemplates[value.name]
             ?: LkanvasRegistry.getOverlayDefinition(value.name)
@@ -792,6 +802,7 @@ class LKanvasChart private constructor(
             inst.visible = value.visible
             inst.zIndex = value.zLevel
             inst.modeSensitivity = value.modeSensitivity
+            inst.mode = value.mode?.let { magnetModeOf(it) }
             value.styles?.let { inst.styles = it }
             state.notifyOverlayChanged()
             return id
@@ -812,6 +823,7 @@ class LKanvasChart private constructor(
         inst.visible = value.visible
         inst.zIndex = value.zLevel
         inst.modeSensitivity = value.modeSensitivity
+        inst.mode = value.mode?.let { magnetModeOf(it) }
         value.styles?.let { inst.styles = it }
         state.notifyOverlayChanged()
         return id
@@ -832,6 +844,7 @@ class LKanvasChart private constructor(
     /** 上游 `overrideOverlay(override)`：以 `override.name+filter` 定位。 */
     fun overrideOverlay(id: String, override: OverlayOverride): Boolean {
         val inst = state.overlays.get(id) ?: return false
+        if (override.modeSensitivity?.let { !it.isFinite() || it < 0 } == true) return false
         override.points?.let { pts ->
             inst.points.clear()
             inst.points.addAll(pts)
@@ -843,6 +856,7 @@ class LKanvasChart private constructor(
         override.zLevel?.let { inst.zIndex = it }
         override.fixedZLevel?.let { inst.fixedZLevel = it }
         override.modeSensitivity?.let { inst.modeSensitivity = it }
+        override.mode?.let { inst.mode = magnetModeOf(it) }
         override.styles?.let { inst.styles = it }
         state.notifyOverlayChanged()
         return true

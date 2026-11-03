@@ -445,12 +445,24 @@ data class CandleTooltipStylePatch(
     val showRule: String? = null,
     val title: TooltipTitleStylePatch? = null,
     val legend: TooltipLegendStylePatch? = null,
+    val showType: String? = null,
+    val rect: CandleTooltipRectStylePatch? = null,
+    val offsetLeft: Double? = null,
+    val offsetTop: Double? = null,
+    val offsetRight: Double? = null,
+    val offsetBottom: Double? = null,
 ) {
     /** 仅覆盖已提供字段（嵌套递归）。 */
     fun applyTo(base: CandleTooltipStyle): CandleTooltipStyle = base.copy(
+        showType = showType ?: base.showType,
+        rect = rect?.applyTo(base.rect) ?: base.rect,
         showRule = showRule ?: base.showRule,
         title = title?.applyTo(base.title) ?: base.title,
         legend = legend?.applyTo(base.legend) ?: base.legend,
+        offsetLeft = offsetLeft ?: base.offsetLeft,
+        offsetTop = offsetTop ?: base.offsetTop,
+        offsetRight = offsetRight ?: base.offsetRight,
+        offsetBottom = offsetBottom ?: base.offsetBottom,
     )
 }
 
@@ -644,11 +656,25 @@ data class IndicatorLastValueMarkStylePatch(
 data class IndicatorTooltipStylePatch(
     val title: TooltipTitleStylePatch? = null,
     val legend: TooltipLegendStylePatch? = null,
+    val offsetLeft: Double? = null,
+    val offsetTop: Double? = null,
+    val offsetRight: Double? = null,
+    val offsetBottom: Double? = null,
+    val showRule: String? = null,
+    val showType: String? = null,
+    val features: List<TooltipFeatureStyle>? = null,
 ) {
     /** 仅覆盖已提供字段（嵌套递归）。 */
     fun applyTo(base: IndicatorTooltipStyle): IndicatorTooltipStyle = base.copy(
         title = title?.applyTo(base.title) ?: base.title,
         legend = legend?.applyTo(base.legend) ?: base.legend,
+        offsetLeft = offsetLeft ?: base.offsetLeft,
+        offsetTop = offsetTop ?: base.offsetTop,
+        offsetRight = offsetRight ?: base.offsetRight,
+        offsetBottom = offsetBottom ?: base.offsetBottom,
+        showRule = showRule ?: base.showRule,
+        showType = showType ?: base.showType,
+        features = features ?: base.features,
     )
 }
 

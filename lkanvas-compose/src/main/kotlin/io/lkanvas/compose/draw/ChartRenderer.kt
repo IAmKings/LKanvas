@@ -99,7 +99,8 @@ object ChartRenderer {
             System.identityHashCode(state.dataSnapshot), idx, System.identityHashCode(styles),
             params.width, params.height, params.gutterWidth, params.legendTextSizePx,
             density, fontScale, panes, state.extraPaneLayout,
-            crosshair != null, if (styles?.candle?.tooltip?.showType == "rect") crosshair else null,
+            crosshair != null, if (styles?.candle?.tooltip?.showType == "rect" || styles?.indicator?.tooltip?.showType == "rect") crosshair else null,
+            theme, state.getIndicators().map { listOf(it.id, System.identityHashCode(it.state), it.visible, it.params, it.precisionOverride, it.displayName(), it.yAxisId) },
         )
         val cacheHit = cache != null && cache.key == key && cache.ops != null
         // Layout once before price marks, then replay at the original tooltip layer.
@@ -110,43 +111,29 @@ object ChartRenderer {
             !params.drawLegend -> emptyList()
             styles == null -> listOf(Rect(0f, 0f, contentRight, 4f + params.legendTextSizePx * 1.4f + text.textHeight))
             cacheHit -> cache!!.mainBounds
-            else -> mainOps.map { op ->
-                when (op) {
-                    is TooltipRenderer.DrawOp.Text -> {
-                        val layout = textMeasurer.measure(op.text, TooltipRenderer.textStyle(op.sizePx, op.color))
-                        Rect(op.topLeft, Size(layout.size.width.toFloat(), layout.size.height.toFloat()))
-                    }
-                    is TooltipRenderer.DrawOp.RoundRect -> Rect(op.topLeft, op.size)
-                    is TooltipRenderer.DrawOp.StrokePath -> op.path.getBounds()
-                }
-            }
+            else -> mainOps.map { tooltipBounds(it, textMeasurer) }
         }
+
         val tooltipOps = if (!params.drawLegend || styles == null) emptyList() else if (cacheHit) cache!!.ops!! else {
             val ops = ArrayList(mainOps)
-            drawSubPaneTooltips(state, styles, theme, textMeasurer, params.legendTextSizePx, crosshair, contentRight, mainBottom, volTop, volBottom, macdBottom, recorder = ops, drawContent = false)
+            drawSubPaneTooltips(state, styles, theme, textMeasurer, params.legendTextSizePx, crosshair, contentRight, recorder = ops, drawContent = false)
             ops
         }
         state.legendHeightsPx = when {
             !params.drawLegend -> emptyMap()
             styles == null -> mapOf("main" to legendHeight)
             cacheHit -> cache!!.legendHeights
-            else -> tooltipOps.filterIsInstance<TooltipRenderer.DrawOp.Text>().groupBy { op ->
-                when (op.clipBounds?.top) {
-                    volTop -> "vol"
-                    volBottom + 1f -> "macd"
-                    else -> "main"
-                }
-            }.mapNotNull { (pane, ops) ->
-                if (pane == "main" && styles.candle.tooltip.showType == "rect") null
-                else {
-                    val top = state.paneBounds(pane)?.first ?: 0f
-                    pane to (ops.maxOf { op ->
-                        val height = textMeasurer.measure(op.text, TooltipRenderer.textStyle(op.sizePx, op.color)).size.height
-                        minOf(op.topLeft.y + height, op.clipBounds?.bottom ?: mainBottom)
-                    } - top + 4f)
-                }
-            }.toMap()
+            else -> tooltipOps.filter { it.reserveLegendSpace }.groupBy { op ->
+                if (op.clipBounds == null) "main" else state.paneList().firstOrNull { pane ->
+                    val top = state.paneBounds(pane)?.first ?: return@firstOrNull false
+                    kotlin.math.abs(top - op.clipBounds!!.top) <= 1f
+                } ?: "main"
+            }.mapValues { (pane, ops) ->
+                val top = state.paneBounds(pane)?.first ?: 0f
+                ops.maxOf { op -> minOf(tooltipBounds(op, textMeasurer).bottom, op.clipBounds?.bottom ?: mainBottom) } - top + 4f
+            }
         }
+
         // 0.4.0 多轴：自定义轴标签列坐标（主轴列右侧依次向右；主轴列宽 = tagWidth+8）
         val extraAxisCols = if (params.extraAxisColW > 0f && state.extraYAxisMeta.isNotEmpty()) {
             val mainCol = text.tagWidth + 8f
@@ -197,6 +184,15 @@ object ChartRenderer {
         if (crosshair != null) {
             drawCrosshairLabels(state, theme, text, crosshair, contentRight, legendHeight)
         }
+    }
+
+    private fun tooltipBounds(op: TooltipRenderer.DrawOp, measurer: androidx.compose.ui.text.TextMeasurer): Rect = when (op) {
+        is TooltipRenderer.DrawOp.Text -> {
+            val layout = measurer.measure(op.text, TooltipRenderer.textStyle(op.sizePx, op.color))
+            Rect(op.topLeft, Size(layout.size.width.toFloat(), layout.size.height.toFloat()))
+        }
+        is TooltipRenderer.DrawOp.RoundRect -> Rect(op.topLeft, op.size)
+        is TooltipRenderer.DrawOp.StrokePath -> op.path.getBounds()
     }
 
     private fun DrawScope.replayTooltip(ops: List<TooltipRenderer.DrawOp>, textMeasurer: TextMeasurer) {
@@ -257,52 +253,18 @@ object ChartRenderer {
         baseTextSizePx: Float,
         crosshair: Offset?,
         contentRight: Float,
-        mainBottom: Float,
-        volTop: Float,
-        volBottom: Float,
-        macdBottom: Float,
         recorder: MutableList<io.lkanvas.compose.draw.TooltipRenderer.DrawOp>? = null,
         drawContent: Boolean = true,
     ) {
         val candles = state.dataSnapshot.candles
         if (candles.isEmpty()) return
-        val idx = crosshair
-            ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) }
-            ?: (candles.size - 1)
-        with(io.lkanvas.compose.draw.TooltipRenderer) {
-            // VOL：volume + 均量线
-            val vol = state.volResult
-            if (vol != null) {
-                val keys = vol.result.keys.toList()
-                clipPaneTooltip(state, Rect(0f, volTop, contentRight, volBottom), recorder) {
-                    drawPaneIndicatorTooltip(
-                        state, styles, theme, textMeasurer, baseTextSizePx, crosshair, contentRight,
-                        paneTop = mainBottom, paneId = "vol",
-                        name = "VOL",
-                        legendKeys = keys.map { it to vol.result[it].getOrNull(idx) },
-                        legendColors = keys.mapIndexed { i, _ -> theme.linePalette[i % theme.linePalette.size] },
-                        recorder = recorder,
-                        drawContent = drawContent,
-                    )
-                }
-            }
-            // MACD：dif/dea/macd
-            val macd = state.macdResult
-            if (macd != null) {
-                val keys = listOf("dif", "dea", "macd")
-                clipPaneTooltip(state, Rect(0f, volBottom + 1f, contentRight, macdBottom), recorder) {
-                    drawPaneIndicatorTooltip(
-                        state, styles, theme, textMeasurer, baseTextSizePx, crosshair, contentRight,
-                        paneTop = volBottom, paneId = "macd",
-                        name = "MACD",
-                        legendKeys = keys.map { it to macd.result[it]?.getOrNull(idx) },
-                        legendColors = listOf(
-                            theme.macdDif, theme.macdDea,
-                            if ((macd.result["macd"]?.getOrNull(idx) ?: 0.0) >= 0) theme.macdBarUp else theme.macdBarDown,
-                        ),
-                        recorder = recorder,
-                        drawContent = drawContent,
-                    )
+        with(TooltipRenderer) {
+            for (pane in state.paneList().filter { it != "main" }) {
+                val (top, bottom) = state.paneBounds(pane) ?: continue
+                val end = bottom - styles.indicator.tooltip.offsetBottom.toFloat()
+                clipPaneTooltip(state, Rect(0f, top + 1f, contentRight, end.coerceAtLeast(top + 1f)), recorder) {
+                    drawIndicatorTooltip(state, styles, theme, textMeasurer, baseTextSizePx, crosshair, contentRight, top, pane,
+                        recorder, drawContent)
                 }
             }
         }
@@ -385,19 +347,14 @@ object ChartRenderer {
             x += text.measureWidth(s) + 10f
         }
 
-        // 主 pane 指标图例（遍历全部 price 系实例，批次 2b）
-        var li = 0
+        // 无 Styles 的 ChartTheme 入口也使用同一份图形顺序与颜色。
         var lx = 8f
         val ly = y + textSizePx * 1.4f
-        for (inst in state.mainPaneIndicatorResults()) {
-            val res = inst.state ?: continue
-            for ((k, key) in res.result.keys.withIndex()) {
-                val v = res.result[key].getOrNull(idx) ?: Double.NaN
-                val color = theme.linePalette[(li + k) % theme.linePalette.size]
-                val label = "${inst.displayName()} ${text.price(v)}"
+        for (group in TooltipRenderer.buildMainIndicatorGroups(state, idx, io.lkanvas.chart.styles.Styles(), theme, text)) {
+            for (row in group.legends) {
+                val label = "${row.title} ${row.value}"
                 if (lx > contentWidth - 40f) break
-                drawText(text, label, Offset(lx, ly), color)
-                li++
+                drawText(text, label, Offset(lx, ly), row.valueColor)
                 lx += text.measureWidth(label) + 10f
             }
         }

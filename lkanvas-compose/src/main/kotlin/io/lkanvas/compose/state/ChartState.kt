@@ -673,85 +673,71 @@ class ChartState(
         return from to to
     }
 
-    /** 时间戳 → 数据索引（不存在取不大于它的最近一根；早于首根取首根）。 */
-    fun indexOfTimestampNearest(ts: Long): Int? {
-        val candles = dataSnapshot.candles
-        if (candles.isEmpty()) return null
-        val exact = io.lkanvas.core.viewport.Viewport.indexOfTimestamp(ts, candles)
-        return exact ?: run {
-            var lo = 0
-            var hi = candles.size - 1
-            var ans = 0
-            while (lo <= hi) {
-                val mid = (lo + hi) ushr 1
-                if (candles[mid].timestamp <= ts) {
-                    ans = mid; lo = mid + 1
-                } else hi = mid - 1
-            }
-            ans
-        }
-    }
+    /** 时间戳 → 最近数据索引，等距取较早一根。 */
+    fun indexOfTimestampNearest(ts: Long): Int? =
+        io.lkanvas.core.viewport.Viewport.indexOfTimestamp(ts, dataSnapshot.candles)
 
     /** 锚点 → 像素（主 pane）。 */
     fun overlayPointToPx(p: io.lkanvas.core.overlay.OverlayPoint): androidx.compose.ui.geometry.Offset? =
         overlayPointToPx(p, "main")
 
     /** 锚点 → 像素（R09：按实例 pane 的值映射与几何）。 */
-    fun overlayPointToPx(p: io.lkanvas.core.overlay.OverlayPoint, paneId: String): androidx.compose.ui.geometry.Offset? {
-        val idx = indexOfTimestampNearest(p.timestamp) ?: return null
-        val x = viewport.candleCenterX(idx.toDouble())
+    fun overlayPointToPx(p: io.lkanvas.core.overlay.OverlayPoint, paneId: String, continuous: Boolean = false): androidx.compose.ui.geometry.Offset? {
+        val idx = if (continuous) io.lkanvas.core.viewport.Viewport.timestampToFloatIndex(p.timestamp, dataSnapshot.candles)
+            else indexOfTimestampNearest(p.timestamp)?.toDouble()
+        val x = viewport.candleCenterX(idx ?: return null)
         val y = paneValueToY(paneId, p.value) ?: return null
         return androidx.compose.ui.geometry.Offset(x.toFloat(), (y + (paneBounds(paneId)?.first ?: 0f)).toFloat())
     }
 
     /**
      * 像素 → 锚点（按磁吸模式吸附；PRD R-09）。
-     * [sensitivityPx]：磁吸灵敏度（上游 modeSensitivity，默认 8px）——WEAK 模式下
-     * 仅当目标像素与最近 OHLC 像素距离 ≤ 灵敏度时吸附（SLA-013 消费）。
+     * [sensitivityPx] 是无实例上下文的灵敏度回退；创建/编辑优先消费实例 mode 与 modeSensitivity。
+     * weak 在 candle 内吸附到 OHLC，范围外仅在灵敏度内吸附。
      */
     fun overlayPointFromPx(
         x: Float,
         y: Float,
         sensitivityPx: Double = 8.0,
         paneId: String = "main",
+        instanceId: String? = overlays.creatingId,
     ): io.lkanvas.core.overlay.OverlayPoint? {
         val candles = dataSnapshot.candles
         if (candles.isEmpty()) return null
-        val idx = viewport.logicalIndexAt(x.toDouble()).roundToInt().coerceIn(candles.indices)
+        val instance = instanceId?.let(overlays::get)
+        val template = instance?.let { io.lkanvas.core.extension.overlay.OverlayTemplates[it.templateName] }
+        val floatIndex = viewport.logicalIndexAt(x.toDouble())
+        val idx = floatIndex.roundToInt().coerceIn(candles.indices)
         val candle = candles[idx]
+        val mode = if (template?.supportMagnet == false || paneId != "main") io.lkanvas.core.overlay.MagnetMode.NORMAL
+            else instance?.mode ?: overlays.magnetMode
+        val sensitivity = instance?.modeSensitivity ?: sensitivityPx
         // T04/Q04：手势传入**整图绝对 y**——在输入边界减一次 pane top 再交给
         // 期望相对 y 的 paneValueAt（修复前直接传入，paneValueAt 内部再加 top，
         // 双计导致副图反算值错误）
         val paneTopForInput = paneBounds(paneId)?.first ?: 0f
         val valueOf: (Float) -> Double? = { yy -> paneValueAt(paneId, yy - paneTopForInput) }
-        val value = when (overlays.magnetMode) {
-            io.lkanvas.core.overlay.MagnetMode.NORMAL ->
-                valueOf(y) ?: candle.close
-            io.lkanvas.core.overlay.MagnetMode.WEAK -> {
-                val raw = valueOf(y) ?: candle.close
-                // 弱磁吸：与最近 OHLC 的像素距离在灵敏度内才吸附（pane 感知映射）
-                val nearest = listOf(candle.open, candle.high, candle.low, candle.close).minByOrNull {
-                    kotlin.math.abs(it - raw)
-                } ?: raw
-                val nearestPx = paneValueToY(paneId, nearest)
-                val rawPx = paneValueToY(paneId, raw)
-                if (nearestPx != null && rawPx != null &&
-                    kotlin.math.abs(nearestPx - rawPx) <= sensitivityPx
-                ) {
-                    nearest
-                } else {
-                    raw
-                }
-            }
-            io.lkanvas.core.overlay.MagnetMode.STRONG -> {
-                val raw = valueOf(y) ?: candle.close
-                // 吸附到最近 OHLC
-                listOf(candle.open, candle.high, candle.low, candle.close).minByOrNull {
-                    kotlin.math.abs(it - raw)
-                } ?: raw
-            }
+        val raw = valueOf(y) ?: candle.close
+        val bodyHigh = maxOf(candle.open, candle.close)
+        val bodyLow = minOf(candle.open, candle.close)
+        val nearest = when {
+            raw > candle.high -> candle.high
+            raw < candle.low -> candle.low
+            raw > bodyHigh -> if (raw - bodyHigh < candle.high - raw) bodyHigh else candle.high
+            raw < bodyLow -> if (raw - candle.low < bodyLow - raw) candle.low else bodyLow
+            else -> if (bodyHigh - raw < raw - bodyLow) bodyHigh else bodyLow
         }
-        return io.lkanvas.core.overlay.OverlayPoint(candle.timestamp, value)
+        val nearestPx = paneValueToY(paneId, nearest)
+        val rawPx = paneValueToY(paneId, raw)
+        val value = when {
+            mode == io.lkanvas.core.overlay.MagnetMode.NORMAL -> raw
+            mode == io.lkanvas.core.overlay.MagnetMode.STRONG -> nearest
+            raw in candle.low..candle.high -> nearest
+            nearestPx != null && rawPx != null && kotlin.math.abs(nearestPx - rawPx) < sensitivity -> nearest
+            else -> raw
+        }
+        val timestamp = if (template?.continuous == true) io.lkanvas.core.viewport.Viewport.floatIndexToTimestamp(floatIndex, candles) ?: candle.timestamp else candle.timestamp
+        return io.lkanvas.core.overlay.OverlayPoint(timestamp, value)
     }
 
     /**

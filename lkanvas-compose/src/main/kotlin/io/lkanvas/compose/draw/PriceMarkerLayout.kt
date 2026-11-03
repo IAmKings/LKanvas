@@ -7,7 +7,7 @@ import kotlin.math.abs
 internal fun priceMarkerBounds(
     anchorX: Float, preferredTop: Float, width: Float, height: Float,
     right: Float, bottom: Float, exclusions: List<Rect>,
-): Rect {
+): Rect? {
     val x = (if (anchorX > right / 2f) anchorX - 6f - width else anchorX + 6f)
         .coerceIn(0f, (right - width).coerceAtLeast(0f))
     val top = preferredTop.coerceIn(0f, (bottom - height).coerceAtLeast(0f))
@@ -17,10 +17,15 @@ internal fun priceMarkerBounds(
         .minByOrNull { abs(it.top - top) }
     if (vertical != null) return vertical
     // 换行图例占满左侧高度时，保留价格高度并尝试相邻的水平空位。
-    val horizontal = exclusions.flatMap { listOf(it.left - width - 2f, it.right + 2f) }
-        .map { Rect(it, top, it + width, top + height) }
+    val xCandidates = exclusions.flatMap { listOf(it.left - width - 2f, it.right + 2f) }
+    val horizontal = xCandidates.map { Rect(it, top, it + width, top + height) }
         .filter { it.left >= 0f && it.right <= right && it.bottom <= bottom && exclusions.none(it::overlaps) }
         .minByOrNull { abs(it.left - x) }
-    // shortcut: if neither direction has space, retain the clamped anchor; crowded panes need a separate policy.
-    return horizontal ?: Rect(x, top, x + width, top + height)
+    if (horizontal != null) return horizontal
+    // 两个方向分别受阻时，角落仍可能存在可用空间。
+    val corner = xCandidates.asSequence().flatMap { xx -> candidates.asSequence().map { yy -> Rect(xx, yy, xx + width, yy + height) } }
+        .filter { it.left >= 0f && it.top >= 0f && it.right <= right && it.bottom <= bottom && exclusions.none(it::overlaps) }
+        .minByOrNull { abs(it.left - x) + abs(it.top - top) }
+    // 极矮 pane 无可用空位时省略可选价格文字，保留图例可读性。
+    return corner
 }
