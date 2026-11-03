@@ -30,6 +30,13 @@ if [[ -z "$VERSION_ARG" ]]; then
   echo "错误: 无法确定版本（传参或检查 gradle.properties 的 lkanvas.version）" >&2
   exit 1
 fi
+# groupId 单一来源（发布契约），仓库路径 = groupId 中的 . 换 /（如 io/github/iamkings）
+GROUP_ID="$(grep '^lkanvas.groupId=' gradle.properties | head -1 | cut -d= -f2- | tr -d '[:space:]')"
+if [[ -z "$GROUP_ID" ]]; then
+  echo "错误: gradle.properties 缺少 lkanvas.groupId（Maven Central 已验证命名空间）" >&2
+  exit 1
+fi
+GROUP_PATH="${GROUP_ID//./\/}"
 case "$PUBLISHING_TYPE" in
   USER_MANAGED|AUTOMATIC) ;;
   *) echo "错误: publishingType 只能是 USER_MANAGED 或 AUTOMATIC，收到 '$PUBLISHING_TYPE'" >&2; exit 1 ;;
@@ -59,9 +66,9 @@ fi
 # 目标版本目录必须齐全（仅上传目标版本，历史版本目录不带入 bundle）
 STAGING="$(mktemp -d)"
 trap 'rm -rf "$STAGING"' EXIT
-mkdir -p "$STAGING/io/lkanvas"
+mkdir -p "$STAGING/$GROUP_PATH"
 for artifact in lkanvas-core lkanvas-compose; do
-  dir="build/maven-repo/io/lkanvas/${artifact}/${VERSION_ARG}"
+  dir="build/maven-repo/${GROUP_PATH}/${artifact}/${VERSION_ARG}"
   if [[ ! -d "$dir" ]]; then
     echo "错误: 缺少 $dir —— 先执行 ./gradlew publish 生成制品" >&2
     exit 1
@@ -71,13 +78,13 @@ for artifact in lkanvas-core lkanvas-compose; do
     echo "       检查 local.properties 的 signing.keyId/password/secretKeyRingFile 后重跑 ./gradlew publish" >&2
     exit 1
   fi
-  mkdir -p "$STAGING/io/lkanvas/$artifact"
-  cp -R "$dir" "$STAGING/io/lkanvas/$artifact/"
+  mkdir -p "$STAGING/$GROUP_PATH/$artifact"
+  cp -R "$dir" "$STAGING/$GROUP_PATH/$artifact/"
 done
 
-(cd "$STAGING" && zip -qr bundle.zip io)
+(cd "$STAGING" && zip -qr bundle.zip "$GROUP_PATH")
 BUNDLE_SIZE="$(du -h "$STAGING/bundle.zip" | cut -f1 | tr -d ' ')"
-echo "上传 0.16.0 系列版本: $VERSION_ARG（publishingType=$PUBLISHING_TYPE，bundle=$BUNDLE_SIZE）"
+echo "上传 $GROUP_ID 版本 $VERSION_ARG（publishingType=$PUBLISHING_TYPE，bundle=$BUNDLE_SIZE）"
 
 # Portal API：Bearer = base64(username:token)
 BASIC_TOKEN="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | openssl base64 -A)"
@@ -117,8 +124,8 @@ for _ in $(seq 1 "$MAX_POLLS"); do
       echo "[$(date +%H:%M:%S)] 正式发布中…"
       ;;
     PUBLISHED)
-      echo "✅ 已发布: io.lkanvas:lkanvas-core / io.lkanvas:lkanvas-compose : $VERSION_ARG"
-      echo "   Central 检索: https://central.sonatype.com/artifact/io.lkanvas/lkanvas-compose/$VERSION_ARG"
+      echo "✅ 已发布: $GROUP_ID:lkanvas-core / $GROUP_ID:lkanvas-compose : $VERSION_ARG"
+      echo "   Central 检索: https://central.sonatype.com/artifact/$GROUP_ID/lkanvas-compose/$VERSION_ARG"
       exit 0
       ;;
     FAILED)

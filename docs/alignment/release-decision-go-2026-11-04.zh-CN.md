@@ -11,8 +11,8 @@
 |---|---|
 | 发布决策 | **GO**：解除远程发布 HOLD，制品发布至 Maven Central，开启内测 |
 | 内测版本 | `0.16.0-beta01`（pre-release 语义；后续 rc → 正式按标准路径切版） |
-| 坐标 | `io.lkanvas:lkanvas-compose` / `io.lkanvas:lkanvas-core`（groupId 保持不变） |
-| 渠道 | **主**：Maven Central Publisher Portal（central.sonatype.com），命名空间 `io.lkanvas` 经域名 DNS TXT 验证；**备**：JitPack（`com.github.IAmKings.LKanvas` 坐标，零凭据）；**封闭内测**：GitHub Packages（`maven.pkg.github.com/IAmKings/LKanvas`，坐标保持 io.lkanvas，需 PAT 鉴权） |
+| 坐标 | `io.github.iamkings:lkanvas-compose` / `io.github.iamkings:lkanvas-core`（Maven Central 已验证命名空间 `io.github.iamkings`，GitHub 一键验证；`io.lkanvas` 需域名 DNS 验证未持有，保留为后续可选迁移） |
+| 渠道 | **主**：Maven Central Publisher Portal（central.sonatype.com），命名空间 `io.github.iamkings`；**备**：JitPack（`com.github.IAmKings.LKanvas` 坐标，零凭据）；**封闭内测**：GitHub Packages（`maven.pkg.github.com/IAmKings/LKanvas`，坐标同 Central，需 PAT 鉴权） |
 | 发布方式 | `./gradlew publish` → 本地制品（含 .asc 签名）→ `tools/publish-central.sh` 上传，默认 `USER_MANAGED`（Portal 网页点击 Publish 确认） |
 | 决策人 | 项目维护者（KingsLZ），2026-11-04 |
 
@@ -40,8 +40,10 @@ PJZ110 对应项短测通过；双机最终双次矩阵、真机 heap/B06 尾项
 
 ## 4. 发布运维约定
 
-- **版本单一来源**：`gradle.properties` 的 `lkanvas.version`；`verifyLibraryVersions` 守护任务挂 `publish*` 全族，
-  校验 `LKanvas.VERSION`、`LKanvasChart.VERSION`、app-sample versionName、consumer 示例依赖与之一致，不一致即构建失败。
+- **版本单一来源**：`gradle.properties` 的 `lkanvas.version` 与 `lkanvas.groupId`（Maven Central 已验证命名空间；
+  JitPack 经 `-Plkanvas.groupId=` 命令行覆盖为 `com.github.IAmKings.LKanvas`）；`verifyLibraryVersions` 守护任务挂
+  `publish*` 全族，校验 `LKanvas.VERSION`、`LKanvasChart.VERSION`、app-sample versionName、consumer 示例依赖与
+  版本一致，不一致即构建失败。
 - **凭据**：只放 `local.properties`（gitignored）或环境变量，**严禁写入会提交的 gradle.properties**：
   - Central Portal User Token：`central.username` / `central.password`
   - GPG：`signing.keyId` / `signing.password` / `signing.secretKeyRingFile`

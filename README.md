@@ -12,11 +12,11 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 
 > 内测期 API 与坐标可能随 rc 版本调整；遇到问题请提 [issue](https://github.com/IAmKings/LKanvas/issues)（附环境与 `LKanvasChart.version()`）。三个发布渠道并存，任选其一；**Maven Central 为主渠道**（测试者零配置）。
 
-**Maven Central（推荐）**——无需额外仓库：
+**Maven Central（推荐）**——无需额外仓库（groupId 为 Central 已验证命名空间 `io.github.iamkings`）：
 
 ```kotlin
 dependencies {
-    implementation("io.lkanvas:lkanvas-compose:0.16.0-beta01") // AAR，自动传递 lkanvas-core
+    implementation("io.github.iamkings:lkanvas-compose:0.16.0-beta01") // AAR，自动传递 lkanvas-core
 }
 ```
 
@@ -44,7 +44,7 @@ repositories {
         }
     }
 }
-// 依赖坐标同 Maven Central：io.lkanvas:lkanvas-compose:0.16.0-beta01
+// 依赖坐标同 Maven Central：io.github.iamkings:lkanvas-compose:0.16.0-beta01
 ```
 
 - 要求：minSdk 23、JVM 17 字节码；Compose 集成（验证组合：BOM 2026.06.01 + Kotlin 2.4.x）。

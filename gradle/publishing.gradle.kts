@@ -17,11 +17,16 @@ val lkanvasVersion: String = run {
     raw
 }
 
-// groupId 可覆盖：JitPack 强制 com.github.User.Repo 坐标，经 -Plkanvas.groupId=... 重映射
-// （jitpack.yml install 命令传入）；默认保持 Maven Central 的 io.lkanvas
-val lkanvasGroup: String =
-    (project.findProperty("lkanvas.groupId") as String?)?.trim()?.takeIf { it.isNotEmpty() }
-        ?: "io.lkanvas"
+// groupId 单一来源（gradle.properties lkanvas.groupId）：缺失即失败（同版本契约）。
+// JitPack 强制 com.github.User.Repo 坐标，经 -Plkanvas.groupId=... 在命令行覆盖
+// （jitpack.yml install 命令传入；-P 优先级高于 gradle.properties）
+val lkanvasGroup: String = run {
+    val raw = (project.findProperty("lkanvas.groupId") as String?)?.trim().orEmpty()
+    if (raw.isEmpty()) {
+        error("gradle.properties 缺少 lkanvas.groupId（Maven Central 已验证命名空间，发布契约必填）")
+    }
+    raw
+}
 
 // 凭据解析：-P/gradle.properties → local.properties（gitignored）→ 环境变量
 fun resolvedCredential(key: String): String? {
