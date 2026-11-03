@@ -37,8 +37,10 @@ jobs:
       - name: Rename APK by lkanvas.version
         run: |
           VERSION="$(grep '^lkanvas.version=' gradle.properties | cut -d= -f2- | tr -d '[:space:]')"
+          APK_SOURCE="$(ls app-sample/build/outputs/apk/release/*.apk | head -1)"
+          echo "APK source: ${APK_SOURCE}"
           mkdir -p dist
-          cp app-sample/build/outputs/apk/release/app-release.apk "dist/LKanvas-sample-${VERSION}.apk"
+          cp "$APK_SOURCE" "dist/LKanvas-sample-${VERSION}.apk"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
       - name: Upload workflow artifact
