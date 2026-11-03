@@ -65,4 +65,7 @@ PJZ110 对应项短测通过；双机最终双次矩阵、真机 heap/B06 尾项
 
 - 全量单测（core+compose）、`:lkanvas-compose:assembleRelease`、本地 publish `0.16.0-beta01`（制品/签名/伴随件齐备）、
   A-46 独立 consumer 仅凭制品编译——数据见 [compatibility.md 变更记录 2026-11-04 行](../compatibility.md)。
+- **JitPack 通道已验证（2026-11-04）**：tag `0.16.0-beta01`（commit `51c6b12`）现场构建 `status: ok`（JDK 17，
+  两模块出件）；`com.github.IAmKings.LKanvas:lkanvas-compose:0.16.0-beta01` POM 可解析（坐标/Apache-2.0/描述正确），
+  AAR 与本地制品 SHA256 一致（`cbfca082…`，666977 字节，字节级相同）。
 - 远端验证（仅 `mavenCentral()` 的干净 consumer 解析 `0.16.0-beta01` 编译）在 Portal 发布上线后补记至 compatibility.md。
