@@ -114,7 +114,11 @@ chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE) { }
 
 ## 示例应用
 
-`app-sample` 是行情试用工作台（本地模拟行情，不联网）：深浅主题、`1m ~ 1d` 周期切换、27 指标、画线工具、图型/轴切换、PNG 与诊断导出。构建运行：
+`app-sample` 是行情试用工作台（本地模拟行情，不联网）：深浅主题、`1m ~ 1d` 周期切换、27 指标、画线工具、图型/轴切换、PNG 与诊断导出。
+
+**免构建试用**：从 [Releases](https://github.com/IAmKings/LKanvas/releases) 下载 `LKanvas-sample-<version>.apk`（R8 release 构建、debug 签名，允许「安装未知来源应用」后直接侧载；每次推 `v*` tag 由 CI 自动构建发布）。
+
+本地构建运行：
 
 ```bash
 ./gradlew :app-sample:installDebug
