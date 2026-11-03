@@ -1,9 +1,63 @@
-// 发布约定：本地 Maven 仓库（build/maven-repo），POM 元数据与 sources 伴随件
-// （PRD R-16/T-32：发布制品含源码包与 API 文档基础；A-46 独立 consumer 验证输入）
+// 发布约定：本地 Maven 仓库（build/maven-repo）+ Maven Central Portal 上传配套，
+// POM 元数据与 sources/javadoc 伴随件、GPG 签名（凭据在位时自动启用）。
+// （PRD R-16/T-32：发布制品含源码包与 API 文档基础；A-46 独立 consumer 验证输入；
+// 2026-11-04 远程发布 GO 决策：docs/alignment/release-decision-go-2026-11-04.zh-CN.md）
 
 apply(plugin = "maven-publish")
+apply(plugin = "signing")
 
 val isAndroid = project.plugins.hasPlugin("com.android.library")
+
+// 版本单一来源（gradle.properties lkanvas.version）：缺失即失败，杜绝硬编码漂移
+val lkanvasVersion: String = run {
+    val raw = (project.findProperty("lkanvas.version") as String?)?.trim().orEmpty()
+    if (raw.isEmpty()) {
+        error("gradle.properties 缺少 lkanvas.version（版本单一来源，发布契约必填）")
+    }
+    raw
+}
+
+// 凭据解析：-P/gradle.properties → local.properties（gitignored）→ 环境变量
+fun resolvedCredential(key: String): String? {
+    (project.findProperty(key) as String?)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    val localProps = java.util.Properties()
+    val localFile = rootProject.file("local.properties")
+    if (localFile.isFile) {
+        localFile.inputStream().use { localProps.load(it) }
+    }
+    localProps.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    return System.getenv(key.uppercase().replace('.', '_'))?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+val javadocJar = tasks.register<Jar>("javadocJar") {
+    group = "build"
+    description = "Javadoc 伴随件 stub（Central 必需；dokka 正式文档后续补）"
+    archiveClassifier.set("javadoc")
+    from(rootProject.layout.projectDirectory.file("gradle/javadoc-stub.html"))
+}
+
+val verifyLibraryVersions = tasks.register("verifyLibraryVersions") {
+    group = "verification"
+    description = "版本守护：代码/示例中的版本标识必须与 lkanvas.version 一致"
+    doLast {
+        val expected = lkanvasVersion
+        val guardFiles = listOf(
+            "lkanvas-core/src/main/kotlin/io/lkanvas/core/LKanvas.kt",
+            "lkanvas-compose/src/main/kotlin/io/lkanvas/chart/LKanvasChart.kt",
+            "app-sample/build.gradle.kts",
+            "tools/consumer-example/consumer/build.gradle.kts",
+        )
+        val mismatches = guardFiles
+            .map { rootProject.file(it) }
+            .filter { it.isFile && !it.readText().contains(expected) }
+        if (mismatches.isNotEmpty()) {
+            error(
+                "版本不一致：以下文件未包含 lkanvas.version=$expected —— " +
+                    mismatches.joinToString { it.relativeTo(rootProject.projectDir).path },
+            )
+        }
+    }
+}
 
 configure<org.gradle.api.publish.PublishingExtension> {
     repositories {
@@ -19,7 +73,7 @@ configure<org.gradle.api.publish.PublishingExtension> {
             create<MavenPublication>("lkanvas") {
                 groupId = "io.lkanvas"
                 artifactId = "lkanvas-compose"
-                version = "0.16.0"
+                version = lkanvasVersion
                 afterEvaluate {
                     from(components["release"])
                 }
@@ -29,7 +83,7 @@ configure<org.gradle.api.publish.PublishingExtension> {
             create<MavenPublication>("lkanvas") {
                 groupId = "io.lkanvas"
                 artifactId = "lkanvas-core"
-                version = "0.16.0"
+                version = lkanvasVersion
                 from(components["java"])
                 pomConfig(this)
             }
@@ -37,23 +91,47 @@ configure<org.gradle.api.publish.PublishingExtension> {
     }
 }
 
-// Java 源码/文档伴随件（仅 JVM 模块；Android 的 sources 由 AGP 组件携带）
-if (!isAndroid) {
-    val sourcesJar = tasks.register<Jar>("sourcesJar") {
-        archiveClassifier.set("sources")
-        // 惰性解析：任务配置执行时 java 插件已应用
-        from(
-            project.extensions.getByType(org.gradle.api.tasks.SourceSetContainer::class.java)
-                .getByName("main").allSource,
-        )
-    }
-    configure<org.gradle.api.publish.PublishingExtension> {
-        publications {
-            named<MavenPublication>("lkanvas") {
+// 伴随件：非 Android 模块的 sources 由本脚本生成（Android 的 sources 由 AGP 组件携带）；
+// javadoc stub 两个模块都必须有（Central 校验必需伴随件）。
+configure<org.gradle.api.publish.PublishingExtension> {
+    publications {
+        named<MavenPublication>("lkanvas") {
+            if (!isAndroid) {
+                val sourcesJar = tasks.register<Jar>("sourcesJar") {
+                    archiveClassifier.set("sources")
+                    // 惰性解析：任务配置执行时 java 插件已应用
+                    from(
+                        project.extensions.getByType(org.gradle.api.tasks.SourceSetContainer::class.java)
+                            .getByName("main").allSource,
+                    )
+                }
                 artifact(sourcesJar)
             }
+            artifact(javadocJar)
         }
     }
+}
+
+// GPG 签名（Maven Central 必需）：凭据齐备时自动启用，缺省静默跳过（本地发布不强制）
+val signingKeyId = resolvedCredential("signing.keyId")
+val signingPassword = resolvedCredential("signing.password")
+val signingKeyRing = resolvedCredential("signing.secretKeyRingFile")
+if (signingKeyId != null && signingPassword != null && signingKeyRing != null) {
+    configure<org.gradle.plugins.signing.SigningExtension> {
+        val publications = project.extensions.getByType(org.gradle.api.publish.PublishingExtension::class.java)
+            .publications
+        if (publications.isNotEmpty()) {
+            sign(*publications.toTypedArray())
+            setRequired(true)
+        }
+    }
+} else {
+    logger.lifecycle("publishing: signing 凭据缺失（local.properties 的 signing.*），跳过 GPG 签名——仅限本地发布")
+}
+
+// 发布前版本守护（publish* 全族：本地/远端、聚合/单任务）
+tasks.matching { it.name.startsWith("publish") }.configureEach {
+    dependsOn(verifyLibraryVersions)
 }
 
 fun pomConfig(publication: MavenPublication) {
@@ -63,6 +141,7 @@ fun pomConfig(publication: MavenPublication) {
             if (isAndroid) "Jetpack Compose K 线图组件（LKanvas）——KLineChart 的 Kotlin/Compose 原生实现"
             else "LKanvas 领域核心：数据模型、指标引擎、坐标与覆盖物（KLineChart 的 Kotlin 原生移植）",
         )
+        url.set("https://github.com/IAmKings/LKanvas")
         licenses {
             license {
                 name.set("The Apache License, Version 2.0")

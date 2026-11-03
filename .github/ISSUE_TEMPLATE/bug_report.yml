@@ -1,0 +1,66 @@
+name: 缺陷反馈
+description: LKanvas 库或 sample 的缺陷报告（内测期主要反馈入口）
+labels: ["bug", "beta-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢参与内测。请先确认使用的是最新内测版本（`LKanvasChart.version()`）；
+        上游 KLineChart 行为差异请改用「上游兼容性反馈」模板。
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 缺陷范围
+      options:
+        - lkanvas-compose（图表组件/手势/渲染）
+        - lkanvas-core（指标/覆盖物/数据链路）
+        - app-sample（示例应用）
+        - 构建/依赖/制品问题
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: LKanvas 版本
+      description: `LKanvasChart.version()` 的返回值，例如 0.16.0-beta01
+      placeholder: "0.16.0-beta01"
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境信息
+      description: 设备/模拟器型号、Android 版本、AGP/Kotlin/Compose 版本、是否开启 R8 minify
+      placeholder: |
+        - 设备：Pixel 8 / Android 15
+        - AGP 8.13.2 / Kotlin 2.4.21 / Compose BOM 2026.06.01
+        - minify: 开/关
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 逐条描述从打开应用到出现问题的操作序列；附最小复现代码更好
+      placeholder: |
+        1. 创建图表并 …
+        2. 手指 …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为与实际行为
+      description: 预期发生什么、实际发生什么（若与上游 KLineChart 行为不一致，注明上游版本）
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 截图 / 录屏 / 日志
+      description: 有则必附；崩溃请贴完整 stacktrace
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充说明
+      description: 出现频率（必现/偶现）、是否影响主流程、其他上下文

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 上游 KLineChart 文档
+    url: https://klinecharts.com/
+    about: 上游 API 文档——确认行为差异前建议先对照上游同名 API 的预期表现

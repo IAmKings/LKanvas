@@ -1,12 +1,30 @@
 # LKanvas
 
-> 当前本地修复版本为 **0.16.0**：短按/长按十字线保持、右拖历史、轴留白与图例可读性见[验证记录](docs/alignment/0.16.0-interaction-visual-alignment.md)；sample 周期已改为[同一基础行情的 OHLCV 聚合](docs/alignment/0.16.0-period-switch-fix.md)。[其他模块审计中的 8 项差异](docs/alignment/0.16.0-other-module-audit.md)已修复并完成针对性验证。0.15.0 保持冻结；远程发布仍为 **HOLD**，本轮不替代[既有双机性能、heap/B06/真人 TalkBack 验收](docs/alignment/release-readiness-round7-execution-2026-11-02.zh-CN.md)。
+> 当前版本 **0.16.0-beta01（内测）**：短按/长按十字线保持、右拖历史、轴留白与图例可读性见[验证记录](docs/alignment/0.16.0-interaction-visual-alignment.md)；sample 周期已改为[同一基础行情的 OHLCV 聚合](docs/alignment/0.16.0-period-switch-fix.md)。[其他模块审计中的 8 项差异](docs/alignment/0.16.0-other-module-audit.md)已修复并完成针对性验证。**远程发布 HOLD 已解除（[GO 决策](docs/alignment/release-decision-go-2026-11-04.zh-CN.md)）**，制品经 Maven Central 开启内测；K60U 两项帧指标缺口转为技术债，[双机性能、heap/B06/真人 TalkBack 的完整验收](docs/alignment/release-readiness-round7-execution-2026-11-02.zh-CN.md)随性能优化轮补齐。
 
 KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 [KLineChart](https://github.com/klinecharts/KLineChart)（v10.1.0）的领域能力——指标、覆盖物、坐标轴、
 数据接入模型——移植为纯 Kotlin 计算核心 + Compose 原生绘制的图表库。
 
 > 本项目为独立维护的社区移植，不是 KLineChart 官方 Android 版本。
+
+## 内测接入（Maven Central）
+
+> 内测期 API 与坐标可能随 rc 版本调整；遇到问题请提 [issue](https://github.com/IAmKings/LKanvas/issues)（附环境与 `LKanvasChart.version()`）。
+
+```kotlin
+// 无需额外仓库——Maven Central 在默认仓库内
+dependencies {
+    implementation("io.lkanvas:lkanvas-compose:0.16.0-beta01") // AAR，自动传递 lkanvas-core
+}
+```
+
+- 要求：minSdk 23、JVM 17 字节码；Compose 集成（验证组合：BOM 2026.06.01 + Kotlin 2.4.x）。
+- R8 注意：AAR 含 Kotlin 2.4 元数据，宿主开 minify 时建议 AGP ≥ 8.13.20，旧 AGP 参考本项目
+  `settings.gradle.kts` 的 R8 9.1.29 注入方式。
+- 门面用法（与上游 KLineChart 同名同语义）：见下方迁移章节。
+- 内测范围与已知缺口：[发布 GO 决策](docs/alignment/release-decision-go-2026-11-04.zh-CN.md)。
+- 反馈渠道：GitHub Issues，模板见 `.github/ISSUE_TEMPLATE/`（缺陷反馈 / 上游兼容性反馈）。
 
 ## 模块
 
@@ -98,7 +116,6 @@ chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE) { }
 - 迁移章节完整版随 0.2.0 发布（本文上方示例 + parity 用例即最小迁移面；多轴/事件回调族细节见 gap-matrix）
 
 ## 上游基线
-## 上游基线
 
 - 上游版本：KLineChart **v10.1.0**（快照见 `third_party/klinechart-v10.1.0/`，仅用于开发期 TS 对照 oracle，不进入发布制品）。
 - 功能对齐范围、差异登记与验收口径见 [PRD](docs/PRD-KLineChart-Kotlin-Compose.zh-CN.md) 与
@@ -109,6 +126,8 @@ chart.subscribeAction(ActionType.ON_CROSSHAIR_CHANGE) { }
 ```bash
 ./gradlew :lkanvas-core:test          # 纯 JVM 测试（数据/指标/坐标）
 ./gradlew :app-sample:assembleDebug   # 构建示例应用
+./gradlew publish                     # 本地 Maven 制品 → build/maven-repo（signing.* 凭据在位时含 .asc）
+tools/publish-central.sh              # 上传 Maven Central（运维约定见发布 GO 决策文档）
 ```
 
 要求：JDK 21、Android SDK（compileSdk 36，minSdk 23）。

@@ -1,5 +1,7 @@
 # 性能基线（P1 性能线：Macrobenchmark 骨架与门槛冻结）
 
+> **发布决策更新（2026-11-04）**：远程发布 HOLD 解除（**GO**，内测 `0.16.0-beta01` 经 Maven Central 发布）。K60U S0 实时帧 CPU P95 19.2584ms / S0 正overrun 10.9053% / S2 正overrun 12.5% 未达标项转技术债跟踪，随「更严苛性能优化轮」收敛后重下门槛结论；本节及 §4.z 系列历史数据与结论**保留原意不改写**。见[发布 GO 决策](alignment/release-decision-go-2026-11-04.zh-CN.md)。
+
 > **当前验收（2026-11-02，设备/发布第七轮双机续验）**：0.15.0 保持冻结，候选为 0.15.1-rc5（APK `8c5895b3…`）。当前同包K60U实时帧CPU P95 19.2584ms / 正overrun 10.9053%，压力正overrun 12.5%，仍失败；PJZ110对应两项各一次短测通过。双机字体、API23模拟器冒烟、JVM417与本地制品链通过。最终双次矩阵、heap/B06/真人TalkBack尚未完成，发布仍 **HOLD**。见 §4.z7 与[第七轮执行报告 §7–8](alignment/release-readiness-round7-execution-2026-11-02.zh-CN.md)。旧APK数值不替代当前认证。
 
 > 执行安排：[第七轮发布放行任务计划](alignment/release-readiness-round7-plan-2026-11-02.zh-CN.md)。新发布档已在观察结果前锁定为 [R2-60-v1](release-acceptance-r2-60.md)；原 D1 冻结值与历史 HOLD 保留。

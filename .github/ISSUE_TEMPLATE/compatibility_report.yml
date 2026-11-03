@@ -1,0 +1,52 @@
+name: 上游兼容性反馈
+description: 与上游 KLineChart（v10.1.0 基线）行为不一致的报告
+labels: ["compatibility", "beta-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本项目以上游 [KLineChart v10.1.0](https://github.com/klinecharts/KLineChart) 为对照基线，
+        已知有意差异登记于 `docs/compatibility.md`；提交前可先检索该文档与既有 issue。
+  - type: input
+    id: version
+    attributes:
+      label: LKanvas 版本
+      description: `LKanvasChart.version()` 的返回值
+      placeholder: "0.16.0-beta01"
+    validations:
+      required: true
+  - type: input
+    id: upstream-version
+    attributes:
+      label: 对照的上游版本
+      description: 上游 KLineChart 版本号（默认 v10.1.0）
+      placeholder: "v10.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: 涉及的 API / 指标 / 覆盖物
+      description: 同名入口（如 createIndicator / createOverlay / 某指标名）或渲染行为
+      placeholder: "例如：createOverlay('fibonacciLine') 的价格空间投影"
+    validations:
+      required: true
+  - type: textarea
+    id: upstream-behavior
+    attributes:
+      label: 上游行为
+      description: 上游 KLineChart（网页 demo 或宿主项目）的实际表现，附操作步骤
+    validations:
+      required: true
+  - type: textarea
+    id: lkanvas-behavior
+    attributes:
+      label: LKanvas 行为
+      description: 本项目的实际表现；有截图/录屏/数据请附上
+    validations:
+      required: true
+  - type: textarea
+    id: repro-data
+    attributes:
+      label: 复现数据
+      description: 尽量给出可复现的 K 线数据或参数（指标参数、styles、数据片段）

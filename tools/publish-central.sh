@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# Maven Central Publisher Portal 上传（发布运维）。
+# 决策依据与凭据约定见 docs/alignment/release-decision-go-2026-11-04.zh-CN.md。
+#
+# 用法:
+#   tools/publish-central.sh [version] [publishingType]
+#     version          默认取 gradle.properties 的 lkanvas.version（版本单一来源）
+#     publishingType   USER_MANAGED（默认：Portal 网页点击 Publish 确认）
+#                      | AUTOMATIC（校验通过后自动发布）
+#
+# 前置:
+#   1. ./gradlew publish 已把目标版本发到 build/maven-repo（含 .asc 签名伴随件）
+#   2. Central Portal（central.sonatype.com）命名空间 io.lkanvas 已完成 DNS 验证
+#   3. 凭据写入 local.properties（gitignored，严禁提交 gradle.properties）:
+#        central.username=<Portal User Token 的 username>
+#        central.password=<Portal User Token 的 token>
+#
+# 安全约定: 凭据不回显、不落日志；中间产物放 mktemp 目录，退出自动清理。
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+VERSION_ARG="${1:-}"
+PUBLISHING_TYPE="${2:-USER_MANAGED}"
+
+if [[ -z "$VERSION_ARG" ]]; then
+  VERSION_ARG="$(grep '^lkanvas.version=' gradle.properties | head -1 | cut -d= -f2- | tr -d '[:space:]')"
+fi
+if [[ -z "$VERSION_ARG" ]]; then
+  echo "错误: 无法确定版本（传参或检查 gradle.properties 的 lkanvas.version）" >&2
+  exit 1
+fi
+case "$PUBLISHING_TYPE" in
+  USER_MANAGED|AUTOMATIC) ;;
+  *) echo "错误: publishingType 只能是 USER_MANAGED 或 AUTOMATIC，收到 '$PUBLISHING_TYPE'" >&2; exit 1 ;;
+esac
+
+read_cred() {
+  local key="$1" value=""
+  if [[ -f local.properties ]]; then
+    value="$(grep "^${key}=" local.properties | head -1 | cut -d= -f2- | tr -d '\r')"
+  fi
+  if [[ -z "$value" ]]; then
+    # 与 publishing.gradle.kts 的环境变量回退同形：CENTRAL_USERNAME / CENTRAL_PASSWORD
+    local env_key
+    env_key="$(printf '%s' "$key" | tr '[:lower:].' '[:upper:]_')"
+    value="${!env_key:-}"
+  fi
+  printf '%s' "$value"
+}
+
+CENTRAL_USERNAME="$(read_cred central.username)"
+CENTRAL_PASSWORD="$(read_cred central.password)"
+if [[ -z "$CENTRAL_USERNAME" || -z "$CENTRAL_PASSWORD" ]]; then
+  echo "错误: 缺少凭据——在 local.properties 配置 central.username / central.password（Central Portal User Token）" >&2
+  exit 1
+fi
+
+# 目标版本目录必须齐全（仅上传目标版本，历史版本目录不带入 bundle）
+STAGING="$(mktemp -d)"
+trap 'rm -rf "$STAGING"' EXIT
+mkdir -p "$STAGING/io/lkanvas"
+for artifact in lkanvas-core lkanvas-compose; do
+  dir="build/maven-repo/io/lkanvas/${artifact}/${VERSION_ARG}"
+  if [[ ! -d "$dir" ]]; then
+    echo "错误: 缺少 $dir —— 先执行 ./gradlew publish 生成制品" >&2
+    exit 1
+  fi
+  if ! ls "$dir"/*.asc >/dev/null 2>&1; then
+    echo "错误: $dir 无 .asc 签名伴随件——Central 校验必失败。" >&2
+    echo "       检查 local.properties 的 signing.keyId/password/secretKeyRingFile 后重跑 ./gradlew publish" >&2
+    exit 1
+  fi
+  mkdir -p "$STAGING/io/lkanvas/$artifact"
+  cp -R "$dir" "$STAGING/io/lkanvas/$artifact/"
+done
+
+(cd "$STAGING" && zip -qr bundle.zip io)
+BUNDLE_SIZE="$(du -h "$STAGING/bundle.zip" | cut -f1 | tr -d ' ')"
+echo "上传 0.16.0 系列版本: $VERSION_ARG（publishingType=$PUBLISHING_TYPE，bundle=$BUNDLE_SIZE）"
+
+# Portal API：Bearer = base64(username:token)
+BASIC_TOKEN="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | openssl base64 -A)"
+UPLOAD_URL="https://central.sonatype.com/api/v1/publisher/upload?publishingType=${PUBLISHING_TYPE}"
+RESPONSE="$(curl -sS -X POST "$UPLOAD_URL" \
+  -H "Authorization: Bearer ${BASIC_TOKEN}" \
+  -H "Accept: application/json" \
+  -F "bundle=@${STAGING}/bundle.zip;type=application/zip")"
+
+DEPLOYMENT_ID="$RESPONSE"
+if [[ ! "$DEPLOYMENT_ID" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+  echo "错误: 上传未返回 deployment id（Portal 拒绝，响应如下）" >&2
+  echo "$RESPONSE" >&2
+  exit 1
+fi
+echo "已受理: deploymentId=$DEPLOYMENT_ID"
+
+STATUS_URL="https://central.sonatype.com/api/v1/publisher/status?id=${DEPLOYMENT_ID}"
+LAST_STATE=""
+MAX_POLLS=160   # 15s × 160 ≈ 40 分钟
+for _ in $(seq 1 "$MAX_POLLS"); do
+  sleep 15
+  STATUS_JSON="$(curl -sS "$STATUS_URL" -H "Authorization: Bearer ${BASIC_TOKEN}" -H "Accept: application/json")"
+  STATE="$(printf '%s' "$STATUS_JSON" | sed -n 's/.*"deploymentState":"\([^"]*\)".*/\1/p')"
+  [[ "$STATE" == "$LAST_STATE" ]] && continue
+  case "$STATE" in
+    PENDING_VALIDATION|VALIDATING)
+      echo "[$(date +%H:%M:%S)] Portal 校验中…"
+      ;;
+    VALIDATED)
+      echo "[$(date +%H:%M:%S)] 校验通过，进入发布队列"
+      ;;
+    WAITING_FOR_USER)
+      echo "[$(date +%H:%M:%S)] 等待人工确认: 打开 https://central.sonatype.com → View Deployments → 对该次上传点击 Publish"
+      ;;
+    PUBLISHING)
+      echo "[$(date +%H:%M:%S)] 正式发布中…"
+      ;;
+    PUBLISHED)
+      echo "✅ 已发布: io.lkanvas:lkanvas-core / io.lkanvas:lkanvas-compose : $VERSION_ARG"
+      echo "   Central 检索: https://central.sonatype.com/artifact/io.lkanvas/lkanvas-compose/$VERSION_ARG"
+      exit 0
+      ;;
+    FAILED)
+      echo "❌ 校验/发布失败，Portal 响应:" >&2
+      echo "$STATUS_JSON" >&2
+      echo "   明细见 https://central.sonatype.com → View Deployments" >&2
+      exit 1
+      ;;
+    "")
+      echo "[$(date +%H:%M:%S)] 状态暂不可读，继续轮询…（原始响应: $STATUS_JSON）"
+      ;;
+    *)
+      echo "[$(date +%H:%M:%S)] 状态: $STATE"
+      ;;
+  esac
+  LAST_STATE="$STATE"
+done
+
+echo "错误: 轮询超时（约 40 分钟），请到 Portal View Deployments 页面人工跟进 deploymentId=$DEPLOYMENT_ID" >&2
+exit 1
