@@ -70,4 +70,7 @@ PJZ110 对应项短测通过；双机最终双次矩阵、真机 heap/B06 尾项
 - **JitPack 通道已验证（2026-11-04）**：tag `0.16.0-beta01`（commit `51c6b12`）现场构建 `status: ok`（JDK 17，
   两模块出件）；`com.github.IAmKings.LKanvas:lkanvas-compose:0.16.0-beta01` POM 可解析（坐标/Apache-2.0/描述正确），
   AAR 与本地制品 SHA256 一致（`cbfca082…`，666977 字节，字节级相同）。
-- 远端验证（仅 `mavenCentral()` 的干净 consumer 解析 `0.16.0-beta01` 编译）在 Portal 发布上线后补记至 compatibility.md。
+- **远端验证已通过（2026-11-04）**：Portal PUBLISHED（deploymentId `67282b27`，USER_MANAGED）后，仅公共仓库
+  （无本地仓库引用）+ `--refresh-dependencies` 的临时 consumer 全量解析并编译通过（1m37s）；aliyun / 华为镜像对
+  `io.github.iamkings:lkanvas-core|lkanvas-compose:0.16.0-beta01` 全 200。口径说明：`repo1.maven.org` 直连 403 经
+  junit 老制品控制组证实为本出口被 CDN 拒（非制品问题）；`repo.maven.apache.org` 规范直连核验可后续经 CI 出口补记。
