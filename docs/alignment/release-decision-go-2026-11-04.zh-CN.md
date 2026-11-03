@@ -63,6 +63,28 @@ PJZ110 对应项短测通过；双机最终双次矩阵、真机 heap/B06 尾项
 - **伴随件**：core JAR / compose AAR + sources + javadoc stub（`gradle/javadoc-stub.html`；dokka 正式文档后续补）+
   POM（url/license/scm/developer 齐备）+ Gradle `.module` + `.asc` 签名（JitPack 通道无签名，由其平台分发）。
 
+## 4.1 发版操作清单（自动化边界，2026-11-04 维护者决策）
+
+| 产物 | 方式 | 触发 |
+|---|---|---|
+| Release APK | **自动**（`release-apk` workflow） | 推 `v<version>` tag |
+| JitPack | **自动**（首次请求现场懒构建） | 推 `<version>`（无 v 前缀）tag，版本号=tag 名 |
+| Maven Central | **手动**（决策：凭据不出本机 + 保留 Portal 人工闸门，不接入 CI） | 本机三步，见下 |
+
+每次发版序列（两个 tag 指向同一提交）：
+
+```bash
+# 1. 推 tag → APK 自动挂 GitHub Release
+git tag -a "v${VERSION}" -m "..." && git tag -a "${VERSION}" -m "..."
+git push origin main "v${VERSION}" "${VERSION}"
+
+# 2~3. Maven Central（本机，凭据在 local.properties）
+./gradlew publish          # 签名制品 → build/maven-repo
+tools/publish-central.sh   # 上传 Portal → 网页 View Deployments 点 Publish
+```
+
+发版后收尾（可交由 agent）：远端解析验证、compatibility.md 台账补记。
+
 ## 5. 验收证据（本决策落地的链路验证）
 
 - 全量单测（core+compose）、`:lkanvas-compose:assembleRelease`、本地 publish `0.16.0-beta01`（制品/签名/伴随件齐备）、
