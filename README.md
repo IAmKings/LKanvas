@@ -8,15 +8,43 @@ KLineChart 的 Android / Jetpack Compose 原生实现。目标是把上游
 
 > 本项目为独立维护的社区移植，不是 KLineChart 官方 Android 版本。
 
-## 内测接入（Maven Central）
+## 内测接入
 
-> 内测期 API 与坐标可能随 rc 版本调整；遇到问题请提 [issue](https://github.com/IAmKings/LKanvas/issues)（附环境与 `LKanvasChart.version()`）。
+> 内测期 API 与坐标可能随 rc 版本调整；遇到问题请提 [issue](https://github.com/IAmKings/LKanvas/issues)（附环境与 `LKanvasChart.version()`）。三个发布渠道并存，任选其一；**Maven Central 为主渠道**（测试者零配置）。
+
+**Maven Central（推荐）**——无需额外仓库：
 
 ```kotlin
-// 无需额外仓库——Maven Central 在默认仓库内
 dependencies {
     implementation("io.lkanvas:lkanvas-compose:0.16.0-beta01") // AAR，自动传递 lkanvas-core
 }
+```
+
+**JitPack（备用）**——零凭据备份通道：
+
+```kotlin
+// settings.gradle.kts
+repositories { maven("https://jitpack.io") }
+// build.gradle.kts
+dependencies {
+    implementation("com.github.IAmKings.LKanvas:lkanvas-compose:0.16.0-beta01")
+}
+```
+
+**GitHub Packages（封闭内测）**——需 PAT（`read:packages`）：
+
+```kotlin
+// settings.gradle.kts
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/IAmKings/LKanvas")
+        credentials {
+            username = "<GitHub 用户名>"
+            password = "<read:packages PAT>"
+        }
+    }
+}
+// 依赖坐标同 Maven Central：io.lkanvas:lkanvas-compose:0.16.0-beta01
 ```
 
 - 要求：minSdk 23、JVM 17 字节码；Compose 集成（验证组合：BOM 2026.06.01 + Kotlin 2.4.x）。

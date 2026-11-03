@@ -1,0 +1,16 @@
+# JitPack 备用发布通道：坐标 com.github.IAmKings.LKanvas:<module>:<tag>
+# （与 Maven Central 主渠道 io.lkanvas 并存；发布渠道说明见
+#   docs/alignment/release-decision-go-2026-11-04.zh-CN.md §4）
+# 状态检查：https://jitpack.io/com/github/IAmKings/LKanvas/lkanvas-compose/<tag>/build.log
+jdk:
+  - openjdk17
+before_install:
+  # 预写 Android SDK license（JitPack 构建机未预接受时 AGP 无法下载 platform/build-tools）
+  - mkdir -p "$ANDROID_HOME/licenses"
+  - echo "8933bad161af4178b1185d1a37fbf41ea5269c55"  > "$ANDROID_HOME/licenses/android-sdk-license"
+  - echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license"
+  - echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> "$ANDROID_HOME/licenses/android-sdk-license"
+install:
+  # JitPack 版本号=tag 名：tag 必须与 lkanvas.version 完全一致（无 v 前缀），
+  # 否则发布制品版本与请求版本错位；groupId 重映射为 JitPack 强制坐标
+  - ./gradlew publishToMavenLocal -Plkanvas.groupId=com.github.IAmKings.LKanvas

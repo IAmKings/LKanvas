@@ -17,6 +17,12 @@ val lkanvasVersion: String = run {
     raw
 }
 
+// groupId 可覆盖：JitPack 强制 com.github.User.Repo 坐标，经 -Plkanvas.groupId=... 重映射
+// （jitpack.yml install 命令传入）；默认保持 Maven Central 的 io.lkanvas
+val lkanvasGroup: String =
+    (project.findProperty("lkanvas.groupId") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: "io.lkanvas"
+
 // 凭据解析：-P/gradle.properties → local.properties（gitignored）→ 环境变量
 fun resolvedCredential(key: String): String? {
     (project.findProperty(key) as String?)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -65,13 +71,28 @@ configure<org.gradle.api.publish.PublishingExtension> {
             name = "LocalRepo"
             url = uri(rootProject.layout.buildDirectory.dir("maven-repo"))
         }
+        // GitHub Packages（封闭内测渠道）：gpr.user/gpr.key 凭据齐备时注册；
+        // 聚合 publish 会同时推 LocalRepo 与此仓库——同版本重复推送不可变，请用
+        // publishAllPublicationsToGitHubPackagesRepository 定向推送
+        val gprUser = resolvedCredential("gpr.user")
+        val gprKey = resolvedCredential("gpr.key")
+        if (gprUser != null && gprKey != null) {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/IAmKings/LKanvas")
+                credentials {
+                    username = gprUser
+                    password = gprKey
+                }
+            }
+        }
     }
 
     publications {
         if (isAndroid) {
             // lkanvas-compose AAR：Android 库组件由 AGP 创建（release）
             create<MavenPublication>("lkanvas") {
-                groupId = "io.lkanvas"
+                groupId = lkanvasGroup
                 artifactId = "lkanvas-compose"
                 version = lkanvasVersion
                 afterEvaluate {
@@ -81,7 +102,7 @@ configure<org.gradle.api.publish.PublishingExtension> {
             }
         } else {
             create<MavenPublication>("lkanvas") {
-                groupId = "io.lkanvas"
+                groupId = lkanvasGroup
                 artifactId = "lkanvas-core"
                 version = lkanvasVersion
                 from(components["java"])

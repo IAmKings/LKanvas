@@ -12,7 +12,7 @@
 | 发布决策 | **GO**：解除远程发布 HOLD，制品发布至 Maven Central，开启内测 |
 | 内测版本 | `0.16.0-beta01`（pre-release 语义；后续 rc → 正式按标准路径切版） |
 | 坐标 | `io.lkanvas:lkanvas-compose` / `io.lkanvas:lkanvas-core`（groupId 保持不变） |
-| 渠道 | Maven Central Publisher Portal（central.sonatype.com），命名空间 `io.lkanvas` 经域名 DNS TXT 验证 |
+| 渠道 | **主**：Maven Central Publisher Portal（central.sonatype.com），命名空间 `io.lkanvas` 经域名 DNS TXT 验证；**备**：JitPack（`com.github.IAmKings.LKanvas` 坐标，零凭据）；**封闭内测**：GitHub Packages（`maven.pkg.github.com/IAmKings/LKanvas`，坐标保持 io.lkanvas，需 PAT 鉴权） |
 | 发布方式 | `./gradlew publish` → 本地制品（含 .asc 签名）→ `tools/publish-central.sh` 上传，默认 `USER_MANAGED`（Portal 网页点击 Publish 确认） |
 | 决策人 | 项目维护者（KingsLZ），2026-11-04 |
 
@@ -49,8 +49,17 @@ PJZ110 对应项短测通过；双机最终双次矩阵、真机 heap/B06 尾项
   - 凭据缺位时发布链路跳过签名（仅限本地制品）；`tools/publish-central.sh` 遇无 `.asc` 直接拒绝上传。
 - **上传**：`tools/publish-central.sh [version] [USER_MANAGED|AUTOMATIC]`——只打包目标版本目录（历史版本不带入），
   Bearer=base64(username:token)，状态轮询至 PUBLISHED/FAILED；首版走 USER_MANAGED 人工确认。
+- **备用渠道（与 Central 并存，互不影响）**：
+  - **JitPack**：tag 推送后 JitPack 现场构建 `publishToMavenLocal`（`jitpack.yml`：JDK 17 + SDK license 预写 +
+    `-Plkanvas.groupId=com.github.IAmKings.LKanvas` 重映射）。约定：JitPack 版本号=tag 名，**tag 必须无 v 前缀且与
+    `lkanvas.version` 完全一致**（如 `0.16.0-beta01`）；`v0.16.0-beta01` 仅作正式版本标记。状态：
+    `https://jitpack.io/com/github/IAmKings/LKanvas/lkanvas-compose/<tag>/build.log`。测试者接入见 README「内测接入」。
+  - **GitHub Packages**：publishing.gradle.kts 在 `gpr.user` / `gpr.key` 凭据齐备时注册仓库
+    （PAT 需 `write:packages`；凭据放 local.properties，严禁提交）。定向推送：
+    `./gradlew publishAllPublicationsToGitHubPackagesRepository`——同版本不可重复推送，勿用聚合 `publish`（会先推 LocalRepo）。
+    测试者需配置 `read:packages` PAT 的认证仓库后以 `io.lkanvas` 坐标拉取（接入片段见 README）。
 - **伴随件**：core JAR / compose AAR + sources + javadoc stub（`gradle/javadoc-stub.html`；dokka 正式文档后续补）+
-  POM（url/license/scm/developer 齐备）+ Gradle `.module` + `.asc` 签名。
+  POM（url/license/scm/developer 齐备）+ Gradle `.module` + `.asc` 签名（JitPack 通道无签名，由其平台分发）。
 
 ## 5. 验收证据（本决策落地的链路验证）
 
