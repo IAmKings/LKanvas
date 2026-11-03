@@ -143,7 +143,7 @@ fun SampleWorkspace(
                 } else {
                     KLineChart(
                         state, Modifier.weight(1f).fillMaxWidth(), theme = theme,
-                        config = ChartLayoutConfig(subPaneHeight = 76.dp, legendTextSize = 11.sp, axisTextSize = 11.sp),
+                        config = ChartLayoutConfig(subPaneHeight = (76 * LocalDensity.current.fontScale).dp, legendTextSize = 11.sp, axisTextSize = 11.sp),
                         styles = styles,
                         legendSlot = if (customLegend) { { data ->
                             Text(
@@ -177,7 +177,7 @@ fun SampleWorkspace(
                 } else if (!compact) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("$candleCount 根 · ${chartTypeLabel(state.mainChartType)}", fontSize = 11.sp, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("拖动浏览 · 长按查看", fontSize = 11.sp, color = colors.onSurfaceVariant, maxLines = 1)
+                        Text("点按查看 · 拖动浏览", fontSize = 11.sp, color = colors.onSurfaceVariant, maxLines = 1)
                     }
                 }
                 Row(
@@ -256,7 +256,7 @@ fun SampleWorkspace(
                                     val indicators = remember(state.viewRevision) { facade.getIndicators() }
                                     PanelCaption("真实图表能力与可复现的本地演示。数据不来自交易所。")
                                     SettingSwitch("深色主题", "页面、面板、图表与导出保持一致", dark, onChange = { onThemeChange() })
-                                    SettingSwitch("模拟行情推送", "加速演示：每秒生成一根新 K 线", !feed.paused, enabled = stress == null, onChange = { feed.paused = !it })
+                                    SettingSwitch("模拟行情推送", "加速演示：每秒推进一分钟行情", !feed.paused, enabled = stress == null, onChange = { feed.paused = !it })
                                     SettingSwitch("自定义图例", "演示宿主 legendSlot", customLegend, onChange = { customLegend = it })
                                     val bollOn = indicators.any { it.id == "sample_pane_boll" }
                                     SettingSwitch("独立 BOLL 副图", "演示动态 pane 的创建与移除", bollOn, onChange = {

@@ -35,7 +35,7 @@ class LKanvasChart private constructor(
 ) {
 
     companion object {
-        const val VERSION = "0.15.1-rc5"
+        const val VERSION = "0.16.0"
 
         /** 上游 `init(ds, options?)`：Android 无 DOM，直接构造（同一 state 重复 init 返回既有实例）。 */
         private val liveCharts = java.util.concurrent.ConcurrentHashMap<ChartState, LKanvasChart>()
@@ -133,7 +133,7 @@ class LKanvasChart private constructor(
     fun scrollToRealTime(animationDuration: Long? = null) {
         val vp = state.viewport
         val total = state.dataSnapshot.candles.size
-        val delta = (vp.maxScrollFor(total) - vp.scrollIndex) * vp.barSpacing
+        val delta = (vp.scrollIndex - vp.maxScrollFor(total)) * vp.barSpacing
         scrollByDistance(delta, animationDuration)
     }
 
@@ -145,9 +145,9 @@ class LKanvasChart private constructor(
     fun scrollToDataIndex(dataIndex: Int, animationDuration: Long? = null) {
         val vp = state.viewport
         val total = state.dataSnapshot.candles.size
-        // 目标：右锚模型落点（dataIndex 距右缘 rightOffset 处）
-        val targetScroll = dataIndex - vp.visibleCount + vp.effectiveRightSlotsFor()
-        val distance = (targetScroll - vp.scrollIndex) * vp.barSpacing
+        // 上游目标 candle 的右边缘落在内容区右边缘，距离为内容位移。
+        val targetScroll = dataIndex + 1 - vp.visibleCount
+        val distance = (vp.scrollIndex - targetScroll) * vp.barSpacing
         scrollByDistance(distance, animationDuration)
     }
 
@@ -1147,6 +1147,7 @@ class LKanvasChart private constructor(
      * - 创建额外轴不再改写 mainAxisSpec（额外轴有自己的 spec）。
      */
     private fun syncExtraAxes() {
+        state.axisGaps = yAxes.mapValues { it.value.gap }
         yAxes["main"]?.let { state.mainAxisReverse = it.reverse }
         val extras = yAxes.values.filter { it.id != "main" }
         state.extraYAxisMeta = extras.associate {

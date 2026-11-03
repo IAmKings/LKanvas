@@ -8,16 +8,24 @@ import io.lkanvas.compose.state.ChartState
 import io.lkanvas.core.common.DataLoader
 import io.lkanvas.core.data.Candle
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import kotlin.math.abs
+import kotlin.math.sin
 
-/** 固定种子的加速模拟行情；周期与分页均通过公开 DataLoader 契约。 */
+/** 同一条确定性分钟行情按 UTC 周期聚合；模拟时钟每秒推进一分钟。 */
 class LocalFeed(private val scope: CoroutineScope, private val seed: Int = 2026) : DataLoader {
     private var rand = Random(seed)
-    private var last: Candle? = null
+    private var minute = System.currentTimeMillis() / MINUTE * MINUTE
+    private var phase = TICKS_PER_MINUTE
+    private var loadJob: Job? = null
     private var pages = 0
     private var subscription: Job? = null
     var paused by mutableStateOf(false)
@@ -27,55 +35,79 @@ class LocalFeed(private val scope: CoroutineScope, private val seed: Int = 2026)
         minOf(open, close) - rand.nextDouble() * 0.5, close, volume,
     )
 
+    private fun price(timestamp: Long, salt: Long): Double {
+        val m = timestamp.toDouble() / MINUTE + salt
+        return 100 + 4 * sin(m * 0.11) + 8 * sin(m * 0.007) +
+            12 * sin(m * 0.0007) + 16 * sin(m * 0.00003)
+    }
+
+    private fun aggregate(start: Long, step: Long, now: Long, tick: Int, salt: Long): Candle {
+        val open = price(start - MINUTE, salt)
+        var close = open
+        var high = open
+        var low = open
+        var volume = 0.0
+        var previous = open
+        var timestamp = start
+        val end = minOf(start + step, now + MINUTE)
+        while (timestamp < end) {
+            val fraction = if (timestamp == now) tick.toDouble() / TICKS_PER_MINUTE else 1.0
+            val next = price(timestamp, salt)
+            close = previous + (next - previous) * fraction
+            val m = timestamp.toDouble() / MINUTE + salt
+            val wick = (0.15 + 0.35 * abs(sin(m * 0.37))) * fraction
+            high = maxOf(high, maxOf(previous, close) + wick)
+            low = minOf(low, minOf(previous, close) - wick)
+            volume += (100 + 2450 * (1 + sin(m * 1.7))) * fraction
+            previous = next
+            timestamp += MINUTE
+        }
+        return Candle(start, open, high, low, close, volume)
+    }
+
     override fun getBars(params: DataLoader.GetBarsParams) {
         val step = params.period.toMillis()
-        val data = when (params.type) {
+        require(step in MINUTE..86_400_000L && step % MINUTE == 0L)
+        val count = when (params.type) {
             DataLoader.DataLoadType.INIT -> {
-                rand = Random(seed)
+                loadJob?.cancel()
                 pages = 0
-                var price = 100.0
-                val end = System.currentTimeMillis() / step * step
-                List(500) { i ->
-                    val open = price
-                    price += (rand.nextDouble() - 0.5) * 2
-                    candleAt(end - (499 - i) * step, open, price, rand.nextDouble() * 5000 + 100)
-                }.also { last = it.last() }
+                500
             }
-            DataLoader.DataLoadType.FORWARD -> {
-                val before = params.timestamp
-                if (before == null || pages >= 3) emptyList() else {
-                    pages++
-                    var price = 90.0
-                    List(200) { i ->
-                        val open = price
-                        price += (rand.nextDouble() - 0.5) * 2
-                        candleAt(before - (200 - i) * step, open, price, rand.nextDouble() * 5000 + 100)
-                    }
+            DataLoader.DataLoadType.FORWARD ->
+                if (params.timestamp == null || pages >= 3) 0 else { pages++; 200 }
+            else -> 0
+        }
+        val now = minute
+        val tick = phase
+        val end = if (params.type == DataLoader.DataLoadType.INIT) now / step * step + step else params.timestamp ?: 0L
+        val salt = (seed.toLong() xor params.symbol.ticker.hashCode().toLong()) % 100_000
+        val more = DataLoader.DataLoadMore(backward = false, forward = pages < 3)
+        loadJob = scope.launch {
+            val data = withContext(Dispatchers.Default) {
+                List(count) { i ->
+                    currentCoroutineContext().ensureActive()
+                    aggregate(end - (count - i) * step, step, now, tick, salt)
                 }
             }
-            else -> emptyList()
+            params.callback(data, more)
         }
-        params.callback(data, DataLoader.DataLoadMore(backward = false, forward = pages < 3))
     }
 
     override fun subscribeBar(params: DataLoader.SubscribeBarParams) {
         subscription?.cancel()
+        val step = params.period.toMillis()
+        require(step in MINUTE..86_400_000L && step % MINUTE == 0L)
+        val salt = (seed.toLong() xor params.symbol.ticker.hashCode().toLong()) % 100_000
         subscription = scope.launch {
-            var tick = 0
             while (isActive) {
                 delay(200)
                 if (paused) continue
-                val previous = last ?: continue
-                tick++
-                val next = if (tick % 5 == 0) {
-                    candleAt(previous.timestamp + params.period.toMillis(), previous.close,
-                        previous.close + (rand.nextDouble() - 0.5), rand.nextDouble() * 5000 + 100)
-                } else {
-                    val close = previous.close + (rand.nextDouble() - 0.5) * 0.4
-                    previous.copy(close = close, high = maxOf(previous.high, close), low = minOf(previous.low, close))
-                }
-                last = next
-                params.callback(next)
+                if (phase == TICKS_PER_MINUTE) { minute += MINUTE; phase = 1 } else phase++
+                val now = minute
+                val tick = phase
+                val next = withContext(Dispatchers.Default) { aggregate(now / step * step, step, now, tick, salt) }
+                if (!paused) params.callback(next)
             }
         }
     }
@@ -143,6 +175,10 @@ class LocalFeed(private val scope: CoroutineScope, private val seed: Int = 2026)
             "stress 注入完成：${stress.candles} candle / ${stress.indicators} 指标 / ${stress.overlays} 覆盖物，" +
                 "就绪耗时 ${System.currentTimeMillis() - injectStartMs}ms",
         )
+    }
+    private companion object {
+        const val MINUTE = 60_000L
+        const val TICKS_PER_MINUTE = 5
     }
 }
 

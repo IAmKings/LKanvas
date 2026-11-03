@@ -12,7 +12,7 @@
 |---|---|---|---|---|
 | `Store.ts`（数据路径段） | `lkanvas-core/.../store/Store.kt`（0.6.0 已落地：load/addData/resetData/边界触发/代次门禁） | `ChartDataStore.kt`（会话门禁）与 `ChartEngine.kt`（计算编排）保留为内核 | 数据路径补丁→Store.kt 局部移植（Parity4） | 行为通过 |
 | `Chart.ts` | `lkanvas-compose/.../chart/LKanvasChart.kt`（门面方法集逐一对齐） | 同名（方法语义待对齐） | Android 无 DOM：init(state)、Compose 组合 | 已声明 |
-| `Event.ts`+`Eventful.ts` | `lkanvas-core/.../store/ChartEvents.kt` | 门面 actionCallbacks | notExecuteAction 抑制语义（SLA-015） | 已声明 |
+| `Event.ts`+`Eventful.ts` | `lkanvas-core/.../store/ChartEvents.kt` + `lkanvas-compose/.../gesture/ChartGestures.kt` | 门面 actionCallbacks 与原生输入状态机 | notExecuteAction 抑制；0.16.0 短按/保持/平移行为验证见专门记录，其他画线输入差异另列审计 | 已接线 |
 | `Options.ts` | `lkanvas-compose/.../chart/ChartOptions.kt`（对齐字段集） | 同名 | 平台适配 | 已声明 |
 | `common/Data.ts` | `lkanvas-core/.../common/Data.kt` | `ChartTypes.kt`（扁平 payload） | 无（嵌套 payload 属上游原貌，SLA-015） | 已声明 |
 | `common/{Crosshair,Point,BarSpace,VisibleRange,Period,SymbolInfo,Action,DataLoader,Nullable,DeepPartial}.ts` | `lkanvas-core/.../common/` 同名.kt | 分散在 ChartTypes/SymbolInfo/DataLoader | 类型等价 | 已声明 |

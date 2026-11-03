@@ -75,7 +75,7 @@ object PaneRenderers {
         if (range.count <= 0) return
         val visible = candles.subList(range.first, range.last + 1)
 
-        val (lo, hi) = LinearYAxis.rangeOfCandles(visible) ?: return
+        val (lo, hi) = state.axisDisplayRange("main", state.mainPaneRange() ?: return)
         val spec = state.effectiveMainAxisSpec()
         val (rf, rt) = YAxisMath.realRange(spec, lo, hi)
         val yReal: (Double) -> Double = { r -> LinearYAxis.valueToY(r, rf, rt, top.toDouble(), bottom.toDouble()) }
@@ -150,7 +150,7 @@ object PaneRenderers {
             val meta = extraAxes[axisId] ?: continue
             val inPane = meta.inside || meta.positionLeft
             val colX = if (inPane) -1f else extraAxisCols.getOrNull(colIdx++) ?: continue
-            val (alo, ahi) = state.extraAxisRange(axisId, range.first, range.last) ?: continue
+            val (alo, ahi) = state.axisDisplayRange("main", state.extraAxisRange(axisId, range.first, range.last) ?: continue, axisId)
             val reversed = meta.reverse
             // R06：轴实例生效 spec（custom > 模板 spec > Normal）——与 convert 同源
             val customSpec = state.effectiveExtraAxisSpec(axisId)
@@ -297,7 +297,7 @@ object PaneRenderers {
         if (insts.isEmpty()) return
         // M02：与 drawExtraPane 同一选择入口——绑定副轴实例按其轴投影（修复前
         // 固定 pane 忽略 yAxisId，全部实例共用普通线性 y）
-        val (lo, hi) = state.paneVisibleRange(paneId) ?: return
+        val (lo, hi) = state.axisDisplayRange(paneId, state.paneVisibleRange(paneId) ?: return)
         val defaultY: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)
         clipRect(left = contentLeft, top = top, right = contentRight, bottom = bottom) {
@@ -351,7 +351,7 @@ object PaneRenderers {
         // 单一来源 = paneVisibleRange；轴解析**移入实例循环**——每实例按 yAxisId
         // 经 state.instanceBoundYOf 取专属投影（修复前 firstOrNull 在循环外，
         // 多个有效绑定共用第一条轴；未绑定实例回退普通线性）
-        val (lo, hi) = state.paneVisibleRange(paneId) ?: return
+        val (lo, hi) = state.axisDisplayRange(paneId, state.paneVisibleRange(paneId) ?: return)
         val defaultY: (Double) -> Double = { v -> LinearYAxis.valueToY(v, lo, hi, top.toDouble(), bottom.toDouble()) }
 
         drawGrid(theme, text, lo, hi, contentLeft, contentRight, top, bottom, tickCount = 3)

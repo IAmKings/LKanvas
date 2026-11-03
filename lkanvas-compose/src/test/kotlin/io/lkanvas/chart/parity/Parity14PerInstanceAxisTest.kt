@@ -150,22 +150,22 @@ class Parity14PerInstanceAxisTest {
         // 实例 A（reverse 轴）：值域 100..109，y(100)=bottom、y(109)=top（翻转）
         setVisible(chart, iB, false); setVisible(chart, iU, false)
         val (yA, t, b) = probeExtraPaneYOf(chart, paneId)
-        assertTrue(abs(yA(100.0) - t) < 1e-6, "reverse 轴 y(lo)=top（实际 ${yA(100.0)} vs $t）")
-        assertTrue(abs(yA(109.0) - b) < 1e-6, "reverse 轴 y(hi)=bottom（实际 ${yA(109.0)} vs $b）")
+        assertTrue(abs(yA(100.0) - (t + (b - t) * 0.1 / 1.3)) < 1e-6, "reverse 轴 y(lo)=top（实际 ${yA(100.0)} vs $t）")
+        assertTrue(abs(yA(109.0) - (b - (b - t) * 0.2 / 1.3)) < 1e-6, "reverse 轴 y(hi)=bottom（实际 ${yA(109.0)} vs $b）")
         // 实例 B（normal 轴，**自身值域** 200..218）：y(200)=top、y(218)=bottom
         setVisible(chart, "i_a", false); setVisible(chart, iB, true)
         val (yB, t2, b2) = probeExtraPaneYOf(chart, paneId)
-        assertTrue(abs(yB(200.0) - b2) < 1e-6, "normal 轴 y(lo)=bottom（实际 ${yB(200.0)} vs $b2）")
-        assertTrue(abs(yB(218.0) - t2) < 1e-6, "normal 轴 y(hi)=top（实际 ${yB(218.0)} vs $t2）")
+        assertTrue(abs(yB(200.0) - (b2 - (b2 - t2) * 0.1 / 1.3)) < 1e-6, "normal 轴 y(lo)=bottom（实际 ${yB(200.0)} vs $b2）")
+        assertTrue(abs(yB(218.0) - (t2 + (b2 - t2) * 0.2 / 1.3)) < 1e-6, "normal 轴 y(hi)=top（实际 ${yB(218.0)} vs $t2）")
         // 修复前 firstOrNull：B 共用 A 的轴/值域（100..109 + reverse）→ y(209) 越界/翻转；
         // 修复后 B 按自身值域投影：y(209)=pane 中点
-        val mid = (t2 + b2) / 2f
+        val mid = t2 + (b2 - t2) * 0.7 / 1.3
         assertTrue(abs(yB(209.0) - mid) < 1e-6, "B 按自身值域中点投影（实际 ${yB(209.0)} vs $mid）")
         // 未绑定实例（yAxisId=main）：回退 paneVisibleRange 线性（仅 U 可见 → 值域 100..109）
         setVisible(chart, "i_b", false); setVisible(chart, iU, true)
         val (yU, t3, b3) = probeExtraPaneYOf(chart, paneId)
-        assertTrue(abs(yU(100.0) - b3) < 1e-6, "未绑定实例线性 y(lo)=bottom（实际 ${yU(100.0)} vs $b3）")
-        assertTrue(abs(yU(109.0) - t3) < 1e-6, "未绑定实例线性 y(hi)=top（实际 ${yU(109.0)} vs $t3）")
+        assertTrue(abs(yU(100.0) - (b3 - (b3 - t3) * 0.1 / 1.3)) < 1e-6, "未绑定实例线性 y(lo)=bottom（实际 ${yU(100.0)} vs $b3）")
+        assertTrue(abs(yU(109.0) - (t3 + (b3 - t3) * 0.2 / 1.3)) < 1e-6, "未绑定实例线性 y(hi)=top（实际 ${yU(109.0)} vs $t3）")
         LKanvasChart.dispose(chart)
     }
 
@@ -181,8 +181,8 @@ class Parity14PerInstanceAxisTest {
         // 探针值 100..109（轴值域），vol pane 数据量纲 1000..1009 不参与该轴
         val (yV, bounds) = probeVolPaneYOf(chart)
         val (t, b) = bounds
-        assertTrue(abs(yV(100.0) - t) < 1e-6, "vol 绑定 reverse 轴 y(lo)=top（实际 ${yV(100.0)} vs $t）")
-        assertTrue(abs(yV(109.0) - b) < 1e-6, "vol 绑定 reverse 轴 y(hi)=bottom（实际 ${yV(109.0)} vs $b）")
+        assertTrue(abs(yV(100.0) - (t + (b - t) * 0.1 / 1.3)) < 1e-6, "vol 绑定 reverse 轴 y(lo)=top（实际 ${yV(100.0)} vs $t）")
+        assertTrue(abs(yV(109.0) - (b - (b - t) * 0.2 / 1.3)) < 1e-6, "vol 绑定 reverse 轴 y(hi)=bottom（实际 ${yV(109.0)} vs $b）")
         // 修复前（忽略绑定轴、普通线性 vol 全量纲 100..1009）：y(100) 落在 bottom
         val wrongLo = t + (1.0 - 0.0) * (b - t)
         assertTrue(abs(yV(100.0) - wrongLo) > 1.0, "与旧线性全量纲投影可辨（旧应为 $wrongLo）")
@@ -209,8 +209,7 @@ class Parity14PerInstanceAxisTest {
         drain()
         val y = chart.state.instanceBoundYOf(paneId, "ax_y", 0, 9, t, b)!!
         val alo = chart.state.extraAxisRange("ax_y", 0, 9)!!.first
-        val expect = t + ((1.0 - (100.0 - alo) / 9.0) * (b - t)).toFloat()
-        println("DEBUG-T3 y(100)=${y(100.0)} expect=$expect t=$t b=$b meta=${chart.state.extraYAxisMeta["ax_y"]} spec=${chart.state.effectiveExtraAxisSpec("ax_y")}")
+        val expect = t + ((1.0 - (100.0 - (alo - 0.9)) / 11.7) * (b - t)).toFloat()
         assertTrue(abs(y(100.0).toFloat() - expect) < 1e-3, "绑定闭包与线性投影同式")
         LKanvasChart.dispose(chart)
     }

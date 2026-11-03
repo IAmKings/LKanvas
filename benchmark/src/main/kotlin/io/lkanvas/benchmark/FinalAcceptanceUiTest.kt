@@ -16,6 +16,59 @@ import java.io.File
 /** Real input and accessibility actions against the installed candidate (including R8 release). */
 @RunWith(AndroidJUnit4::class)
 class FinalAcceptanceUiTest {
+    @Test fun periodButtonsChangeThePricePlotWithTheFeedPaused() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val device = UiDevice.getInstance(instrumentation)
+        val output = File(instrumentation.targetContext.getExternalFilesDir("validation"), "periods").apply { mkdirs() }
+        device.executeShellCommand("am force-stop io.lkanvas.sample")
+        device.executeShellCommand("am start -W -n io.lkanvas.sample/.MainActivity --ez stress_mode false")
+        val chart = device.findObject(UiSelector().descriptionContains("，高 "))
+        assertTrue(chart.waitForExists(15000))
+        device.findObject(UiSelector().text("更多")).click()
+        val push = device.findObject(UiSelector().text("模拟行情推送"))
+        assertTrue(push.waitForExists(5000))
+        push.click()
+        device.findObject(UiSelector().description("关闭面板")).click()
+        assertTrue(device.findObject(UiSelector().text("模拟已暂停")).waitForExists(5000))
+        fun pricePlotHash(): Int {
+            val b = chart.bounds
+            val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("screenshot unavailable")
+            try {
+                // 只取主图内部，排除周期按钮、图例、轴标签与时间标签。
+                val w = (b.width() * 0.7).toInt()
+                val h = (b.height() * 0.3).toInt()
+                val pixels = IntArray(w * h)
+                bitmap.getPixels(pixels, 0, w, b.left + b.width() / 20, b.top + b.height() / 5, w, h)
+                return pixels.contentHashCode()
+            } finally { bitmap.recycle() }
+        }
+        Thread.sleep(300)
+        var before = pricePlotHash()
+        val rows = mutableListOf("1m initial=$before")
+        for (label in listOf("5m", "15m", "1h", "1d", "1m")) {
+            device.findObject(UiSelector().text(label)).click()
+            var after = before
+            var stable = false
+            for (attempt in 0 until 150) {
+                Thread.sleep(100)
+                if (chart.exists()) after = pricePlotHash()
+                if (after != before && chart.exists()) {
+                    Thread.sleep(300)
+                    if (pricePlotHash() == after) { stable = true; break }
+                }
+            }
+            assertNotEquals("$label must change the price plot while live updates are paused", before, after)
+            assertTrue("$label must reach a stable rendered price plot", stable)
+            device.takeScreenshot(File(output, "$label.png"))
+            rows += "$label plotHash=$after"
+            before = after
+        }
+        File(output, "plot-hashes.txt").writeText(rows.joinToString("\n"))
+        device.findObject(UiSelector().text("更多")).click()
+        device.findObject(UiSelector().text("模拟行情推送")).click()
+        device.findObject(UiSelector().description("关闭面板")).click()
+    }
+
     @Test fun pinchAccessibilityAndConfigurationMatrix() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
@@ -59,6 +112,17 @@ class FinalAcceptanceUiTest {
             assertTrue(chart.performTwoPointerGesture(Point(x - 250, y), Point(x + 250, y), Point(x - 80, y), Point(x + 80, y), 30))
             Thread.sleep(500)
             assertNotEquals("pinch in must change the chart", enlarged, hash())
+            val beforeTap = hash()
+            device.click(x, y)
+            Thread.sleep(300)
+            val afterTap = hash()
+            assertNotEquals("short tap must display the crosshair after release", beforeTap, afterTap)
+            Thread.sleep(300)
+            assertEquals("short tap selection must persist", afterTap, hash())
+            device.takeScreenshot(File(output, "tap-release.png"))
+            device.click(x + 180, y + 100)
+            Thread.sleep(300)
+            assertEquals("distant touch dismisses the retained selection", beforeTap, hash())
             val downTime = SystemClock.uptimeMillis()
             fun touch(action: Int) {
                 val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, x.toFloat(), y.toFloat(), 0)
@@ -91,7 +155,7 @@ class FinalAcceptanceUiTest {
                 }
                 assertTrue("each consecutive accessibility action must update its summary", changed)
             }
-            File(output, "interaction.txt").writeText("pinch out/in: PASS\nlong press: PASS\nconsecutive previous candle accessibility actions: PASS\n")
+            File(output, "interaction.txt").writeText("pinch out/in: PASS\nshort tap/release/persistence/dismiss: PASS\nlong press: PASS\nconsecutive previous candle accessibility actions: PASS\n")
             for (scale in listOf("1.0", "1.3", "2.0")) {
                 device.executeShellCommand("settings put system font_scale $scale")
                 for (landscape in listOf(false, true)) {

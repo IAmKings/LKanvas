@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.drawText
+import kotlin.math.roundToInt
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
 import io.lkanvas.core.axis.LinearYAxis
@@ -55,6 +56,7 @@ object ChartRenderer {
         internal var key: Any? = null
         internal var ops: List<io.lkanvas.compose.draw.TooltipRenderer.DrawOp>? = null
         internal var mainBounds: List<Rect> = emptyList()
+        internal var legendHeights: Map<String, Float> = emptyMap()
     }
 
     fun DrawScope.render(
@@ -92,11 +94,12 @@ object ChartRenderer {
         val styles = params.styles
         val cache = params.tooltipCache
         val candles = state.dataSnapshot.candles
-        val idx = crosshair?.let { state.viewport.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) } ?: candles.lastIndex
+        val idx = crosshair?.let { state.viewport.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) } ?: candles.lastIndex
         val key = listOf(
             System.identityHashCode(state.dataSnapshot), idx, System.identityHashCode(styles),
             params.width, params.height, params.gutterWidth, params.legendTextSizePx,
             density, fontScale, panes, state.extraPaneLayout,
+            crosshair != null, if (styles?.candle?.tooltip?.showType == "rect") crosshair else null,
         )
         val cacheHit = cache != null && cache.key == key && cache.ops != null
         // Layout once before price marks, then replay at the original tooltip layer.
@@ -117,6 +120,32 @@ object ChartRenderer {
                     is TooltipRenderer.DrawOp.StrokePath -> op.path.getBounds()
                 }
             }
+        }
+        val tooltipOps = if (!params.drawLegend || styles == null) emptyList() else if (cacheHit) cache!!.ops!! else {
+            val ops = ArrayList(mainOps)
+            drawSubPaneTooltips(state, styles, theme, textMeasurer, params.legendTextSizePx, crosshair, contentRight, mainBottom, volTop, volBottom, macdBottom, recorder = ops, drawContent = false)
+            ops
+        }
+        state.legendHeightsPx = when {
+            !params.drawLegend -> emptyMap()
+            styles == null -> mapOf("main" to legendHeight)
+            cacheHit -> cache!!.legendHeights
+            else -> tooltipOps.filterIsInstance<TooltipRenderer.DrawOp.Text>().groupBy { op ->
+                when (op.clipBounds?.top) {
+                    volTop -> "vol"
+                    volBottom + 1f -> "macd"
+                    else -> "main"
+                }
+            }.mapNotNull { (pane, ops) ->
+                if (pane == "main" && styles.candle.tooltip.showType == "rect") null
+                else {
+                    val top = state.paneBounds(pane)?.first ?: 0f
+                    pane to (ops.maxOf { op ->
+                        val height = textMeasurer.measure(op.text, TooltipRenderer.textStyle(op.sizePx, op.color)).size.height
+                        minOf(op.topLeft.y + height, op.clipBounds?.bottom ?: mainBottom)
+                    } - top + 4f)
+                }
+            }.toMap()
         }
         // 0.4.0 多轴：自定义轴标签列坐标（主轴列右侧依次向右；主轴列宽 = tagWidth+8）
         val extraAxisCols = if (params.extraAxisColW > 0f && state.extraYAxisMeta.isNotEmpty()) {
@@ -151,15 +180,14 @@ object ChartRenderer {
             if (styles != null) {
                 if (cacheHit) {
                     // T-34：回放缓存的 DrawOp（文本 measure 命中 TextMeasurer 缓存）
-                    replayTooltip(cache!!.ops!!, textMeasurer)
+                    replayTooltip(tooltipOps, textMeasurer)
                 } else {
-                    val ops = ArrayList(mainOps)
-                    replayTooltip(mainOps, textMeasurer)
-                    drawSubPaneTooltips(state, styles, theme, textMeasurer, params.legendTextSizePx, crosshair, contentRight, mainBottom, volTop, volBottom, macdBottom, recorder = ops)
+                    replayTooltip(tooltipOps, textMeasurer)
                     if (cache != null) {
                         cache.key = key
-                        cache.ops = ops
+                        cache.ops = tooltipOps
                         cache.mainBounds = text.markerExclusions
+                        cache.legendHeights = state.legendHeightsPx
                     }
                 }
             } else {
@@ -234,11 +262,12 @@ object ChartRenderer {
         volBottom: Float,
         macdBottom: Float,
         recorder: MutableList<io.lkanvas.compose.draw.TooltipRenderer.DrawOp>? = null,
+        drawContent: Boolean = true,
     ) {
         val candles = state.dataSnapshot.candles
         if (candles.isEmpty()) return
         val idx = crosshair
-            ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) }
+            ?.let { state.viewport.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) }
             ?: (candles.size - 1)
         with(io.lkanvas.compose.draw.TooltipRenderer) {
             // VOL：volume + 均量线
@@ -253,6 +282,7 @@ object ChartRenderer {
                         legendKeys = keys.map { it to vol.result[it].getOrNull(idx) },
                         legendColors = keys.mapIndexed { i, _ -> theme.linePalette[i % theme.linePalette.size] },
                         recorder = recorder,
+                        drawContent = drawContent,
                     )
                 }
             }
@@ -271,6 +301,7 @@ object ChartRenderer {
                             if ((macd.result["macd"]?.getOrNull(idx) ?: 0.0) >= 0) theme.macdBarUp else theme.macdBarDown,
                         ),
                         recorder = recorder,
+                        drawContent = drawContent,
                     )
                 }
             }
@@ -329,7 +360,7 @@ object ChartRenderer {
         val candles = state.dataSnapshot.candles
         if (candles.isEmpty()) return
         val vp = state.viewport
-        val idx = crosshair?.let { vp.logicalIndexAt(it.x.toDouble()).toInt().coerceIn(candles.indices) }
+        val idx = crosshair?.let { vp.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) }
             ?: (candles.size - 1)
         val c = candles[idx]
         val contentWidth = totalWidth - gutterW

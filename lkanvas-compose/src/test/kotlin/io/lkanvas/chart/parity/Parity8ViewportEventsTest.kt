@@ -88,17 +88,17 @@ class Parity8ViewportEventsTest {
     }
 
     @Test
-    fun `scrollToDataIndex按右侧留白锚点定位`() {
+    fun `scrollToDataIndex将目标末端置于右边缘`() {
         val chart = newChartWithData()
         chart.state.onLayout(800f, io.lkanvas.compose.state.ChartState.PaneHeights(400f, 40f, 80f, 20f))
         drain()
         val vp = chart.state.viewport
         chart.scrollToDataIndex(100)
         drain()
-        // 目标索引位于右侧留白锚点：candleCenterX ≈ contentWidth - rightOffset*bar
+        // 上游 scrollToDataIndex：目标 candle 的右边缘对齐内容区右边缘
         val x = vp.candleCenterX(100.0)
-        val expect = vp.contentWidth - vp.rightOffsetSlots * vp.barSpacing
-        assertTrue(abs(x - expect) < vp.barSpacing, "目标索引在右缘留白锚点附近（上游模型）")
+        val expect = vp.contentWidth - vp.barSpacing / 2
+        assertTrue(abs(x - expect) < vp.barSpacing, "目标 candle 右边缘对齐")
         LKanvasChart.dispose(chart)
     }
 
@@ -146,7 +146,7 @@ class Parity8ViewportEventsTest {
         drain()
         assertEquals(barBefore, vp.barSpacing, "禁缩放后 zoomAtCoordinate 间距不变")
         chart.setScrollEnabled(true)
-        chart.scrollByDistance(-200.0)
+        chart.scrollByDistance(200.0)
         drain()
         assertTrue(vp.scrollIndex != scrollBefore, "恢复开关后可滚动")
         LKanvasChart.dispose(chart)

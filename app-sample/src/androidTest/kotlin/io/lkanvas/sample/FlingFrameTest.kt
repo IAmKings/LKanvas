@@ -45,7 +45,7 @@ class FlingFrameTest {
                 if (!dispatchMessage.contains("FrameDisplayEventReceiver")) outsideFrames++
             }
             val before = state.viewport.scrollIndex
-            state.fling(-2500f)
+            state.fling(2500f)
             delay(250)
             val moved = state.viewport.scrollIndex < before
             state.beginGesture(GestureOwner.NONE)

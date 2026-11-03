@@ -111,13 +111,13 @@ class ChartLayerPixelTest {
                 if (frame == 0) first = actual else assertFalse("state changes must invalidate the chart drawing", first!!.contentEquals(actual))
                 if (frame == 0) instrumentation.runOnMainSync {
                     val old = state.viewport.scrollIndex
-                    state.panBy(-123f)
+                    state.panBy(123f)
                     assertNotEquals("fixture must pan away from the latest boundary", old, state.viewport.scrollIndex)
                 }
                 if (frame == 1) runBlocking(Dispatchers.Main) {
                     state.appendBatch(listOf(Candle(600 * 60000L, 101.0, 106.0, 97.0, 105.0, 2345.0)))
                 }
-                if (frame == 2) instrumentation.runOnMainSync { state.panBy(-47f) }
+                if (frame == 2) instrumentation.runOnMainSync { state.panBy(47f) }
             }
             // 摘要必须在无须宿主重组的状态变更后更新，不能留下旧的朗读值。
             var previousSummary = ""

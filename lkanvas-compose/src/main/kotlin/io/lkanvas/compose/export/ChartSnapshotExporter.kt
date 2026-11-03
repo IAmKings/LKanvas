@@ -82,24 +82,31 @@ object ChartSnapshotExporter {
         }
         canvas.save()
         canvas.scale(scale, scale)
-        drawScope.draw(density, LayoutDirection.Ltr, canvas, Size(layoutW, layoutH)) {
-            with(ChartRenderer) {
-                render(
-                    state = state,
-                    theme = theme,
-                    params = ChartRenderer.Params(
-                        width = layoutW,
-                        height = layoutH,
-                        gutterWidth = gutterPx,
-                        legendTextSizePx = legendPx,
-                        axisTextSizePx = axisPx,
-                        includeCrosshair = includeCrosshair,
-                    ),
-                    textMeasurer = textMeasurer,
-                )
+        val screenLegendHeights = state.legendHeightsPx
+        val screenFeatureHits = state.tooltipFeatureHits
+        try {
+            drawScope.draw(density, LayoutDirection.Ltr, canvas, Size(layoutW, layoutH)) {
+                with(ChartRenderer) {
+                    render(
+                        state = state,
+                        theme = theme,
+                        params = ChartRenderer.Params(
+                            width = layoutW,
+                            height = layoutH,
+                            gutterWidth = gutterPx,
+                            legendTextSizePx = legendPx,
+                            axisTextSizePx = axisPx,
+                            includeCrosshair = includeCrosshair,
+                        ),
+                        textMeasurer = textMeasurer,
+                    )
+                }
             }
+        } finally {
+            state.legendHeightsPx = screenLegendHeights
+            state.tooltipFeatureHits = screenFeatureHits
+            canvas.restore()
         }
-        canvas.restore()
         return Result.Ok(bitmap, widthPx, heightPx)
     }
 

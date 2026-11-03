@@ -56,8 +56,8 @@ internal object OverlayEventDispatch {
  *   纵向为主的位移不消费，外层 LazyColumn/Pager 可正常接管（A-32 基础）
  * - 双指 → 缩放（PINCH，中点为锚）；第二指加入时结束平移/十字线；
  *   双指抬一指降级等待，不再误触发平移
- * - 长按（未移动）→ 十字线（CROSSHAIR），移动吸附 candle 中心，抬起隐藏
- * - 短按无位移 → 点击 candle 事件
+ * - 短按/长按 → 十字线（CROSSHAIR），松手保持；近处再拖动检查，远处触摸关闭
+ * - 短按无位移 → 同时派发点击 candle 事件
  * - 创建模式（CREATE）：点击按磁吸加控制点，补齐自动完成（O-01 segment）
  * - 命中覆盖物：控制点拖动（POINT_DRAG）优先于整体拖动（WHOLE_DRAG），
  *   再优先于图表平移（命中优先级 PRD R-09）
@@ -69,10 +69,13 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
 
     awaitEachGesture {
         val down = awaitFirstDown()
+        val gestureSession = state.dataSnapshot.sessionId
         val downNanos = System.nanoTime()
         state.beginGesture(GestureOwner.NONE)
         var mode = GMode.IDLE
         var moved = false
+        var dismissCrosshair = false
+        var resumedCrosshair = false
         var pinchDist: Float? = null
         val velocity = VelocityTracker()
         // 覆盖物拖动上下文
@@ -168,6 +171,20 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
             }
         }
 
+        if (mode == GMode.IDLE && tapHitInstanceId == null && state.tooltipFeatureAt(down.position.x, down.position.y) == null) {
+            state.crosshairPosition?.let { crosshair ->
+                if (hypot(down.position.x - crosshair.x, down.position.y - crosshair.y) <= slop) {
+                    resumedCrosshair = true
+                    mode = GMode.CROSSHAIR
+                    state.setGestureOwner(GestureOwner.CROSSHAIR)
+                    state.moveCrosshair(down.position.x, down.position.y)
+                } else {
+                    dismissCrosshair = true
+                    state.hideCrosshair()
+                }
+            }
+        }
+
         while (true) {
             val awaitingLongPress = mode == GMode.IDLE && !moved
             val event = if (awaitingLongPress) {
@@ -179,6 +196,10 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                 awaitPointerEvent(PointerEventPass.Main)
             }
 
+            if (state.dataSnapshot.sessionId != gestureSession) {
+                state.hideCrosshair()
+                break
+            }
             // 长按到期且未移动未抬指 → 进入十字线（命中覆盖物时先派发 onRightClick，批次 8a）
             if (event == null) {
                 if (tapHitInstanceId != null) {
@@ -224,6 +245,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
 
                         GMode.CROSSHAIR -> {
                             val c = event.changes.firstOrNull() ?: continue
+                            if (hypot(c.position.x - down.position.x, c.position.y - down.position.y) > slop) moved = true
                             state.moveCrosshair(c.position.x, c.position.y)
                             for (change in event.changes) change.consume()
                         }
@@ -245,6 +267,8 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                     mode = GMode.PAN
                                     state.setGestureOwner(GestureOwner.PAN)
                                     velocity.addPosition(c.uptimeMillis, c.position)
+                                    state.panBy(dxTotal)
+                                    for (change in event.changes) change.consume()
                                 }
                                 // 纵向为主：不消费不进入平移，父容器接管
                             }
@@ -337,7 +361,7 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                     }
                     if (stillPressed > 0) continue
                     when (mode) {
-                        GMode.CROSSHAIR -> state.hideCrosshair()
+                        GMode.CROSSHAIR -> if (resumedCrosshair && !moved) state.tapCandle(down.position.x)
                         GMode.PAN -> state.fling(velocity.calculateVelocity().x)
                         GMode.IDLE -> if (!moved) {
                             // 批次 7c：tooltip feature 命中优先（手势端分发三 ActionType）
@@ -363,7 +387,10 @@ fun Modifier.chartGestures(state: ChartState): Modifier = this.pointerInput(stat
                                     }
                                 }
 
-                                else -> state.tapCandle(down.position.x)
+                                else -> {
+                                    if (!dismissCrosshair) state.showCrosshairAt(down.position.x, down.position.y)
+                                    state.tapCandle(down.position.x)
+                                }
                             }
                         }
                         GMode.PINCH -> Unit

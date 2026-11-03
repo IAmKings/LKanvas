@@ -71,16 +71,26 @@ class SampleWorkspaceUiTest {
     private fun chart(): LKanvasChart = (LKanvasChart::class.java.getDeclaredField("liveCharts").apply { isAccessible = true }.get(null) as Map<*, *>).values.filterIsInstance<LKanvasChart>().last()
 
     @Test fun periodSelectionChangesRealTimestampsAndThemeCoversTheWorkspace() {
-        tap("5m")
-        var matched = false
-        repeat(100) {
-            instrumentation.runOnMainSync {
-                val bars = chart().state.dataSnapshot.candles
-                matched = bars.size >= 500 && bars.zipWithNext().all { (a, b) -> b.timestamp - a.timestamp == 300_000L }
+        var previous = emptyList<Double>()
+        instrumentation.runOnMainSync { previous = chart().state.dataSnapshot.candles.take(400).map { it.close } }
+        for ((label, period) in samplePeriods.drop(1) + samplePeriods.take(1)) {
+            tap(label)
+            var matched = false
+            for (attempt in 0 until 300) {
+                instrumentation.runOnMainSync {
+                    val bars = chart().state.dataSnapshot.candles
+                    matched = bars.size >= 500 && bars.zipWithNext().all { (a, b) -> b.timestamp - a.timestamp == period.toMillis() }
+                    if (matched) {
+                        val current = bars.take(400).map { it.close }
+                        assertTrue("$label must change prices, not only timestamps", current != previous)
+                        previous = current
+                    }
+                }
+                if (matched) break
+                Thread.sleep(50)
             }
-            if (!matched) Thread.sleep(50)
+            assertTrue("$label must load the selected period", matched)
         }
-        assertTrue("5m must change the underlying data", matched)
         device.findObject(UiSelector().description("切换浅色主题")).click()
         assertTrue(device.findObject(UiSelector().description("切换深色主题")).waitForExists(5_000))
         tap("指标")
