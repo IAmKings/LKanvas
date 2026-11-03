@@ -10,7 +10,7 @@
 #
 # 前置:
 #   1. ./gradlew publish 已把目标版本发到 build/maven-repo（含 .asc 签名伴随件）
-#   2. Central Portal（central.sonatype.com）命名空间 io.lkanvas 已完成 DNS 验证
+#   2. Central Portal（central.sonatype.com）命名空间已完成验证
 #   3. 凭据写入 local.properties（gitignored，严禁提交 gradle.properties）:
 #        central.username=<Portal User Token 的 username>
 #        central.password=<Portal User Token 的 token>
@@ -84,9 +84,9 @@ done
 
 (cd "$STAGING" && zip -qr bundle.zip "$GROUP_PATH")
 BUNDLE_SIZE="$(du -h "$STAGING/bundle.zip" | cut -f1 | tr -d ' ')"
-echo "上传 $GROUP_ID 版本 $VERSION_ARG（publishingType=$PUBLISHING_TYPE，bundle=$BUNDLE_SIZE）"
+echo "上传目标: $GROUP_ID 版本 $VERSION_ARG (publishingType=$PUBLISHING_TYPE, bundle=$BUNDLE_SIZE)"
 
-# Portal API：Bearer = base64(username:token)
+# Portal API: Bearer = base64(username:token)
 BASIC_TOKEN="$(printf '%s:%s' "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | openssl base64 -A)"
 UPLOAD_URL="https://central.sonatype.com/api/v1/publisher/upload?publishingType=${PUBLISHING_TYPE}"
 RESPONSE="$(curl -sS -X POST "$UPLOAD_URL" \
@@ -103,13 +103,16 @@ fi
 echo "已受理: deploymentId=$DEPLOYMENT_ID"
 
 STATUS_URL="https://central.sonatype.com/api/v1/publisher/status?id=${DEPLOYMENT_ID}"
-LAST_STATE=""
-MAX_POLLS=160   # 15s × 160 ≈ 40 分钟
+# 哨兵初值：空状态（Portal 5xx 等）也必须首轮可见，不得静默跳过
+LAST_STATE="__INIT__"
+MAX_POLLS=160   # 15s x 160 = 40min
 for _ in $(seq 1 "$MAX_POLLS"); do
   sleep 15
-  STATUS_JSON="$(curl -sS "$STATUS_URL" -H "Authorization: Bearer ${BASIC_TOKEN}" -H "Accept: application/json")"
+  STATUS_JSON="$(curl -sS --max-time 20 "$STATUS_URL" -H "Authorization: Bearer ${BASIC_TOKEN}" -H "Accept: application/json")"
   STATE="$(printf '%s' "$STATUS_JSON" | sed -n 's/.*"deploymentState":"\([^"]*\)".*/\1/p')"
-  [[ "$STATE" == "$LAST_STATE" ]] && continue
+  if [[ "$STATE" == "$LAST_STATE" ]]; then
+    continue
+  fi
   case "$STATE" in
     PENDING_VALIDATION|VALIDATING)
       echo "[$(date +%H:%M:%S)] Portal 校验中…"
@@ -118,24 +121,24 @@ for _ in $(seq 1 "$MAX_POLLS"); do
       echo "[$(date +%H:%M:%S)] 校验通过，进入发布队列"
       ;;
     WAITING_FOR_USER)
-      echo "[$(date +%H:%M:%S)] 等待人工确认: 打开 https://central.sonatype.com → View Deployments → 对该次上传点击 Publish"
+      echo "[$(date +%H:%M:%S)] 等待人工确认: 打开 https://central.sonatype.com -> View Deployments -> 对该次上传点击 Publish"
       ;;
     PUBLISHING)
       echo "[$(date +%H:%M:%S)] 正式发布中…"
       ;;
     PUBLISHED)
-      echo "✅ 已发布: $GROUP_ID:lkanvas-core / $GROUP_ID:lkanvas-compose : $VERSION_ARG"
-      echo "   Central 检索: https://central.sonatype.com/artifact/$GROUP_ID/lkanvas-compose/$VERSION_ARG"
+      echo "[OK] 已发布: $GROUP_ID:lkanvas-core / $GROUP_ID:lkanvas-compose : $VERSION_ARG"
+      echo "     Central 检索: https://central.sonatype.com/artifact/$GROUP_ID/lkanvas-compose/$VERSION_ARG"
       exit 0
       ;;
     FAILED)
-      echo "❌ 校验/发布失败，Portal 响应:" >&2
+      echo "[FAIL] 校验/发布失败，Portal 响应:" >&2
       echo "$STATUS_JSON" >&2
-      echo "   明细见 https://central.sonatype.com → View Deployments" >&2
+      echo "   明细见 https://central.sonatype.com -> View Deployments" >&2
       exit 1
       ;;
     "")
-      echo "[$(date +%H:%M:%S)] 状态暂不可读，继续轮询…（原始响应: $STATUS_JSON）"
+      echo "[$(date +%H:%M:%S)] 状态暂不可读，继续轮询（原始响应: $STATUS_JSON）"
       ;;
     *)
       echo "[$(date +%H:%M:%S)] 状态: $STATE"

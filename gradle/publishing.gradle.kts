@@ -144,6 +144,12 @@ val signingPassword = resolvedCredential("signing.password")
 val signingKeyRing = resolvedCredential("signing.secretKeyRingFile")
 if (signingKeyId != null && signingPassword != null && signingKeyRing != null) {
     configure<org.gradle.plugins.signing.SigningExtension> {
+        // signatory 工厂按项目属性（signing.*）解析凭据——local.properties 的值注入 ext，
+        // 使 findProperty 可见（Gradle 本身不读取 local.properties）
+        val ext = project.extensions.getByType(org.gradle.api.plugins.ExtraPropertiesExtension::class.java)
+        ext.set("signing.keyId", signingKeyId)
+        ext.set("signing.password", signingPassword)
+        ext.set("signing.secretKeyRingFile", signingKeyRing)
         val publications = project.extensions.getByType(org.gradle.api.publish.PublishingExtension::class.java)
             .publications
         if (publications.isNotEmpty()) {
