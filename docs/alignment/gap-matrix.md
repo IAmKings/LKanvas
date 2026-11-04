@@ -86,8 +86,8 @@
 | CH-016 | `getStyles` | Chart.ts:612 | 已建（Styles 树全量返回） | B | test | S | 5 |  | 已声明 |
 | CH-017 | `setLayoutOptions` | Chart.ts:616 | ChartLayoutConfig 部分 | B | compile | M | 5 | barSpaceLimit/pane/yAxis | 已声明 |
 | CH-018 | `getLayoutOptions` | Chart.ts:620 | 同上 | B | compile | S | 5 |  | 已声明 |
-| CH-019 | `setFormatter` | Chart.ts:624 | 门面 set/get 已建（Formatter 类型） | B | test | S | 2c | Formatter 接口对齐 | 已声明 |
-| CH-020 | `getFormatter` | Chart.ts:630 | 已建 | B | test | S | 2c |  | 已声明 |
+| CH-019 | `setFormatter` | Chart.ts:624 | 门面 set/get + 三参场景契约接入真实绘制（0.16.0-beta02：时间轴 xAxis/tooltip/语义消费、模板 token、失效重绘、legendData 时区修复；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/FormatterSceneWiringTest.kt） | B | test | S | 2c | Formatter 接口对齐 | 行为通过 |
+| CH-020 | `getFormatter` | Chart.ts:630 | 已建；变更经 notifyFormatChanged 驱动重绘与缓存失效（FormatterSceneWiringTest.kt） | B | test | S | 2c |  | 行为通过 |
 | CH-021 | `setLocale` | Chart.ts:634 | 门面 setLocale/getLocale 已建（zh-CN/en-US 映射 ChartLocale） | B | test | S | 2c | setLocale('en-US')→EN_US | 已声明 |
 | CH-022 | `getLocale` | Chart.ts:640 | 已建 | B | test | S | 2c |  | 已声明 |
 | CH-023 | `setTimezone` | Chart.ts:644 | 门面 set/get + state.timezoneId → ChartText 时间标签渲染消费（0.3.0） | B | test | S | 2c |  | 已声明 |
