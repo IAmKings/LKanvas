@@ -200,10 +200,10 @@
 | IND-011 | `zLevel` | component/Indicator.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 3 |  | 已声明 |
 | IND-012 | `extendData` | component/Indicator.ts | 已建：Definition.extendData | B | test | M | 3 |  | 已声明 |
 | IND-013 | `series` | component/Indicator.ts | 已建：series 枚举（meta diff 断言值映射 undefined→normal） | B | diff | — | 3 | 值字符串化（price） | 已声明 |
-| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef.styles/attrs 回调 + drawLinePlots styleOverrideOf 行级覆盖（0.3.0） | B | diff | M | 3 | 绘制端消费随批次 5+ | 已声明 |
+| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef.styles/attrs 回调 + drawLinePlots styleOverrideOf 行级覆盖（0.3.0）；0.16.0-beta02 实例三色经 BarColorsContext 进 provider，绘制/legend 同源（IndicatorStyleResolver + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity20InstanceStylesTest.kt + app-sample/src/androidTest/kotlin/io/lkanvas/sample/InstanceStylesRasterTest.kt） | B | diff | M | 3 | 绘制端消费随批次 5+ | 行为通过 |
 | IND-015 | `minValue` | component/Indicator.ts | 已建：minValue（VOL=0 覆写） | B | diff | S | 3 | VOL=0 | 已声明 |
 | IND-016 | `maxValue` | component/Indicator.ts | 已建：maxValue（默认 null） | B | diff | S | 3 |  | 已声明 |
-| IND-017 | `styles` | component/Indicator.ts | IndicatorInstance.styles + createIndicator(styles) | B | test | M | 5 | | 已声明 |
+| IND-017 | `styles` | component/Indicator.ts | IndicatorInstance.styles + createIndicator(styles)；0.16.0-beta02 归一化消费（IndicatorStyleSpec/IndicatorStyle/List<PolygonStyle> 三形态，lkanvas-compose/src/test/kotlin/io/lkanvas/chart/styles/IndicatorInstanceStylesTest.kt + lkanvas-core/src/test/kotlin/io/lkanvas/core/indicator/BuiltInBarStylesContextTest.kt） | B | test | M | 5 | | 行为通过 |
 | IND-018 | `shouldUpdate` | component/Indicator.ts | 已建：shouldUpdate（默认 true；PRD R-08） | B | test | S | 3 |  | 已声明 |
 | IND-019 | `calc` | component/Indicator.ts | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 | 已声明 |
 | IND-020 | `regenerateFigures` | component/Indicator.ts | 已建：plotsFor（meta diff 断言 figures 顺序） | B | diff | S | 3 | 改名兼容 | 已声明 |

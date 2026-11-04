@@ -365,6 +365,31 @@ data class IndicatorStyle(
     val tooltip: IndicatorTooltipStyle = IndicatorTooltipStyle(),
 )
 
+/**
+ * 指标柱/圆的**显式三色**表示（hex；上游 bars 的 upColor/downColor/noChangeColor 对应物）。
+ * 旧 `List<PolygonStyle>` 形态按位归一为 [0]=涨、[1]=跌、[2]=平，本类型为等价显式写法。
+ */
+data class IndicatorBarColors(
+    val upColor: String,
+    val downColor: String,
+    val noChangeColor: String,
+)
+
+/**
+ * 指标实例样式显式规格（`createIndicator/overrideIndicator` 的 `styles: Any?`
+ * 认可形态之一，0.16.0-beta02 新增；`IndicatorStyle` 与旧 `List<PolygonStyle>`
+ * 形态继续受支持）。
+ *
+ * - [lineColors]：LINE 槽按 plot 索引取色（不足/超出部分回退全局调色板）；
+ * - [barColors]/[circleColors]：BAR/CIRCLE 槽三色，未配置项回退
+ *   全局 styles（indicator.bars）再回退内置默认。
+ */
+data class IndicatorStyleSpec(
+    val lineColors: List<String> = emptyList(),
+    val barColors: IndicatorBarColors? = null,
+    val circleColors: IndicatorBarColors? = null,
+)
+
 /** 上游 AxisLineStyle。 */
 data class AxisLineStyle(
     val show: Boolean = true,

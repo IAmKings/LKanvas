@@ -32,14 +32,15 @@ class VolumeIndicator : IndicatorDefinition {
             PlotDef(
                 "volume", "VOLUME: ", PlotType.BAR, baseValue = 0.0,
                 // Q05（第四轮复审 2026-10-30）：上游 volume.ts getVolumeFigure styles
-                // 镜像——按 compareRule 涨跌着色（函数约定 (row, params, value, candles)）
-                styles = { row: Int, _: List<Double>, _: Double, candles: List<io.lkanvas.core.data.Candle> ->
+                // 镜像——按 compareRule 收/开着色；色值改走 BarColorsContext
+                //（实例 styles 覆盖→全局 styles 回退），字面量为两级均未配置时的默认
+                styles = io.lkanvas.core.indicator.ContextPlotStyles { row, _, _, candles, barColors ->
                     val c = candles.getOrNull(row)
                     val color = when {
-                        c == null -> "#76808F"
-                        c.close > c.open -> "#2DC08E"
-                        c.close < c.open -> "#F92855"
-                        else -> "#76808F"
+                        c == null -> barColors.noChangeColor ?: "#76808F"
+                        c.close > c.open -> barColors.upColor ?: "#2DC08E"
+                        c.close < c.open -> barColors.downColor ?: "#F92855"
+                        else -> barColors.noChangeColor ?: "#76808F"
                     }
                     mapOf("color" to color)
                 },

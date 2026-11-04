@@ -580,7 +580,7 @@ class AxisAndInstanceFieldsTest {
         val inst = io.lkanvas.core.indicator.IndicatorInstance("audit_fig_inst", def)
         val candles = (0 until 4).map { candleOf(it.toLong(), 100.0 + it) }
         // styles 消费（Q05 签名含 value/candles 上下文）
-        val styleFn = io.lkanvas.compose.draw.PaneRenderers.styleOverrideFor(inst)
+        val styleFn = io.lkanvas.compose.draw.PaneRenderers.styleOverrideFor(inst, io.lkanvas.compose.theme.ChartTheme())
         kotlin.test.assertNotNull(styleFn, "styles 有消费者")
         val (c0, w0) = styleFn!!("k", 0, Double.NaN, candles)
         kotlin.test.assertNotNull(c0, "styles 供色")
@@ -603,14 +603,15 @@ class AxisAndInstanceFieldsTest {
         val vol = io.lkanvas.core.extension.indicator.IndicatorTemplates.get("VOL")!!
         val volPlot = vol.plotsFor(vol.calcParams).first { it.key == "volume" }
         kotlin.test.assertNotNull(volPlot.styles, "VOL volume figure 有 styles 回调（上游 volume.ts:33 镜像）")
-        @Suppress("UNCHECKED_CAST")
-        val upFn = volPlot.styles as (Int, List<Double>, Double, List<io.lkanvas.core.data.Candle>) -> Map<String, String>
+        // 0.16.0-beta02：内置柱色走 ContextPlotStyles（BarColorsContext 空槽 → 字面量默认）
+        val upFn = volPlot.styles as io.lkanvas.core.indicator.ContextPlotStyles
+        val emptyCtx = io.lkanvas.core.indicator.BarColorsContext()
         val candles = listOf(
             io.lkanvas.core.data.Candle(0L, 100.0, 110.0, 90.0, 105.0, 10.0),
             io.lkanvas.core.data.Candle(60_000L, 105.0, 115.0, 95.0, 101.0, 10.0),
         )
-        assertEquals("#2DC08E", upFn(0, vol.calcParams, 10.0, candles)["color"], "阳线绿色")
-        assertEquals("#F92855", upFn(1, vol.calcParams, 10.0, candles)["color"], "阴线红色")
+        assertEquals("#2DC08E", upFn.styles(0, vol.calcParams, 10.0, candles, emptyCtx)?.get("color"), "阳线绿色")
+        assertEquals("#F92855", upFn.styles(1, vol.calcParams, 10.0, candles, emptyCtx)?.get("color"), "阴线红色")
         val macd = io.lkanvas.core.extension.indicator.IndicatorTemplates.get("MACD")!!
         val macdPlot = macd.plots.first { it.key == "macd" }
         kotlin.test.assertNotNull(macdPlot.styles, "MACD macd figure 有 styles 回调")

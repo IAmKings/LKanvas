@@ -100,7 +100,7 @@ object ChartRenderer {
             params.width, params.height, params.gutterWidth, params.legendTextSizePx,
             density, fontScale, panes, state.extraPaneLayout,
             crosshair != null, if (styles?.candle?.tooltip?.showType == "rect" || styles?.indicator?.tooltip?.showType == "rect") crosshair else null,
-            theme, state.getIndicators().map { listOf(it.id, System.identityHashCode(it.state), it.visible, it.params, it.precisionOverride, it.displayName(), it.yAxisId) },
+            theme, state.getIndicators().map { listOf(it.id, System.identityHashCode(it.state), it.visible, it.params, it.precisionOverride, it.displayName(), it.yAxisId, System.identityHashCode(it.styles)) },
         )
         val cacheHit = cache != null && cache.key == key && cache.ops != null
         // Layout once before price marks, then replay at the original tooltip layer.

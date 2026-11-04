@@ -31,12 +31,13 @@ class MacdIndicator : IndicatorDefinition {
         PlotDef(
             "macd", "MACD: ", PlotType.BAR, baseValue = 0.0,
             // Q05：上游 MACD bar styles 镜像——值正负着色（stroke/fill 增强为 Compose
-            // 描边语义延后；色值同 defaultStyles bars[0]）
-            styles = { _: Int, _: List<Double>, value: Double, _: List<io.lkanvas.core.data.Candle> ->
+            // 描边语义延后）；色值改走 BarColorsContext（实例覆盖→全局回退），
+            // 字面量为两级均未配置时的默认
+            styles = io.lkanvas.core.indicator.ContextPlotStyles { _, _, value, _, barColors ->
                 val color = when {
-                    value > 0 -> "#2DC08E"
-                    value < 0 -> "#F92855"
-                    else -> "#76808F"
+                    value > 0 -> barColors.upColor ?: "#2DC08E"
+                    value < 0 -> barColors.downColor ?: "#F92855"
+                    else -> barColors.noChangeColor ?: "#76808F"
                 }
                 mapOf("color" to color)
             },
