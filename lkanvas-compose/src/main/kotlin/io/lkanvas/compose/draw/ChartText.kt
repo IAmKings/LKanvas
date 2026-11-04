@@ -158,9 +158,9 @@ class ChartText(
                     p.get(java.util.Calendar.YEAR) == cal.get(java.util.Calendar.YEAR)
             }
             return when {
-                intervalMs >= 24 * 3600_000L -> "yy/MM-dd"
+                intervalMs >= 24 * 3600_000L -> "YYYY-MM-DD"
                 sameDay -> "HH:mm"
-                else -> "MM-dd"
+                else -> "MM-DD"
             }
         }
 

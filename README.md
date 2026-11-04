@@ -1,13 +1,13 @@
 # LKanvas
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.iamkings/lkanvas-compose)](https://central.sonatype.com/artifact/io.github.iamkings/lkanvas-compose)
-[![JitPack](https://jitpack.io/v/IAmKings/LKanvas.svg)](https://jitpack.io/#IAmKings/LKanvas/0.16.0-beta01)
+[![JitPack](https://jitpack.io/v/IAmKings/LKanvas.svg)](https://jitpack.io/#IAmKings/LKanvas/0.16.0-beta02)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **LKanvas** 是 [KLineChart](https://github.com/klinecharts/KLineChart)（v10.1.0）的 Android / Jetpack Compose 原生实现——纯 Kotlin 计算核心 + Compose Canvas 绘制的 K 线图表库，指标、覆盖物、坐标轴与数据接入模型与上游同名 API 对齐，WebView 迁移者可按上游文档习惯直接调用。
 
 > 本项目为独立维护的社区移植，不是 KLineChart 官方 Android 版本。
-> 当前处于 **0.16.0-beta01 内测**阶段，API 仍可能随 rc 版本调整；发布决策与已知缺口见[发布决策文档](docs/alignment/release-decision-go-2026-11-04.zh-CN.md)。
+> 当前处于 **0.16.0-beta02 内测**阶段，API 仍可能随 rc 版本调整；本轮修正及兼容边界见[beta02 版本记录](docs/alignment/0.16.0-beta02-release-notes.zh-CN.md)。
 
 ## 特性
 
@@ -35,7 +35,9 @@
 
 要求：**minSdk 23**、JVM 17 字节码；Compose 集成（验证组合：Compose BOM 2026.06.01 + Kotlin 2.4.x）。
 
-**Maven Central（推荐，无需额外仓库）**
+**Maven Central（已发布 beta01，无需额外仓库）**
+
+本次 beta02 使用下方 JitPack 坐标；Central 同步发布前保留已发布版本，避免引用尚不存在的制品。
 
 ```kotlin
 dependencies {
@@ -51,7 +53,7 @@ repositories { maven("https://jitpack.io") }
 
 // build.gradle.kts
 dependencies {
-    implementation("com.github.IAmKings.LKanvas:lkanvas-compose:0.16.0-beta01")
+    implementation("com.github.IAmKings.LKanvas:lkanvas-compose:0.16.0-beta02")
 }
 ```
 

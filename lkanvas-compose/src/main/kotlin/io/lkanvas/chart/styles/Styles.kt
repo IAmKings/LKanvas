@@ -74,6 +74,10 @@ data class PolygonStyle(
     val borderSize: Double = 1.0,
     val borderStyle: String = "solid",
     val borderDashedValue: List<Double> = listOf(2.0, 2.0),
+    /** 指标图形的 ChangeColor 槽；全部为空时兼容原有单色写法。 */
+    val upColor: String? = null,
+    val downColor: String? = null,
+    val noChangeColor: String? = null,
 )
 
 /** 上游 RectStyle。 */
@@ -367,7 +371,7 @@ data class IndicatorStyle(
 
 /**
  * 指标柱/圆的**显式三色**表示（hex；上游 bars 的 upColor/downColor/noChangeColor 对应物）。
- * 旧 `List<PolygonStyle>` 形态按位归一为 [0]=涨、[1]=跌、[2]=平，本类型为等价显式写法。
+ * 每个元素对应一个 BAR 图形，数组按该类型的图形序号循环。
  */
 data class IndicatorBarColors(
     val upColor: String,
@@ -380,14 +384,15 @@ data class IndicatorBarColors(
  * 认可形态之一，0.16.0-beta02 新增；`IndicatorStyle` 与旧 `List<PolygonStyle>`
  * 形态继续受支持）。
  *
- * - [lineColors]：LINE 槽按 plot 索引取色（不足/超出部分回退全局调色板）；
- * - [barColors]/[circleColors]：BAR/CIRCLE 槽三色，未配置项回退
- *   全局 styles（indicator.bars）再回退内置默认。
+ * 同类型样式槽循环使用；单个 [barColors] 是单槽简写。
+ * [circleColors] 保留兼容；当前 PlotType 仅支持 LINE/BAR，不消费圆形样式。
+ * 上游对象形态也可通过 styles 的 Map 表达，不改变旧 IndicatorStyle 的构造器。
  */
 data class IndicatorStyleSpec(
     val lineColors: List<String> = emptyList(),
     val barColors: IndicatorBarColors? = null,
     val circleColors: IndicatorBarColors? = null,
+    val bars: List<IndicatorBarColors> = emptyList(),
 )
 
 /** 上游 AxisLineStyle。 */

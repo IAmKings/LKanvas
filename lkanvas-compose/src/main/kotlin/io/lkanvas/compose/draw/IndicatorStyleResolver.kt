@@ -1,116 +1,74 @@
 package io.lkanvas.compose.draw
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import io.lkanvas.chart.styles.IndicatorBarColors
-import io.lkanvas.chart.styles.IndicatorStyleSpec
+import io.lkanvas.chart.styles.*
 import io.lkanvas.compose.theme.ChartTheme
 import io.lkanvas.compose.theme.StylesThemeBridge
 import io.lkanvas.core.indicator.BarColorsContext
 import io.lkanvas.core.indicator.IndicatorInstance
+import io.lkanvas.core.indicator.PlotType
 
-/**
- * 指标实例有效样式解析（复核文档 §5.2 单一入口）：
- *
- * 解析顺序 = **全局 styles（ChartTheme 已含合并）→ 实例覆盖 → figure 动态覆盖**：
- * - [normalize]：实例 `styles: Any?` 的认可形态归一——
- *   `IndicatorStyleSpec`（显式三色/按索引线色）、`IndicatorStyle`（bars/lines/
- *   circles 槽位）、旧 `List<PolygonStyle>`（BAR/CIRCLE 按位 [0]=涨 [1]=跌 [2]=平、
- *   LINE 按 plot 索引）；无法识别的形态按 null 处理（不抛错、不误读）。
- * - LINE：实例 lineColors 按索引覆盖全局调色板；
- * - BAR/CIRCLE：实例三色覆盖全局 macdBar*，再回退内置默认（由 provider 字面量兜底）；
- * - figure 动态（PlotDef.styles/ContextPlotStyles）按行覆盖前两级（内置 VOL/MACD
- *   的 provider 经 [barColorsContext] 消费前两级解析结果）。
- *
- * 图形绘制与 legend/tooltip 共用本对象结果，禁止按指标名称在 renderer 打补丁。
- */
+/** 上游 prepareIndicatorFigures：各图形类型独立计数，实例数组覆盖全局数组。 */
 internal object IndicatorStyleResolver {
-
-    /** 归一化实例三色（颜色已解析；hex 供 core BarColorsContext）。 */
-    internal data class BarColors(
-        val up: Color,
-        val down: Color,
-        val noChange: Color,
-        val upHex: String,
-        val downHex: String,
-        val noChangeHex: String,
+    data class Normalized(
+        val lineColors: List<Color?> = emptyList(),
+        val bars: List<BarColorsContext> = emptyList(),
     )
 
-    internal data class Normalized(
-        val lineColors: List<Color> = emptyList(),
-        val barColors: BarColors? = null,
-        val circleColors: BarColors? = null,
-    )
-
-    /** 无法识别的形态返回 null（契约：静默忽略，不抛错）。 */
     fun normalize(styles: Any?): Normalized? = when (styles) {
-        null -> null
         is IndicatorStyleSpec -> Normalized(
-            lineColors = styles.lineColors.map { StylesThemeBridge.parse(it) },
-            barColors = styles.barColors?.let { toBarColors(it) },
-            circleColors = styles.circleColors?.let { toBarColors(it) },
+            styles.lineColors.map(StylesThemeBridge::parse),
+            styles.bars.ifEmpty { listOfNotNull(styles.barColors) }.map { BarColorsContext(it.upColor, it.downColor, it.noChangeColor) },
         )
-        is io.lkanvas.chart.styles.IndicatorStyle -> Normalized(
-            lineColors = styles.lines.map { StylesThemeBridge.parse(it.color) },
-            barColors = positionalBarColors(styles.bars),
-            circleColors = positionalBarColors(styles.circles),
+        is IndicatorStyle -> Normalized(
+            styles.lines.map { StylesThemeBridge.parse(it.color) },
+            barSlots(styles.bars),
         )
-        is List<*> -> {
-            val polygons = styles.filterIsInstance<io.lkanvas.chart.styles.PolygonStyle>()
-            Normalized(barColors = positionalBarColors(polygons))
-        }
+        is IndicatorStylePatch -> normalize(styles.applyTo(IndicatorStyle()))
+        is Map<*, *> -> Normalized(
+            (styles["lines"] as? List<*>)?.map { line ->
+                (line as? Map<*, *>)?.get("color")?.let { StylesThemeBridge.parse(it.toString()) }
+            }.orEmpty(),
+            (styles["bars"] as? List<*>)?.map { bar ->
+                val slot = bar as? Map<*, *>
+                BarColorsContext(slot?.get("upColor") as? String ?: "#000000", slot?.get("downColor") as? String ?: "#000000", slot?.get("noChangeColor") as? String ?: "#000000")
+            }.orEmpty(),
+        )
+        is List<*> -> Normalized(bars = barSlots(styles.filterIsInstance<PolygonStyle>()))
         else -> null
     }
 
-    private fun toBarColors(b: IndicatorBarColors): BarColors = BarColors(
-        up = StylesThemeBridge.parse(b.upColor),
-        down = StylesThemeBridge.parse(b.downColor),
-        noChange = StylesThemeBridge.parse(b.noChangeColor),
-        upHex = b.upColor,
-        downHex = b.downColor,
-        noChangeHex = b.noChangeColor,
-    )
-
-    /** 旧 List<PolygonStyle> 按位归一：[0]=涨 [1]=跌 [2]=平（<2 项时缺失位为 null）。 */
-    private fun positionalBarColors(polygons: List<io.lkanvas.chart.styles.PolygonStyle>): BarColors? {
-        if (polygons.isEmpty()) return null
-        val up = polygons.getOrNull(0)?.color ?: return null
-        val down = polygons.getOrNull(1)?.color ?: up
-        val noChange = polygons.getOrNull(2)?.color ?: down
-        return toBarColors(IndicatorBarColors(up, down, noChange))
+    fun barSlots(bars: List<PolygonStyle>): List<BarColorsContext> = bars.map {
+        if (it.upColor != null || it.downColor != null || it.noChangeColor != null)
+            BarColorsContext(it.upColor, it.downColor, it.noChangeColor)
+        else BarColorsContext(it.color, it.color, it.color)
     }
 
-    /**
-     * LINE 槽有效色：实例 lineColors 按 plot 索引覆盖全局 palette（不足/超出回退）。
-     * 与 [PaneRenderers.figureColors] 配合使用。
-     */
-    fun lineColor(instanceStyles: Any?, plotIndex: Int, fallback: Color): Color {
-        val n = normalize(instanceStyles) ?: return fallback
-        return n.lineColors.getOrNull(plotIndex) ?: fallback
-    }
+    private fun <T> List<T>.slot(index: Int): T? = if (isEmpty()) null else get(index % size)
 
-    /** 全局 BAR 三色（theme.barColorsContext 由桥接层从全局 styles 构造；null=未配置）。 */
-    private fun globalBarContext(theme: ChartTheme): BarColorsContext =
-        theme.barColorsContext ?: BarColorsContext()
+    fun lineColor(styles: Any?, index: Int, fallback: Color): Color =
+        normalize(styles)?.lineColors?.slot(index) ?: fallback
 
-    /**
-     * ContextPlotStyles 的柱色上下文：实例三色覆盖全局 styles 显式配置；两级均未
-     * 配置的槽位保持 null → 内置默认字面量生效（默认外观不因主题默认色漂移）。
-     */
-    fun barColorsContext(instance: IndicatorInstance, theme: ChartTheme): BarColorsContext {
-        val n = normalize(instance.styles)
-        val g = globalBarContext(theme)
-        val b = n?.barColors
-        val c = n?.circleColors
+    fun barColorsContext(instance: IndicatorInstance, theme: ChartTheme, index: Int = 0): BarColorsContext =
+        barColorsContext(normalize(instance.styles), theme, index)
+
+    private fun barColorsContext(styles: Normalized?, theme: ChartTheme, index: Int): BarColorsContext {
+        val local = styles?.bars?.slot(index)
+        val global = theme.indicatorBarStyles.slot(index) ?: theme.barColorsContext
         return BarColorsContext(
-            upColor = b?.upHex ?: c?.upHex ?: g.upColor,
-            downColor = b?.downHex ?: c?.downHex ?: g.downColor,
-            noChangeColor = b?.noChangeHex ?: c?.noChangeHex ?: g.noChangeColor,
+            local?.upColor ?: global?.upColor,
+            local?.downColor ?: global?.downColor,
+            local?.noChangeColor ?: global?.noChangeColor,
         )
     }
 
-    /** 实例 BAR 槽三色（Color 形态，供无动态 provider 的自定义 BAR 图形回退）。 */
-    fun barColors(instance: IndicatorInstance): BarColors? = normalize(instance.styles)?.barColors
-
-    private fun Color.toHex(): String = "#%08X".format(toArgb())
+    fun figureColors(instance: IndicatorInstance, theme: ChartTheme, plots: List<io.lkanvas.core.indicator.PlotDef> = PaneRenderers.figurePlots(instance)): Map<String, Color> {
+        val styles = normalize(instance.styles)
+        val colors = PaneRenderers.figureColors(plots, theme, 0, styles?.lineColors.orEmpty()).toMutableMap()
+        var barIndex = 0
+        for (plot in plots) if (plot.type == PlotType.BAR) {
+            colors[plot.key] = StylesThemeBridge.parse(barColorsContext(styles, theme, barIndex++).noChangeColor ?: "#76808F")
+        }
+        return colors
+    }
 }

@@ -62,7 +62,7 @@ class OtherModuleAlignmentTest {
         })
         assertEquals(listOf("MA5: ", "MA10: ", "MA30: ", "MA60: "), groups[0].legends.map { it.title })
         assertEquals(theme.linePalette[0], groups[0].legends[0].valueColor)
-        assertEquals(theme.linePalette[4 % theme.linePalette.size], groups[1].legends[0].valueColor)
+        assertEquals(theme.linePalette[0], groups[1].legends[0].valueColor)
     }
     @Test fun instanceMagnetModeAndSensitivityAreConsumedWithoutAffectingPeers() {
         val state = state()
@@ -137,7 +137,7 @@ class OtherModuleAlignmentTest {
             assertEquals("VOLUME: ", volume.title)
             assertEquals(io.lkanvas.compose.theme.StylesThemeBridge.parse("#2DC08E"), volume.valueColor)
             assertEquals(volume.valueColor, volume.titleColor)
-            assertEquals(ChartTheme().linePalette[4 % ChartTheme().linePalette.size], groups[1].legends.first().valueColor)
+            assertEquals(ChartTheme().linePalette[0], groups[1].legends.first().valueColor)
         }
     }
 

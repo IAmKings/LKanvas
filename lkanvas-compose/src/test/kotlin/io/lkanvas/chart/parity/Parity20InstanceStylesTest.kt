@@ -106,11 +106,11 @@ class Parity20InstanceStylesTest {
         drawFigures(barTemplate(), null, theme)
         assertTrue(received.isNotEmpty())
         assertEquals("#AA0000", received[0].upColor)
-        assertEquals("#00AA00", received[0].downColor)
+        assertEquals("#AA0000", received[0].downColor)
     }
 
     @Test
-    fun `instance line colors override figureColors by plot index`() {
+    fun `instance line colors cycle independently of global palette`() {
         val plots = listOf(
             PlotDef("a", "A", PlotType.LINE),
             PlotDef("b", "B", PlotType.LINE),
@@ -121,8 +121,8 @@ class Parity20InstanceStylesTest {
             plots, theme, 0, IndicatorStyleResolver.normalize(inst)!!.lineColors,
         )
         assertEquals(androidx.compose.ui.graphics.Color(0xFF112233), colors.getValue("a"))
-        // 超出实例列表的 plot 回退全局调色板
-        assertEquals(theme.linePalette[1], colors.getValue("b"))
+        // 上游同类型槽循环使用。
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF112233), colors.getValue("b"))
     }
 
     private fun androidx.compose.ui.graphics.Color.toHex(): String = "#%08X".format(toArgb())

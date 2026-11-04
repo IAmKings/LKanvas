@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.LayoutDirection
  */
 class TestDrawScope(override val size: Size) : DrawScope {
 
-    data class RectOp(val l: Float, val t: Float, val r: Float, val b: Float, val depth: Int)
+    data class RectOp(val l: Float, val t: Float, val r: Float, val b: Float, val depth: Int, val color: Color = Color.Transparent)
     data class CircleOp(val cx: Float, val cy: Float, val radius: Float, val depth: Int)
     data class LineOp(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val depth: Int)
 
@@ -82,7 +82,7 @@ class TestDrawScope(override val size: Size) : DrawScope {
     override fun drawRect(color: Color, topLeft: Offset, size: Size, alpha: Float, style: DrawStyle, colorFilter: ColorFilter?, blendMode: BlendMode) {
         ops += "rect"
         val l = effX(topLeft.x); val t = effY(topLeft.y)
-        rects += RectOp(l, t, l + size.width, t + size.height, _clipDepth)
+        rects += RectOp(l, t, l + size.width, t + size.height, _clipDepth, color)
     }
 
     override fun drawRect(brush: Brush, topLeft: Offset, size: Size, alpha: Float, style: DrawStyle, colorFilter: ColorFilter?, blendMode: BlendMode) {

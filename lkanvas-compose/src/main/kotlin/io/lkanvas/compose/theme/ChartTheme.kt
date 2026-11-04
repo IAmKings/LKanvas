@@ -31,10 +31,6 @@ data class ChartTheme(
     val macdDea: Color = Color(0xFF2196F3),
     val macdBarUp: Color = Color(0xFF26A69A),
     val macdBarDown: Color = Color(0xFFEF5350),
-    // 柱式指标显式三色上下文（0.16.0-beta02）：由 StylesThemeBridge 从全局 styles
-    // indicator.bars 桥接，**null 槽位 = styles 未配置**（内置指标保持字面量默认）；
-    // 手工构造的 ChartTheme 默认 null。实例 styles 覆盖在此基础上生效。
-    val barColorsContext: io.lkanvas.core.indicator.BarColorsContext? = null,
     // 图例
     val legendText: Color = Color(0xFF7C7C7C),
     val legendValueUp: Color = Color(0xFF26A69A),
@@ -66,6 +62,9 @@ data class ChartTheme(
     val indicatorLineSizePx: Float = 1.5f,
     val indicatorLineDashed: Boolean = false,
     val lastValueMarkShow: Boolean = true,
+    /** 单个全局柱样式的兼容简写；多图形使用独立的 indicatorBarStyles 槽。 */
+    val barColorsContext: io.lkanvas.core.indicator.BarColorsContext? = null,
+    val indicatorBarStyles: List<io.lkanvas.core.indicator.BarColorsContext> = emptyList(),
 ) {
     companion object {
         fun dark(): ChartTheme = ChartTheme(

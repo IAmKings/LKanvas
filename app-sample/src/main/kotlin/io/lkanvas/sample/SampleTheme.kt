@@ -84,7 +84,7 @@ fun sampleStyles(dark: Boolean, base: Styles): Styles {
         ),
         indicator = base.indicator.copy(
             lines = palette.map { SmoothLineStyle(color = it) },
-            bars = listOf(PolygonStyle(color = up), PolygonStyle(color = down)),
+            bars = listOf(PolygonStyle(upColor = up, downColor = down, noChangeColor = text)),
             tooltip = base.indicator.tooltip.copy(
                 title = base.indicator.tooltip.title.copy(color = text),
                 legend = base.indicator.tooltip.legend.copy(color = text),

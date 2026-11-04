@@ -16,10 +16,10 @@ import org.junit.Test
 /**
  * 指标实例样式归一化与有效三色上下文契约（0.16.0-beta02，复核文档 §5.2）：
  * - 认可形态：IndicatorStyleSpec（显式）、IndicatorStyle（槽位）、旧 List<PolygonStyle>
- *   （按位 [0]=涨 [1]=跌 [2]=平）；无法识别形态静默为 null；
+ *   （每项为一个单色图形槽）；无法识别形态静默为 null；
  * - barColorsContext：实例覆盖全局（ChartTheme 桥接的 indicator.bars）；实例未配置
  *   的槽位由全局兜底；两实例互不污染；
- * - LINE 槽按 plot 索引，不足/超出回退。
+ * - LINE 槽按同类型图形序号循环。
  */
 class IndicatorInstanceStylesTest {
 
@@ -50,7 +50,7 @@ class IndicatorInstanceStylesTest {
     }
 
     @Test
-    fun `legacy IndicatorStyle bars map positionally up-down-noChange`() {
+    fun `legacy IndicatorStyle bars preserve per-figure monochrome slots`() {
         val c = ctxOf(
             IndicatorStyle(
                 bars = listOf(
@@ -61,17 +61,17 @@ class IndicatorInstanceStylesTest {
             ),
         )
         assertEquals("#111111", c.upColor)
-        assertEquals("#222222", c.downColor)
-        assertEquals("#333333", c.noChangeColor)
+        assertEquals("#111111", c.downColor)
+        assertEquals("#111111", c.noChangeColor)
     }
 
     @Test
-    fun `bare PolygonStyle list maps positionally with missing slots filled`() {
-        // 只有 [0]/[1]：平色缺省承接跌色（归一契约的一部分）
+    fun `bare PolygonStyle list preserves first monochrome slot`() {
+        // 两个元素分别属于两个 BAR 图形，不是涨跌两个方向。
         val c = ctxOf(listOf(PolygonStyle(color = "#111111"), PolygonStyle(color = "#222222")))
         assertEquals("#111111", c.upColor)
-        assertEquals("#222222", c.downColor)
-        assertEquals("#222222", c.noChangeColor)
+        assertEquals("#111111", c.downColor)
+        assertEquals("#111111", c.noChangeColor)
     }
 
     @Test
@@ -108,13 +108,13 @@ class IndicatorInstanceStylesTest {
     }
 
     @Test
-    fun `line colors resolve by plot index with fallback`() {
+    fun `line colors cycle by line index`() {
         val styles = IndicatorStyleSpec(lineColors = listOf("#010203"))
         val n = IndicatorStyleResolver.normalize(styles)!!
         assertEquals(1, n.lineColors.size)
         val fallback = ChartTheme().linePalette[0]
         assertEquals(n.lineColors[0], IndicatorStyleResolver.lineColor(styles, 0, fallback))
-        assertEquals(fallback, IndicatorStyleResolver.lineColor(styles, 1, fallback))
+        assertEquals(n.lineColors[0], IndicatorStyleResolver.lineColor(styles, 1, fallback))
         assertEquals(fallback, IndicatorStyleResolver.lineColor(null, 0, fallback))
     }
 

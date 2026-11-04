@@ -220,6 +220,9 @@ class ChartState(
 
     /** 文案（R-11/T-24：中英文切换；默认中文）。 */
     var locale: io.lkanvas.core.i18n.ChartLocale = io.lkanvas.core.i18n.ChartLocale.ZH_CN
+        set(value) {
+            if (field != value) { field = value; notifyFormatChanged() }
+        }
 
     /** 图例模式（PRD R-11：常显跟随 / 隐藏；宿主可用 legendSlot 全面定制）。 */
     var legendMode: LegendMode = LegendMode.VISIBLE
@@ -234,8 +237,8 @@ class ChartState(
 
         /** 库默认规则产出的模板 token（formatter 契约的一部分，随默认规则演进）。 */
         const val TEMPLATE_TIME = "HH:mm"
-        const val TEMPLATE_DATE = "MM-dd"
-        const val TEMPLATE_DATE_YEAR = "yy/MM-dd"
+        const val TEMPLATE_DATE = "MM-DD"
+        const val TEMPLATE_DATE_YEAR = "YYYY-MM-DD"
     }
 
     /**
@@ -247,8 +250,26 @@ class ChartState(
      * [TEMPLATE_DATE_YEAR]）；formatter 已配置时其非空返回值即最终文案（公开类型
      * 契约），未配置时返回 null → 调用点回退默认规则。
      */
-    fun formattedTimeLabel(timestamp: Long, template: String, scene: String): String? =
-        formatConfig.formatDateByScene?.invoke(timestamp, template, scene)
+    fun formattedTimeLabel(timestamp: Long, template: String, scene: String): String? {
+        val actualTemplate = dateTemplate(scene) ?: template
+        return formatConfig.formatDateByScene?.invoke(timestamp, actualTemplate, scene)
+            ?: formatConfig.formatDate?.invoke(timestamp, actualTemplate)
+    }
+
+    internal var formattingPeriod: io.lkanvas.core.common.Period? = null
+        set(value) {
+            if (field != value) { field = value; notifyFormatChanged() }
+        }
+
+    private fun dateTemplate(scene: String): String? = when (formattingPeriod?.type) {
+        io.lkanvas.core.common.Period.PeriodType.SECOND -> "HH:mm:ss"
+        io.lkanvas.core.common.Period.PeriodType.MINUTE -> if (scene == FORMAT_SCENE_X_AXIS) "HH:mm" else "YYYY-MM-DD HH:mm"
+        io.lkanvas.core.common.Period.PeriodType.HOUR -> if (scene == FORMAT_SCENE_X_AXIS) "MM-DD HH:mm" else "YYYY-MM-DD HH:mm"
+        io.lkanvas.core.common.Period.PeriodType.DAY, io.lkanvas.core.common.Period.PeriodType.WEEK -> TEMPLATE_DATE_YEAR
+        io.lkanvas.core.common.Period.PeriodType.MONTH -> "YYYY-MM"
+        io.lkanvas.core.common.Period.PeriodType.YEAR -> "YYYY"
+        null -> null
+    }
 
     /**
      * 当前图例数据（十字线跟随或末根；R-11「常显、跟随十字线」）。
@@ -964,6 +985,9 @@ class ChartState(
 
     /** IANA 时区（0.3.0 批次 8e：门面 setTimezone 注入；空=系统时区）。 */
     var timezoneId: String = ""
+        set(value) {
+            if (field != value) { field = value; notifyFormatChanged() }
+        }
 
     /**
      * 格式配置（上游 Options 的 thousandsSeparator/decimalFold/formatter 消费端，
@@ -972,6 +996,7 @@ class ChartState(
      * formatDate/formatBigNumber 自定义钩子未提供时用内置实现。
      */
     var formatConfig: FormatConfig = FormatConfig()
+        set(value) { field = value; notifyFormatChanged() }
 
     data class FormatConfig(
         val thousandsSign: String? = null,
@@ -1502,7 +1527,11 @@ class ChartState(
     fun isInAxisGutter(x: Float): Boolean = contentWidthPx > 0f && x > contentWidthPx
 
     /** 格式配置等绘制输入变更后的重绘触发（formatter/timezone/locale/period 消费链）。 */
+    internal var formatRevision: Long = 0L
+        private set
+
     internal fun notifyFormatChanged() {
+        formatRevision++
         viewRevision++
     }
 

@@ -72,7 +72,10 @@ class LKanvasChart private constructor(
 
     /** 上游 `setPeriod`：切周期（同上顺序）。 */
     fun setPeriod(period: Period) {
-        scope.launch { store.setPeriod(period) }
+        scope.launch {
+            store.setPeriod(period)
+            state.formattingPeriod = store.period
+        }
     }
 
     /** 上游 `getPeriod`。 */
@@ -963,7 +966,6 @@ class LKanvasChart private constructor(
             formatBigNumber = f?.formatBigNumber,
         )
         // formatter/分隔/折叠变更使时间轴、tooltip 缓存与图例失效重绘
-        state.notifyFormatChanged()
     }
 
     /** 上游 `setHotkey(hotkey)` / `getHotkey()`（平台占位）。 */

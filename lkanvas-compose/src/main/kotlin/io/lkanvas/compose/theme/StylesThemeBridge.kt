@@ -48,13 +48,7 @@ object StylesThemeBridge {
             macdDea = parse(styles.indicator.lines.getOrNull(1)?.color ?: "#2196F3"),
             macdBarUp = parse(styles.indicator.bars.getOrNull(0)?.color ?: "#2DC08E"),
             macdBarDown = parse(styles.indicator.bars.getOrNull(1)?.color ?: "#EF5350"),
-            // 0.16.0-beta02：柱式指标显式三色上下文——保留 styles 的显式性（未配置
-            // 槽位为 null，内置指标保持字面量默认），实例 styles 在此之上覆盖
-            barColorsContext = io.lkanvas.core.indicator.BarColorsContext(
-                upColor = styles.indicator.bars.getOrNull(0)?.color,
-                downColor = styles.indicator.bars.getOrNull(1)?.color,
-                noChangeColor = styles.indicator.bars.getOrNull(2)?.color,
-            ),
+            indicatorBarStyles = io.lkanvas.compose.draw.IndicatorStyleResolver.barSlots(styles.indicator.bars),
             legendText = parse(styles.candle.tooltip.legend.color),
             legendValueUp = parse(up),
             legendValueDown = parse(down),

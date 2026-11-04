@@ -127,9 +127,15 @@ data class PolygonStylePatch(
     val borderSize: Double? = null,
     val borderStyle: String? = null,
     val borderDashedValue: List<Double>? = null,
+    val upColor: String? = null,
+    val downColor: String? = null,
+    val noChangeColor: String? = null,
 ) {
     /** 仅覆盖已提供字段（嵌套递归）。 */
     fun applyTo(base: PolygonStyle): PolygonStyle = base.copy(
+        upColor = upColor ?: base.upColor,
+        downColor = downColor ?: base.downColor,
+        noChangeColor = noChangeColor ?: base.noChangeColor,
         style = style ?: base.style,
         color = color ?: base.color,
         borderColor = borderColor ?: base.borderColor,

@@ -86,8 +86,8 @@
 | CH-016 | `getStyles` | Chart.ts:612 | 已建（Styles 树全量返回） | B | test | S | 5 |  | 已声明 |
 | CH-017 | `setLayoutOptions` | Chart.ts:616 | ChartLayoutConfig 部分 | B | compile | M | 5 | barSpaceLimit/pane/yAxis | 已声明 |
 | CH-018 | `getLayoutOptions` | Chart.ts:620 | 同上 | B | compile | S | 5 |  | 已声明 |
-| CH-019 | `setFormatter` | Chart.ts:624 | 门面 set/get + 三参场景契约接入真实绘制（0.16.0-beta02：时间轴 xAxis/tooltip/语义消费、模板 token、失效重绘、legendData 时区修复；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/FormatterSceneWiringTest.kt） | B | test | S | 2c | Formatter 接口对齐 | 行为通过 |
-| CH-020 | `getFormatter` | Chart.ts:630 | 已建；变更经 notifyFormatChanged 驱动重绘与缓存失效（FormatterSceneWiringTest.kt） | B | test | S | 2c |  | 行为通过 |
+| CH-019 | `setFormatter` | Chart.ts:624 | 三参上游 token/周期/场景消费、时区缓存失效（lkanvas-compose/src/test/kotlin/io/lkanvas/chart/FormatterSceneWiringTest.kt + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/UpstreamConsumptionRegressionTest.kt） | B | test | S | 2c | xAxis/tooltip/语义已验；crosshair 日期浮签无消费点，完整场景待验 | 已接线 |
+| CH-020 | `getFormatter` | Chart.ts:630 | 门面可查询，变更驱动重绘与缓存失效（lkanvas-compose/src/test/kotlin/io/lkanvas/chart/FormatterSceneWiringTest.kt） | B | test | S | 2c | 查询契约已验；与 CH-019 一并保留场景边界 | 已接线 |
 | CH-021 | `setLocale` | Chart.ts:634 | 门面 setLocale/getLocale 已建（zh-CN/en-US 映射 ChartLocale） | B | test | S | 2c | setLocale('en-US')→EN_US | 已声明 |
 | CH-022 | `getLocale` | Chart.ts:640 | 已建 | B | test | S | 2c |  | 已声明 |
 | CH-023 | `setTimezone` | Chart.ts:644 | 门面 set/get + state.timezoneId → ChartText 时间标签渲染消费（0.3.0） | B | test | S | 2c |  | 已声明 |
@@ -200,10 +200,10 @@
 | IND-011 | `zLevel` | component/Indicator.ts | 已建：Definition.zLevel（默认 0） | B | test | S | 3 |  | 已声明 |
 | IND-012 | `extendData` | component/Indicator.ts | 已建：Definition.extendData | B | test | M | 3 |  | 已声明 |
 | IND-013 | `series` | component/Indicator.ts | 已建：series 枚举（meta diff 断言值映射 undefined→normal） | B | diff | — | 3 | 值字符串化（price） | 已声明 |
-| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef.styles/attrs 回调 + drawLinePlots styleOverrideOf 行级覆盖（0.3.0）；0.16.0-beta02 实例三色经 BarColorsContext 进 provider，绘制/legend 同源（IndicatorStyleResolver + lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity20InstanceStylesTest.kt；设备端像素证据另见 app-sample 真机栅格用例，非 JVM 测试源集不作为矩阵引用） | B | diff | M | 3 | 绘制端消费随批次 5+ | 行为通过 |
+| IND-014 | `figures`（含 styles/attrs 回调） | component/Indicator.ts | PlotDef.styles/attrs + LINE/BAR 颜色解析；同类型独立计数与循环、绘制/legend 同源（lkanvas-compose/src/test/kotlin/io/lkanvas/chart/UpstreamConsumptionRegressionTest.kt） | B | test | M | 3 | 仅颜色子集已验证；stroke/fill、TEXT/CIRCLE 完整消费未验收 | 已接线 |
 | IND-015 | `minValue` | component/Indicator.ts | 已建：minValue（VOL=0 覆写） | B | diff | S | 3 | VOL=0 | 已声明 |
 | IND-016 | `maxValue` | component/Indicator.ts | 已建：maxValue（默认 null） | B | diff | S | 3 |  | 已声明 |
-| IND-017 | `styles` | component/Indicator.ts | IndicatorInstance.styles + createIndicator(styles)；0.16.0-beta02 归一化消费（IndicatorStyleSpec/IndicatorStyle/List<PolygonStyle> 三形态，lkanvas-compose/src/test/kotlin/io/lkanvas/chart/styles/IndicatorInstanceStylesTest.kt + lkanvas-core/src/test/kotlin/io/lkanvas/core/indicator/BuiltInBarStylesContextTest.kt） | B | test | M | 5 | | 行为通过 |
+| IND-017 | `styles` | component/Indicator.ts | 实例 typed/Patch/上游 Map 颜色槽消费（lkanvas-compose/src/test/kotlin/io/lkanvas/chart/UpstreamConsumptionRegressionTest.kt） | B | test | M | 5 | BAR 每元素为完整三色槽；texts/lastValueMark/tooltip 等实例槽未贯通，不能记全量行为通过 | 已接线 |
 | IND-018 | `shouldUpdate` | component/Indicator.ts | 已建：shouldUpdate（默认 true；PRD R-08） | B | test | S | 3 |  | 已声明 |
 | IND-019 | `calc` | component/Indicator.ts | 引擎等价（oracle 逐位） | A | diff | — | — | L1 已达标 | 已声明 |
 | IND-020 | `regenerateFigures` | component/Indicator.ts | 已建：plotsFor（meta diff 断言 figures 顺序） | B | diff | S | 3 | 改名兼容 | 已声明 |

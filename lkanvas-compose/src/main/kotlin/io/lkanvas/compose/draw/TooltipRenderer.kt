@@ -104,14 +104,8 @@ object TooltipRenderer {
                     "(${inst.params.joinToString(",") { trimNum(it) }})" else ""
                 val candles = state.dataSnapshot.candles
                 val plots = PaneRenderers.figurePlots(inst)
-                // 0.16.0-beta02：legend 与图形共用同一实例样式解析（LINE 索引色 +
-                // 行级 provider 三色），确保每个 legend 值颜色等于对应图形
-                val instanceStyles = IndicatorStyleResolver.normalize(inst.styles)
-                val colors = PaneRenderers.figureColors(
-                    plots, theme, PaneRenderers.figurePaletteOffset(state, inst),
-                    instanceStyles?.lineColors ?: emptyList(),
-                )
-                val override = PaneRenderers.styleOverrideFor(inst, theme)
+                val colors = IndicatorStyleResolver.figureColors(inst, theme, plots)
+                val override = PaneRenderers.styleOverrideFor(inst, plots.associateBy { it.key }, theme)
                 val custom = if (tooltip.legend.show) inst.definition.createTooltipDataSource?.invoke(candles, idx) else null
                 val rows = when {
                     !tooltip.legend.show -> emptyList()

@@ -70,7 +70,7 @@ class InstanceStylesRasterTest {
         return bitmap
     }
 
-    @Test fun instanceBarColorsApplySignRuleWithoutProvider() {
+    @Test fun plainBarUsesNeutralSlotWithoutProvider() {
         val def = barDef()
         val rows = mapOf("v" to listOf(5.0, -5.0)) // 行 0 正值、行 1 负值
         val signedDef = object : IndicatorDefinition by def {
@@ -84,10 +84,10 @@ class InstanceStylesRasterTest {
             signedDef,
             IndicatorStyleSpec(barColors = IndicatorBarColors("#E04545", "#1FA592", "#76808F")),
         )
-        assertTrue("正值柱应为实例涨色", countColor(bitmap, argb(red)) > 0)
-        assertTrue("负值柱应为实例跌色", countColor(bitmap, argb(green)) > 0)
-        // 未出现的零值色不得渲染
-        assertEquals("零值色不应出现（无零值行）", 0, countColor(bitmap, argb(gray)))
+        assertEquals(0, countColor(bitmap, argb(red)))
+        assertEquals(0, countColor(bitmap, argb(green)))
+        // 没有动态 provider 的上游 BAR 默认使用 noChangeColor，与数值正负无关。
+        assertTrue(countColor(bitmap, argb(gray)) > 0)
     }
 
     @Test fun providerConsumesThemeBridgeContextLikeBuiltins() {

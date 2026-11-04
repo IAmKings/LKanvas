@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import io.lkanvas.compose.state.ChartState
 import io.lkanvas.compose.theme.ChartTheme
 import io.lkanvas.compose.theme.MainChartType
+import io.lkanvas.compose.theme.StylesThemeBridge
 import io.lkanvas.core.axis.AxisTicks
 import io.lkanvas.core.axis.LinearYAxis
 import io.lkanvas.core.axis.YAxisMath
@@ -580,18 +581,26 @@ object PaneRenderers {
         return base + peers.takeWhile { it.id != inst.id }.sumOf { figurePlots(it).size }
     }
 
+    fun figureColors(plots: List<io.lkanvas.core.indicator.PlotDef>, theme: ChartTheme, offset: Int): Map<String, Color> =
+        figureColors(plots, theme, offset, emptyList())
+
     fun figureColors(
         plots: List<io.lkanvas.core.indicator.PlotDef>,
         theme: ChartTheme,
         offset: Int,
-        instanceLineColors: List<Color> = emptyList(),
-    ): Map<String, Color> =
-        plots.mapIndexed { i, plot ->
-            // 0.16.0-beta02：实例 LINE 槽按 plot 索引覆盖全局调色板（不足/超出回退）
-            val color = instanceLineColors.getOrNull(i)
-                ?: theme.linePalette[(offset + i) % theme.linePalette.size]
-            plot.key to color
-        }.toMap()
+        instanceLineColors: List<Color?>,
+    ): Map<String, Color> {
+        val palette = instanceLineColors.ifEmpty { theme.linePalette }
+        var lineIndex = 0
+        return plots.associate { plot ->
+            plot.key to if (plot.type == io.lkanvas.core.indicator.PlotType.LINE) {
+                val index = lineIndex++
+                palette[(if (instanceLineColors.isEmpty()) offset + index else index) % palette.size]
+                    // Android 没有 CSS currentColor；空颜色槽采用 Canvas 默认黑色。
+                    ?: Color.Black
+            } else StylesThemeBridge.parse("#76808F")
+        }
+    }
 
     /** 指标线绘制（跳过 NaN；palette 按 key 序取色）。 */
     private fun DrawScope.drawLinePlots(
@@ -778,8 +787,7 @@ object PaneRenderers {
     ) {
         val figures = figurePlots(inst)
         val plots = figures.associateBy { it.key }
-        val instanceStyles = IndicatorStyleResolver.normalize(inst.styles)
-        val colors = figureColors(figures, theme, paletteOffset, instanceStyles?.lineColors ?: emptyList())
+        val colors = IndicatorStyleResolver.figureColors(inst, theme, figures)
         val override = styleOverrideFor(inst, plots, theme)
         val attrsGeo = attrsOverrideFor(inst, plots)
         val lineKeys = ArrayList<String>()
@@ -801,7 +809,7 @@ object PaneRenderers {
         if (barEntries.isNotEmpty()) {
             val barOverride = if (barEntries.any { plots[it.first]?.styles != null }) override else null
             val barAttrs = if (barEntries.any { plots[it.first]?.attrs != null }) attrsGeo else null
-            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, barOverride, barAttrs, candles, paneTop, colors, instanceStyles?.barColors)
+            drawBarPlots(res, vp, range, y, barEntries, theme.linePalette, paletteOffset + lineKeys.size, barOverride, barAttrs, candles, paneTop, colors)
         }
     }
 
@@ -822,7 +830,6 @@ object PaneRenderers {
         candles: List<Candle> = emptyList(),
         paneTop: Float = 0f,
         figureColors: Map<String, Color> = emptyMap(),
-        instanceBarColors: IndicatorStyleResolver.BarColors? = null,
     ) {
         val gap = (vp.barSpacing * 0.25).coerceAtMost(vp.barSpacing - 1.0).coerceAtLeast(0.0).toFloat()
         val bodyWidth = (vp.barSpacing - gap).coerceAtLeast(1.0).toFloat()
@@ -870,17 +877,7 @@ object PaneRenderers {
                     }
                 }
                 val (c0, _) = override?.invoke(key, i, v, candles) ?: (null to null)
-                // 0.16.0-beta02 取色链（上游 全局→实例→figure 动态 对应物）：
-                // 动态 provider（含内置 VOL/MACD 经 BarColorsContext 消费实例/全局三色）
-                // → 实例三色按值/基线符号规则（无 provider 的自定义 BAR）→ 全局调色板
-                val instanceColor = instanceBarColors?.let { b ->
-                    when {
-                        v > base -> b.up
-                        v < base -> b.down
-                        else -> b.noChange
-                    }
-                }
-                val color = c0 ?: instanceColor ?: figureColors[key] ?: palette[(bi + paletteOffset) % palette.size]
+                val color = c0 ?: figureColors[key] ?: palette[(bi + paletteOffset) % palette.size]
                 drawRect(
                     color,
                     topLeft = Offset(ax, top),
@@ -922,10 +919,13 @@ object PaneRenderers {
     }
 
     /** Q05：styles 上下文含 value+candles（上游 figure.styles data 语义）。 */
+    fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance): ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)? =
+        styleOverrideFor(inst, ChartTheme())
+
     fun styleOverrideFor(inst: io.lkanvas.core.indicator.IndicatorInstance, theme: ChartTheme): ((String, Int, Double, List<Candle>) -> Pair<Color?, Float?>)? =
         styleOverrideFor(inst, inst.definition.plotsFor(inst.params).associateBy { it.key }, theme)
 
-    private fun styleOverrideFor(
+    internal fun styleOverrideFor(
         inst: io.lkanvas.core.indicator.IndicatorInstance,
         plots: Map<String, io.lkanvas.core.indicator.PlotDef>,
         theme: ChartTheme,
@@ -933,9 +933,12 @@ object PaneRenderers {
         if (plots.values.all { it.styles == null }) return null
         val parsedColors = HashMap<String, Color>()
         // 有效三色上下文每实例解析一次（实例覆盖→全局回退）；provider 行内自行选用
-        val barColors = IndicatorStyleResolver.barColorsContext(inst, theme)
+        var barIndex = 0
+        val barColors = plots.values.filter { it.type == io.lkanvas.core.indicator.PlotType.BAR }.associate {
+            it.key to IndicatorStyleResolver.barColorsContext(inst, theme, barIndex++)
+        }
         return { key, row, colValue, candles ->
-            val map: Map<*, *> = evaluateStyles(plots[key]?.styles, row, inst.params, colValue, candles, barColors) ?: emptyMap<Any?, Any>()
+            val map: Map<*, *> = evaluateStyles(plots[key]?.styles, row, inst.params, colValue, candles, barColors[key] ?: io.lkanvas.core.indicator.BarColorsContext()) ?: emptyMap<Any?, Any>()
             // 仍逐行执行 styles；只复用相同字符串的纯颜色解析，缓存有界。
             val color = map["color"]?.toString()?.let { value ->
                 parsedColors[value] ?: io.lkanvas.compose.theme.StylesThemeBridge.parse(value).also {

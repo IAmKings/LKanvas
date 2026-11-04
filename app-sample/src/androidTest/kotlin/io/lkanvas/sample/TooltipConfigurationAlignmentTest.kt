@@ -150,4 +150,35 @@ class TooltipConfigurationAlignmentTest {
         assertNotEquals(group.legends[0].valueColor, next.legends[0].valueColor)
     }
 
+    @Test fun formatterIsConsumedByRasterAndExportAndTimezoneInvalidatesCache() = withState { state, measurer ->
+        val chart = io.lkanvas.chart.LKanvasChart.init(state)
+        val seen = mutableSetOf<String?>()
+        chart.setTimezone("UTC")
+        chart.setFormatter(io.lkanvas.chart.Formatter(formatDate = { timestamp, template, type ->
+            seen += type
+            io.lkanvas.core.common.utils.Format.formatTimestampByTemplate(timestamp, template!!, chart.getTimezone())
+        }))
+        state.showCrosshairAt(state.viewport.candleCenterX(599.0).toFloat(), 200f)
+        val styles = Styles()
+        val cache = ChartRenderer.TooltipKeyHolder()
+        fun render(holder: ChartRenderer.TooltipKeyHolder): android.graphics.Bitmap {
+            val image = ImageBitmap(1200, 1700)
+            CanvasDrawScope().draw(Density(1f), LayoutDirection.Ltr, Canvas(image), Size(1200f, 1700f)) {
+                with(ChartRenderer) {
+                    render(state, ChartTheme(), ChartRenderer.Params(1200f, 1700f, 200f, 12f, 12f, true, styles = styles, tooltipCache = holder), measurer)
+                }
+            }
+            return image.asAndroidBitmap()
+        }
+        val utc = render(cache)
+        assertTrue("actual raster must invoke xAxis and tooltip scenes", seen.containsAll(listOf("xAxis", "tooltip")))
+        chart.setTimezone("Asia/Shanghai")
+        val changed = render(cache)
+        assertFalse("timezone change must alter the rendered date text", utc.sameAs(changed))
+        assertTrue("cached tooltip must match a fresh render after timezone change", changed.sameAs(render(ChartRenderer.TooltipKeyHolder())))
+        seen.clear()
+        val exported = io.lkanvas.compose.export.ChartSnapshotExporter.export(state, measurer, styles = styles, widthPx = 1200, heightPx = 1700)
+        assertTrue(exported is io.lkanvas.compose.export.ChartSnapshotExporter.Result.Ok)
+        assertTrue("PNG must consume the same date formatter", "xAxis" in seen)
+    }
 }

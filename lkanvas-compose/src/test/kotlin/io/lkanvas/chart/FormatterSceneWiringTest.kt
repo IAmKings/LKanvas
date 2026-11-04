@@ -21,7 +21,7 @@ import java.util.TimeZone
 /**
  * 日期 formatter 接线契约（0.16.0-beta02，复核文档 §6）：
  * - 公开三参 formatDate 契约保持；库在真实消费点传入场景（'xAxis'/'tooltip'）
- *   与模板 token（HH:mm / MM-dd / yy/MM-dd，随库默认规则演进）；
+ *   与模板 token（HH:mm / MM-DD / YYYY-MM-DD，随库默认规则演进）；
  * - formatter 未配置 → 调用点回退默认规则（含有效时区与既有标签缓存）；
  *   配置后 formatter 非空返回值即最终文案（公开类型契约）；
  * - legendData 默认时间文案消费有效时区（修复前跟随设备时区）；
@@ -32,6 +32,7 @@ class FormatterSceneWiringTest {
     private val ts = 1_700_000_000_000L // 2023-11-14 22:13:20 UTC
 
     private val dispatcher = UnconfinedTestDispatcher()
+    private val originalTimeZone = TimeZone.getDefault()
 
     @Before
     fun setUp() {
@@ -41,6 +42,7 @@ class FormatterSceneWiringTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        TimeZone.setDefault(originalTimeZone)
     }
 
     @Before
@@ -59,7 +61,7 @@ class FormatterSceneWiringTest {
                 Formatter(formatDate = { t, tpl, type -> seen += Triple(t, tpl, type); "$type#$tpl" }),
             )
             assertEquals("xAxis#HH:mm", state.formattedTimeLabel(ts, ChartState.TEMPLATE_TIME, ChartState.FORMAT_SCENE_X_AXIS))
-            assertEquals("tooltip#MM-dd", state.formattedTimeLabel(ts, ChartState.TEMPLATE_DATE, ChartState.FORMAT_SCENE_TOOLTIP))
+            assertEquals("tooltip#MM-DD", state.formattedTimeLabel(ts, ChartState.TEMPLATE_DATE, ChartState.FORMAT_SCENE_TOOLTIP))
             assertEquals("crosshair#HH:mm", state.formattedTimeLabel(ts, ChartState.TEMPLATE_TIME, ChartState.FORMAT_SCENE_CROSSHAIR))
             org.junit.Assert.assertTrue("公开三参 type 不再恒 null", seen.all { it.third != null })
             assertEquals(ChartState.FORMAT_SCENE_X_AXIS, seen[0].third)
