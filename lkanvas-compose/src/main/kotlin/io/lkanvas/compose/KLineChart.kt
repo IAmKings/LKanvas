@@ -96,7 +96,9 @@ fun KLineChart(
                     // 在语义阶段订阅摘要，视口平移不必重组整个图表节点。
                     @Suppress("UNUSED_VARIABLE") val a11yRevision = state.viewRevision + state.overlayRevision
                     contentDescription = state.accessibilityText { ts ->
-                        ChartText.timeLabel(ts, 60_000L, state.effectiveTimeZone())
+                        // 0.16.0-beta02：语义时间与 tooltip 同场景（formatter 接线）
+                        state.formattedTimeLabel(ts, io.lkanvas.compose.state.ChartState.TEMPLATE_TIME, io.lkanvas.compose.state.ChartState.FORMAT_SCENE_TOOLTIP)
+                            ?: ChartText.timeLabel(ts, 60_000L, state.effectiveTimeZone())
                     }
                     customActions = listOf(
                         CustomAccessibilityAction(state.locale.actionPrevCandle) { state.selectPreviousCandle() },

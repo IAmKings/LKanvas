@@ -100,7 +100,7 @@ object ChartRenderer {
             params.width, params.height, params.gutterWidth, params.legendTextSizePx,
             density, fontScale, panes, state.extraPaneLayout,
             crosshair != null, if (styles?.candle?.tooltip?.showType == "rect" || styles?.indicator?.tooltip?.showType == "rect") crosshair else null,
-            theme, state.getIndicators().map { listOf(it.id, System.identityHashCode(it.state), it.visible, it.params, it.precisionOverride, it.displayName(), it.yAxisId, System.identityHashCode(it.styles)) },
+            theme, System.identityHashCode(state.formatConfig), state.getIndicators().map { listOf(it.id, System.identityHashCode(it.state), it.visible, it.params, it.precisionOverride, it.displayName(), it.yAxisId, System.identityHashCode(it.styles)) },
         )
         val cacheHit = cache != null && cache.key == key && cache.ops != null
         // Layout once before price marks, then replay at the original tooltip layer.
@@ -294,7 +294,11 @@ object ChartRenderer {
             // 中心尚未越过上一标签右缘和间距的候选不会绘出，先跳过格式化。
             // prevTs 仍逐根推进；标签缓存包含上下文，不依赖此前的生成顺序。
             if (lastLabelRight == Float.NEGATIVE_INFINITY || x > lastLabelRight + 6f) {
-                val label = ChartText.timeAxisLabel(c.timestamp, prevTs, interval, timeZone)
+                // 0.16.0-beta02 formatter 接线（xAxis 场景）：库按默认规则选模板，
+                // formatter 未配置/返回 null 时回退默认标签（缓存路径不变）
+                val template = ChartText.axisTemplate(c.timestamp, prevTs, interval, timeZone)
+                val label = state.formattedTimeLabel(c.timestamp, template, io.lkanvas.compose.state.ChartState.FORMAT_SCENE_X_AXIS)
+                    ?: ChartText.timeAxisLabel(c.timestamp, prevTs, interval, timeZone)
                 if (label.isNotEmpty()) {
                     val width = text.measureWidth(label)
                     val drawX = (x - width / 2f).coerceIn(left, (right - width).coerceAtLeast(left))

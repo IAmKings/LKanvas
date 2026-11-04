@@ -948,14 +948,22 @@ class LKanvasChart private constructor(
      * state.formatConfig，由 ChartText.price/volume 统一消费。
      */
     private fun syncFormatConfig() {
+        val f = formatter
         state.formatConfig = ChartState.FormatConfig(
             thousandsSign = thousandsSeparator.sign,
             decimalFoldThreshold = decimalFold.threshold,
-            formatDate = formatter?.let { f ->
-                { ts: Long, tpl: String -> f.formatDate?.invoke(ts, tpl, null) ?: io.lkanvas.core.common.utils.Format.formatTimestampByTemplate(ts, tpl) }
+            // 0.16.0-beta02：公开三参 formatDate 契约保持，场景（'xAxis'/'tooltip'/
+            // 'crosshair'）由库在真实消费点传入（修复前 type 恒 null 且时间轴不消费）
+            formatDate = null,
+            // hook 返回 null 必须向上透传：调用点按库默认规则（含有效时区与既有
+            // 标签缓存）回退，不在本层替换为模板直排
+            formatDateByScene = f?.formatDate?.let { hook ->
+                { ts: Long, tpl: String, scene: String -> hook(ts, tpl, scene) }
             },
-            formatBigNumber = formatter?.formatBigNumber,
+            formatBigNumber = f?.formatBigNumber,
         )
+        // formatter/分隔/折叠变更使时间轴、tooltip 缓存与图例失效重绘
+        state.notifyFormatChanged()
     }
 
     /** 上游 `setHotkey(hotkey)` / `getHotkey()`（平台占位）。 */

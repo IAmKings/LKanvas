@@ -142,6 +142,28 @@ class ChartText(
             if (intervalMs >= 24 * 3600_000L) dayFmt() else timeFmt()
         }
 
+        /**
+         * 时间轴模板 token（0.16.0-beta02 formatter 契约）：与 [timeAxisLabel]
+         * 同一分支规则——日/周/月级 tick 为 [io.lkanvas.compose.state.ChartState.TEMPLATE_DATE_YEAR]，
+         * 同日时刻为 TEMPLATE_TIME，跨日为 TEMPLATE_DATE；formatter 场景接线时
+         * 由时间轴调用，formatter 未生效点回退 [timeAxisLabel]。
+         */
+        fun axisTemplate(timestamp: Long, prevTimestamp: Long?, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String {
+            val cal = java.util.Calendar.getInstance(tz)
+            cal.timeInMillis = timestamp
+            val sameDay = intervalMs < 24 * 3600_000L && prevTimestamp != null && run {
+                val p = java.util.Calendar.getInstance(tz)
+                p.timeInMillis = prevTimestamp
+                p.get(java.util.Calendar.DAY_OF_YEAR) == cal.get(java.util.Calendar.DAY_OF_YEAR) &&
+                    p.get(java.util.Calendar.YEAR) == cal.get(java.util.Calendar.YEAR)
+            }
+            return when {
+                intervalMs >= 24 * 3600_000L -> "yy/MM-dd"
+                sameDay -> "HH:mm"
+                else -> "MM-dd"
+            }
+        }
+
         /** 跨日显示日期、同日显示时间（时间轴）。 */
         fun timeAxisLabel(timestamp: Long, prevTimestamp: Long?, intervalMs: Long, tz: TimeZone = TimeZone.getDefault()): String = cachedLabel(labelKey(timestamp, prevTimestamp, intervalMs, tz, true)) {
             val cal = java.util.Calendar.getInstance(tz)

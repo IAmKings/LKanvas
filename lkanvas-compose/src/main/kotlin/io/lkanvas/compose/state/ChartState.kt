@@ -226,11 +226,40 @@ class ChartState(
 
     enum class LegendMode { VISIBLE, HIDDEN }
 
+    /** 上游 formatter type 场景字面量（'xAxis'/'tooltip'/'crosshair'）。 */
+    companion object FormatScenes {
+        const val FORMAT_SCENE_X_AXIS = "xAxis"
+        const val FORMAT_SCENE_TOOLTIP = "tooltip"
+        const val FORMAT_SCENE_CROSSHAIR = "crosshair"
+
+        /** 库默认规则产出的模板 token（formatter 契约的一部分，随默认规则演进）。 */
+        const val TEMPLATE_TIME = "HH:mm"
+        const val TEMPLATE_DATE = "MM-dd"
+        const val TEMPLATE_DATE_YEAR = "yy/MM-dd"
+    }
+
+    /**
+     * 场景化时间文案（0.16.0-beta02 formatter 接线，复核文档 §6）：自定义
+     * formatter 优先（公开三参契约透传 scene），未配置或返回 null 时由调用方
+     * 回退默认规则（默认规则含有效时区与既有标签缓存）。
+     *
+     * [template] 为库按自身默认规则选择的 token（[TEMPLATE_TIME]/[TEMPLATE_DATE]/
+     * [TEMPLATE_DATE_YEAR]）；formatter 已配置时其非空返回值即最终文案（公开类型
+     * 契约），未配置时返回 null → 调用点回退默认规则。
+     */
+    fun formattedTimeLabel(timestamp: Long, template: String, scene: String): String? =
+        formatConfig.formatDateByScene?.invoke(timestamp, template, scene)
+
     /**
      * 当前图例数据（十字线跟随或末根；R-11「常显、跟随十字线」）。
      * 空数据返回 null。
      */
-    fun legendData(timeText: (Long) -> String = { ts -> io.lkanvas.compose.draw.ChartText.timeLabel(ts, 60_000L) }): LegendData? {
+    fun legendData(timeText: (Long) -> String = { ts ->
+        // 0.16.0-beta02 修正：默认时间文案走 formatter（tooltip 场景）+ 有效时区
+        // （修复前缺 effectiveTimeZone → 跟随设备时区漂移）
+        formattedTimeLabel(ts, TEMPLATE_TIME, FORMAT_SCENE_TOOLTIP)
+            ?: io.lkanvas.compose.draw.ChartText.timeLabel(ts, 60_000L, effectiveTimeZone())
+    }): LegendData? {
         val candles = dataSnapshot.candles
         if (candles.isEmpty()) return null
         val crosshair = crosshairPosition
@@ -949,6 +978,14 @@ class ChartState(
         val decimalFoldThreshold: Int? = null,
         val formatDate: ((timestamp: Long, template: String) -> String)? = null,
         val formatBigNumber: ((value: Double) -> String)? = null,
+        /**
+         * 0.16.0-beta02（兼容性登记：嵌套类新增末尾默认参数——源码兼容、构造器
+         * JVM 签名变化）：场景化日期钩子，对齐上游 formatter.formatDate(ts, template,
+         * type) 三参契约。[scene] 取 [FORMAT_SCENE_X_AXIS]/[FORMAT_SCENE_TOOLTIP]/
+         * [FORMAT_SCENE_CROSSHAIR]（上游 'xAxis'/'tooltip'/'crosshair' 字面量）；
+         * 返回 null = 回退库默认规则。设置时 [formatDate] 保持 null（两者互斥）。
+         */
+        val formatDateByScene: ((timestamp: Long, template: String, scene: String) -> String)? = null,
     )
 
     /**
@@ -1463,6 +1500,11 @@ class ChartState(
 
     /** 是否命中右轴 gutter 区（x > 内容右缘）。 */
     fun isInAxisGutter(x: Float): Boolean = contentWidthPx > 0f && x > contentWidthPx
+
+    /** 格式配置等绘制输入变更后的重绘触发（formatter/timezone/locale/period 消费链）。 */
+    internal fun notifyFormatChanged() {
+        viewRevision++
+    }
 
     fun notifyViewportChanged() {
         viewRevision++

@@ -375,7 +375,9 @@ object TooltipRenderer {
             if (candleRows.isNotEmpty() && crosshair != null && titleStyle.show) {
                 val c = candles.getOrNull(idx)
                 if (c != null) {
-                    val ts = ChartText.timeLabel(c.timestamp, 60_000L, state.effectiveTimeZone())
+                    // 0.16.0-beta02：tooltip 场景 formatter 接线（未配置回退默认+有效时区）
+                    val ts = state.formattedTimeLabel(c.timestamp, io.lkanvas.compose.state.ChartState.TEMPLATE_TIME, io.lkanvas.compose.state.ChartState.FORMAT_SCENE_TOOLTIP)
+                        ?: ChartText.timeLabel(c.timestamp, 60_000L, state.effectiveTimeZone())
                     y = drawRow(
                         scope,
                         LegendRow("", ts, Color.Transparent, StylesThemeBridge.parse(titleStyle.color)),
