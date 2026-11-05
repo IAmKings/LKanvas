@@ -63,7 +63,12 @@ object ChartSnapshotExporter {
         val bitmap = ImageBitmap(widthPx, heightPx).apply { prepareToDraw() }
         val canvas = Canvas(bitmap)
         val drawScope = CanvasDrawScope()
-        val gutterPx = with(density) { config.rightAxisGutter.toPx() }
+        // issue #1：已启用右轴自适应时复用屏幕生效槽宽（所见即所得；不注入
+        // AxisWidthPolicy——导出按屏幕坐标等比缩放，settle 不得在导出度量下重算）
+        val gutterPx = maxOf(
+            with(density) { config.rightAxisGutter.toPx() },
+            state.axisGutterPx,
+        )
         val legendPx = with(density) { config.legendTextSize.toPx() }
         val axisPx = with(density) { config.axisTextSize.toPx() }
 

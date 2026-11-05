@@ -305,7 +305,7 @@
 | STY-034 | `IndicatorStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
 | STY-035 | `AxisTickLineStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
 | STY-036 | `AxisTickTextStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
-| STY-037 | `AxisStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
+| STY-037 | `AxisStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6）；`size:'auto'` 语义经平台替代映射 AxisWidthPolicy 消费（R11-01，上游默认值即 'auto'） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
 | STY-038 | `CrosshairDirectionStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
 | STY-039 | `CrosshairStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
 | STY-040 | `OverlayPointStyle` | Styles.ts | 已建：chart/styles/Styles.kt data class（字段级对齐 ts-inventory §6） | B | diff | M | 5 | 批次 5 字段级展开+默认值对照 | 已声明 |
@@ -501,3 +501,11 @@
 | ID | 复审发现 | 批次 | 实现证据 | 状态 |
 |---|---|---|---|---|
 | R10-01 | 默认段样式 A→B→A 复用早先组，提交行序重排 [0,2,1] | 15 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/PaneRenderers.kt segFor 仅复用最近连续同样式批次 + 批次容器改有序 List（身份语义，修复 data class 值等价键控合并丢段）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/parity/Parity15FigureAttrsTest.kt | 行为通过 |
+
+## 22. 第十一轮复审追踪（issue #1 轴宽审计 R11-01；0.16.0-beta03 收口）
+
+来源：issue #1（Catnip 宿主 `rightAxisGutter=46dp` 固定轴槽下 VOL 大数量级刻度换行/主图刻度截断）+ [Catnip 修复记录](catnip-remediation-fixes-2026-11-04.zh-CN.md) 新增观察「后续量轴格式/轴宽消费审计」。上游 `yAxis.size` 默认值即 `'auto'`（common/Styles.ts:663），轴宽 = marginStart + 实测最大刻度文本宽 + marginEnd（component/YAxis.ts `getAutoSize`），LKanvas 固定 gutter 为对齐缺口——本项按平台替代映射关闭缺口，不引入上游之外的新语义。
+
+| ID | 复审发现 | 批次 | 实现证据 | 状态 |
+|---|---|---|---|---|
+| R11-01 | 右轴槽宽为纯配置常量，刻度/tag 文本从不参与槽宽计算；槽过窄时越界仅画布硬裁切（issue #1） | 15 | lkanvas-compose/src/main/kotlin/io/lkanvas/compose/draw/AxisWidthPolicy.kt（上游 getAutoSize/_settleWidth/widthAnchorValue 移植：实测所需宽 + 立即扩/静默 400ms 收窄/4px 网格防抖）+ ChartRenderer（槽宽 = max(config, 实测刻度/tag 文本)，帧末回写）+ ChartState.applyAxisGutter（4px 网格阈值回写 contentWidthPx 并重布局，手势命中同源）+ ChartSnapshotExporter（导出复用屏幕生效槽宽，所见即所得，不回写）；lkanvas-compose/src/test/kotlin/io/lkanvas/chart/AxisWidthPolicyTest.kt；设备像素证据：Catnip 宿主 46dp 配置 + A 股日 K VOL≥1e7 刻度单行不截断（真机 Pixel/PJZ110 描述性引用，见 0.16.0-beta03-release-notes） | 行为通过 |

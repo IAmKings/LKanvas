@@ -88,6 +88,7 @@
 | `OverlayView` | `OverlayRenderer.kt` | 模板钩子驱动（SLA-013） | 已声明 |
 | `Event/DOM 触摸` | `ChartGestures.kt` | 开关检查入 Store（SLA-011） | 已声明 |
 | `Animation.ts` requestAnimationFrame | Compose `withFrameNanos`（Phase 7） | animationDuration 执行 | 已声明 |
+| `component/YAxis.ts` `getAutoSize`/`_settleWidth`/`widthAnchorValue`（`yAxis.size:'auto'` 自适应轴宽，上游默认值） | `draw/AxisWidthPolicy.kt`（neededWidth/settle/widthAnchorValue）+ `ChartRenderer`（槽宽 = max(config, 实测刻度/tag 文本)，帧末 `ChartState.applyAxisGutter` 回写） | stableWidthText 文本形状稳定化由 tagWidth 启发式 + settle 4px 网格承担；`ChartLayoutConfig.rightAxisGutter` 语义调整为槽宽下限（R11-01，issue #1） | 已声明 |
 
 ## 5. 审计发现 → 映射条目索引
 

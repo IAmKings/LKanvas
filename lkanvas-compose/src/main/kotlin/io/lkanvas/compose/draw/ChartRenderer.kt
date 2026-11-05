@@ -49,6 +49,18 @@ object ChartRenderer {
         val tooltipCache: TooltipKeyHolder? = null,
         /** 0.4.0 多轴：每个自定义轴标签列宽 px（调用方按字体缩放算好）。 */
         val extraAxisColW: Float = 0f,
+        /**
+         * 右轴自适应宽度策略（issue #1 / 上游 `yAxis.size='auto'` 平台移植）：
+         * 非空时槽宽 = max([gutterWidth], 实测刻度/tag 文本所需宽度，settle 防抖)；
+         * null 保持固定 [gutterWidth]。屏幕路径由 KLineChart remember 持有
+         * （跨帧 settle 状态）；导出路径不注入（直接复用屏幕生效值）。
+         */
+        val axisWidthPolicy: AxisWidthPolicy? = null,
+        /**
+         * 自适应槽宽帧末回写 [ChartState.applyAxisGutter]（屏幕渲染 true）。
+         * 导出 false——导出按屏幕 contentWidth 等比缩放，不得回写污染手势布局。
+         */
+        val gutterFeedback: Boolean = false,
     )
 
     /** tooltip 缓存（KLineChart remember 持有，绘制阶段读写）。 */
@@ -66,12 +78,23 @@ object ChartRenderer {
         textMeasurer: TextMeasurer,
     ) {
         val panes = state.paneHeightsPx
-        val contentRight = params.width - params.gutterWidth
         val text = ChartText(textMeasurer, theme.axisText, params.axisTextSizePx, format = state.formatConfig)
 
         drawRect(theme.background, size = size)
 
         if (state.dataSnapshot.candles.isEmpty()) return
+
+        // issue #1：右轴槽宽自适应（上游 `yAxis.size='auto'` getAutoSize 平台移植）。
+        // 实测全部落入 gutter 的文本（主图/副图刻度 + 末价/十字线 tag），配置
+        // gutter 为下限；settle 防抖（立即扩、静默 400ms 后才收窄、4px 网格）。
+        val policy = params.axisWidthPolicy
+        val effectiveGutter = if (policy == null) params.gutterWidth else {
+            var needed = policy.neededWidth(axisGutterTexts(state, text::price), text::measureWidth)
+            val tagNeeded = tagReservedWidth(state, text, theme)
+            if (tagNeeded > needed) needed = tagNeeded
+            if (needed > 0f) maxOf(params.gutterWidth, policy.settle(needed)) else params.gutterWidth
+        }
+        val contentRight = params.width - effectiveGutter
 
         val mainTop = 0f
         val mainBottom = panes.main
@@ -97,7 +120,7 @@ object ChartRenderer {
         val idx = crosshair?.let { state.viewport.logicalIndexAt(it.x.toDouble()).roundToInt().coerceIn(candles.indices) } ?: candles.lastIndex
         val key = listOf(
             System.identityHashCode(state.dataSnapshot), idx, System.identityHashCode(styles),
-            params.width, params.height, params.gutterWidth, params.legendTextSizePx,
+            params.width, params.height, effectiveGutter, params.legendTextSizePx,
             density, fontScale, panes, state.extraPaneLayout,
             crosshair != null, if (styles?.candle?.tooltip?.showType == "rect" || styles?.indicator?.tooltip?.showType == "rect") crosshair else null,
             theme, state.formatRevision, System.identityHashCode(state.formatConfig), state.getIndicators().map { listOf(it.id, System.identityHashCode(it.state), it.visible, it.params, it.precisionOverride, it.displayName(), it.yAxisId, System.identityHashCode(it.styles)) },
@@ -178,12 +201,65 @@ object ChartRenderer {
                     }
                 }
             } else {
-                drawLegend(state, theme, text, params.legendTextSizePx, crosshair, params.gutterWidth, params.width)
+                drawLegend(state, theme, text, params.legendTextSizePx, crosshair, effectiveGutter, params.width)
             }
         }
         if (crosshair != null) {
             drawCrosshairLabels(state, theme, text, crosshair, contentRight, legendHeight)
         }
+        // 帧末回写生效槽宽（仅屏幕路径；导出不回写），内容区宽与手势命中保持同源
+        if (policy != null && params.gutterFeedback) {
+            state.applyAxisGutter(params.width, effectiveGutter)
+        }
+    }
+
+    /**
+     * 右轴 gutter 内全部刻度文本（issue #1 槽宽实测来源；与各 pane 绘制同参同源）：
+     * 主图 [YAxisMath.ticks] 规格文本 + vol/macd/动态副图 [LinearYAxis.ticks]
+     * 经 [format]（调用方绑定 `ChartText::price`，测试可注入）。
+     */
+    internal fun axisGutterTexts(state: ChartState, format: (Double) -> String): List<String> {
+        if (state.dataSnapshot.candles.isEmpty()) return emptyList()
+        val texts = ArrayList<String>(16)
+        state.mainPaneRange()?.let { mpr ->
+            val (lo, hi) = state.axisDisplayRange("main", mpr)
+            for (t in YAxisMath.ticks(state.effectiveMainAxisSpec(), lo, hi, 5).ticks) texts.add(t.text)
+        }
+        val paneIds = buildList {
+            if (state.hasBuiltinPane("vol")) add("vol")
+            if (state.hasBuiltinPane("macd")) add("macd")
+            for ((pane, _) in state.extraPaneLayout) add(pane)
+        }
+        for (paneId in paneIds) {
+            val pr = state.paneVisibleRange(paneId) ?: continue
+            val (lo, hi) = state.axisDisplayRange(paneId, pr)
+            for (v in LinearYAxis.ticks(lo, hi, 3)) texts.add(format(v))
+        }
+        return texts
+    }
+
+    /**
+     * 末价/十字线 tag 所需槽宽（drawTag 几何：底色块 = contentRight+2 起、宽
+     * tagWidth 启发式；实测文本可能更宽）。十字线最坏文本按主区当前量级十位
+     * 锚点估算（上游 `widthAnchorValue` 移植）。无 tag 展示时返回 0。
+     */
+    private fun tagReservedWidth(state: ChartState, text: ChartText, theme: ChartTheme): Float {
+        if (!theme.lastPriceShow && !theme.crosshairShow) return 0f
+        val candles = state.dataSnapshot.candles
+        var measured = 0f
+        if (theme.lastPriceShow) {
+            measured = maxOf(measured, text.measureWidth(text.price(candles.last().close)))
+        }
+        if (theme.crosshairShow) {
+            val range = state.mainPaneRange()
+            if (range != null) {
+                val (lo, hi) = state.axisDisplayRange("main", range)
+                val anchored = AxisWidthPolicy.widthAnchorValue(lo, hi)
+                if (anchored.isFinite()) measured = maxOf(measured, text.measureWidth(text.price(anchored)))
+            }
+        }
+        if (measured <= 0f) return 0f
+        return AxisWidthPolicy.TAG_MARGIN_START + maxOf(text.tagWidth, measured)
     }
 
     private fun tooltipBounds(op: TooltipRenderer.DrawOp, measurer: androidx.compose.ui.text.TextMeasurer): Rect = when (op) {

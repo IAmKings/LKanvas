@@ -1349,6 +1349,30 @@ class ChartState(
         relayout()
     }
 
+    /**
+     * 右轴自适应槽宽（px，屏幕坐标；issue #1 / 上游 `yAxis.size='auto'` 平台移植）。
+     * [ChartRenderer] 每帧回写生效值（≥ 配置 rightAxisGutter 下限）；导出复用
+     * 以保持所见即所得。未启用自适应（policy 未注入/无数据）时为 0。
+     */
+    var axisGutterPx: Float = 0f
+        private set
+
+    /**
+     * 右轴自适应槽宽回写（ChartRenderer 帧末调用）：内容区宽随槽宽修正并
+     * 重布局（viewport 保持锚定）。变化小于 4px 网格阈值时忽略——防止
+     * "槽宽→内容宽→刻度文本→槽宽"回环抖动（与 AxisWidthPolicy.settle 同一防抖语义）。
+     */
+    fun applyAxisGutter(canvasWidthPx: Float, gutterPx: Float) {
+        if (canvasWidthPx <= 0f || gutterPx <= 0f) return
+        axisGutterPx = gutterPx
+        val newContent = (canvasWidthPx - gutterPx).coerceAtLeast(0f)
+        if (contentWidthPx > 0f &&
+            kotlin.math.abs(newContent - contentWidthPx) < io.lkanvas.compose.draw.AxisWidthPolicy.GRID_PX
+        ) return
+        contentWidthPx = newContent
+        relayout()
+    }
+
     /** 0.5.x 动态副图：每 pane 高度覆写（拖动分隔条写入；px）。 */
     private val extraPaneHeightOverride = HashMap<String, Float>()
 
