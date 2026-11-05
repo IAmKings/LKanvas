@@ -138,7 +138,12 @@ for _ in $(seq 1 "$MAX_POLLS"); do
       exit 1
       ;;
     "")
-      echo "[$(date +%H:%M:%S)] 状态暂不可读，继续轮询（原始响应: $STATUS_JSON）"
+      # beta03 发布实测：Portal status 5xx 时空状态分支触发 bash 对「$VAR）」
+      # 多字节邻接的解析缺陷（变量名吞入后续 UTF-8 字节报未绑定）。展开与
+      # 多字节字符解耦并设默认值，语义不变。
+      SNIP="$(printf '%s' "${STATUS_JSON:-}" | head -c 160 | tr '\n' ' ')"
+      echo "[$(date +%H:%M:%S)] 状态暂不可读，继续轮询，原始响应:"
+      printf '%s\n' "$SNIP"
       ;;
     *)
       echo "[$(date +%H:%M:%S)] 状态: $STATE"
